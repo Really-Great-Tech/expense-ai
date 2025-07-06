@@ -1,0 +1,5 @@
+## Maintainers ownership
+/** @papayaglobal/operations
+## Defaults
+# @papayaglobal/devops owns:
+/.github/CODEOWNERS @papayaglobal/devops
