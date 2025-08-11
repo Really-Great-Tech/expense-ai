@@ -8,5 +8,4 @@
 /.github/workflows/jira-validation.yaml @papayaglobal/devops
 /.github/workflows/manual-deploy.yaml @papayaglobal/devops
 /.github/workflows/run-tests.yaml @papayaglobal/devops
-/.github/workflows/sast.yaml @papayaglobal/devops
 /.github/CODEOWNERS @papayaglobal/devops
