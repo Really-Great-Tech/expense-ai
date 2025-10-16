@@ -19,7 +19,8 @@ jobs:
   Tests:
     uses: papayaglobal/workflows/.github/workflows/tests.yaml@main
     with:
-      node-ver: 20
+      node-ver: 22
       account: core
       allure-testresults-path: target/surefire-reports
+      lcov-report-path: coverage/coverage-summary.json
     secrets: inherit
