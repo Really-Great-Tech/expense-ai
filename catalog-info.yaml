@@ -15,6 +15,7 @@ metadata:
     - backend
     - node
   labels:
+    tier: "666"
     papayaglobal.com/division: payroll
   links:
     # Contacts:
