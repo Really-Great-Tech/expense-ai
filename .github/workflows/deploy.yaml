@@ -20,7 +20,7 @@ jobs:
     uses: papayaglobal/workflows/.github/workflows/deploy.yaml@main
     with:
       service-name: ${{ github.event.repository.name }}
-      node-ver: 20
+      node-ver: 22
       docker-context: ./
       dockerfile-path: ./Dockerfile
       runners: payroll
