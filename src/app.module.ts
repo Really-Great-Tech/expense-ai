@@ -1,0 +1,78 @@
+import { Module, MiddlewareConsumer, OnModuleInit } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import configuration from './config';
+import { DocumentModule } from './document/document.module';
+import { ProcessingModule } from './processing/processing.module';
+import { CountryPolicyModule } from './country-policy/country-policy.module';
+import { RedisConfigService } from './config/redis.config';
+import { BullModule } from '@nestjs/bull';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { SecurityMiddleware } from './middleware/security.middleware';
+import { DocumentSplitterModule } from './document-splitter/document-splitter.module';
+import { LoggerModule } from './logger/logger.module';
+import { HealthModule } from './health/health.module';
+import { DatabaseConfigValidator } from './config/database-validation';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+    }),
+    // Throttling
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const ttl = parseInt(configService.get<string>('THROTTLE_TTL', '60'), 10);
+        const limit = parseInt(configService.get<string>('THROTTLE_LIMIT', '100'), 10);
+
+        return {
+          throttlers: [
+            {
+              ttl,
+              limit,
+            },
+          ],
+        };
+      },
+    }),
+
+    // BullMQ for job queues
+    BullModule.forRootAsync({
+      useClass: RedisConfigService,
+    }),
+
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => configService.get('database'),
+      inject: [ConfigService],
+    }),
+    ScheduleModule.forRoot(),
+    DocumentModule,
+    DocumentSplitterModule,
+    ProcessingModule,
+    CountryPolicyModule,
+    LoggerModule,
+    HealthModule, // Health check endpoints for monitoring
+  ],
+  controllers: [AppController],
+  providers: [AppService, RedisConfigService],
+})
+export class AppModule implements OnModuleInit {
+  constructor(private configService: ConfigService) {}
+
+  onModuleInit() {
+    // Validate database configuration on startup
+    // This prevents dangerous misconfigurations in production
+    DatabaseConfigValidator.validate(this.configService);
+  }
+
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SecurityMiddleware).forRoutes('*');
+  }
+}

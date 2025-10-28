@@ -1,0 +1,253 @@
+import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
+
+/**
+ * Migration: Refactor Storage Columns
+ *
+ * Purpose: Migrate from S3-specific column names to storage-agnostic column names
+ * This enables the application to work with both local and S3 storage seamlessly.
+ *
+ * Changes:
+ * - Receipts table: s3_key -> storage_key, s3_bucket -> storage_bucket, add storage_type
+ * - Expense_documents table: s3_key -> storage_key, s3_bucket -> storage_bucket, add storage_type
+ *
+ * Strategy: Backward-compatible migration with data preservation
+ * 1. Add new columns
+ * 2. Migrate data from old columns to new
+ * 3. Drop old columns
+ */
+export class RefactorStorageColumns1736900000000 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // ========================================
+    // RECEIPTS TABLE
+    // ========================================
+
+    // Add new columns to receipts table
+    await queryRunner.addColumn('receipts', new TableColumn({
+      name: 'storage_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: true,
+    }));
+
+    await queryRunner.addColumn('receipts', new TableColumn({
+      name: 'storage_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: true,
+    }));
+
+    await queryRunner.addColumn('receipts', new TableColumn({
+      name: 'storage_type',
+    type: 'enum',
+      enum: ['local', 's3'],
+      default: "'local'",
+      isNullable: false,
+    }));
+
+    // Migrate data from old columns to new columns in receipts
+    await queryRunner.query(`
+      UPDATE receipts
+      SET
+        storage_key = CASE
+          WHEN s3_key LIKE 's3://%' THEN SUBSTRING(s3_key, LOCATE('/', s3_key, 6) + 1)
+          WHEN s3_key LIKE '/Users/%' OR s3_key LIKE '/app/%' OR s3_key LIKE 'uploads/%' THEN
+            CASE
+              WHEN s3_key LIKE '%/uploads/%' THEN SUBSTRING(s3_key, LOCATE('/uploads/', s3_key) + 9)
+              ELSE s3_key
+            END
+          ELSE s3_key
+        END,
+        storage_bucket = s3_bucket,
+        storage_type = CASE
+          WHEN s3_key LIKE 's3://%' THEN 's3'
+          ELSE 'local'
+        END
+      WHERE s3_key IS NOT NULL
+    `);
+
+    // Rename s3_url to storage_url in receipts
+    await queryRunner.renameColumn('receipts', 's3_url', 'storage_url');
+
+    // Make storage_key NOT NULL after data migration
+    await queryRunner.changeColumn('receipts', 'storage_key', new TableColumn({
+      name: 'storage_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: false,
+    }));
+
+    await queryRunner.changeColumn('receipts', 'storage_bucket', new TableColumn({
+      name: 'storage_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: false,
+    }));
+
+    // Drop old columns from receipts
+    await queryRunner.dropColumn('receipts', 's3_key');
+    await queryRunner.dropColumn('receipts', 's3_bucket');
+
+    // ========================================
+    // EXPENSE_DOCUMENTS TABLE
+    // ========================================
+
+    // Add new columns to expense_documents table
+    await queryRunner.addColumn('expense_documents', new TableColumn({
+      name: 'storage_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: true,
+    }));
+
+    await queryRunner.addColumn('expense_documents', new TableColumn({
+      name: 'storage_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: true,
+    }));
+
+    await queryRunner.addColumn('expense_documents', new TableColumn({
+      name: 'storage_type',
+      type: 'enum',
+      enum: ['local', 's3'],
+      default: "'local'",
+      isNullable: false,
+    }));
+
+    // Migrate data from old columns to new columns in expense_documents
+    await queryRunner.query(`
+      UPDATE expense_documents
+      SET
+        storage_key = CASE
+          WHEN s3_key LIKE 's3://%' THEN SUBSTRING(s3_key, LOCATE('/', s3_key, 6) + 1)
+          WHEN s3_key LIKE '/Users/%' OR s3_key LIKE '/app/%' OR s3_key LIKE 'uploads/%' THEN
+            CASE
+              WHEN s3_key LIKE '%/uploads/%' THEN SUBSTRING(s3_key, LOCATE('/uploads/', s3_key) + 9)
+              ELSE s3_key
+            END
+          ELSE s3_key
+        END,
+        storage_bucket = s3_bucket,
+        storage_type = CASE
+          WHEN s3_key LIKE 's3://%' THEN 's3'
+          ELSE 'local'
+        END
+      WHERE s3_key IS NOT NULL AND s3_key != ''
+    `);
+
+    // Rename s3_url to storage_url in expense_documents
+    await queryRunner.renameColumn('expense_documents', 's3_url', 'storage_url');
+
+    // Make storage_key nullable for expense_documents (some may not have files uploaded yet)
+    await queryRunner.changeColumn('expense_documents', 'storage_key', new TableColumn({
+      name: 'storage_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: true,
+      default: "''",
+    }));
+
+    await queryRunner.changeColumn('expense_documents', 'storage_bucket', new TableColumn({
+      name: 'storage_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: true,
+      default: "''",
+    }));
+
+    // Drop old columns from expense_documents
+    await queryRunner.dropColumn('expense_documents', 's3_key');
+    await queryRunner.dropColumn('expense_documents', 's3_bucket');
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // ========================================
+    // RECEIPTS TABLE ROLLBACK
+    // ========================================
+
+    // Add back old columns to receipts
+    await queryRunner.addColumn('receipts', new TableColumn({
+      name: 's3_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: true,
+    }));
+
+    await queryRunner.addColumn('receipts', new TableColumn({
+      name: 's3_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: true,
+    }));
+
+    // Migrate data back to old columns in receipts
+    await queryRunner.query(`
+      UPDATE receipts
+      SET
+        s3_key = storage_key,
+        s3_bucket = storage_bucket
+      WHERE storage_key IS NOT NULL
+    `);
+
+    // Make s3_key NOT NULL
+    await queryRunner.changeColumn('receipts', 's3_key', new TableColumn({
+      name: 's3_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: false,
+    }));
+
+    await queryRunner.changeColumn('receipts', 's3_bucket', new TableColumn({
+      name: 's3_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: false,
+    }));
+
+    // Rename storage_url back to s3_url in receipts
+    await queryRunner.renameColumn('receipts', 'storage_url', 's3_url');
+
+    // Drop new columns from receipts
+    await queryRunner.dropColumn('receipts', 'storage_key');
+    await queryRunner.dropColumn('receipts', 'storage_bucket');
+    await queryRunner.dropColumn('receipts', 'storage_type');
+
+    // ========================================
+    // EXPENSE_DOCUMENTS TABLE ROLLBACK
+    // ========================================
+
+    // Add back old columns to expense_documents
+    await queryRunner.addColumn('expense_documents', new TableColumn({
+      name: 's3_key',
+      type: 'varchar',
+      length: '500',
+      isNullable: true,
+      default: "''",
+    }));
+
+    await queryRunner.addColumn('expense_documents', new TableColumn({
+      name: 's3_bucket',
+      type: 'varchar',
+      length: '255',
+      isNullable: true,
+      default: "''",
+    }));
+
+    // Migrate data back to old columns in expense_documents
+    await queryRunner.query(`
+      UPDATE expense_documents
+      SET
+        s3_key = storage_key,
+        s3_bucket = storage_bucket
+      WHERE storage_key IS NOT NULL
+    `);
+
+    // Rename storage_url back to s3_url in expense_documents
+    await queryRunner.renameColumn('expense_documents', 'storage_url', 's3_url');
+
+    // Drop new columns from expense_documents
+    await queryRunner.dropColumn('expense_documents', 'storage_key');
+    await queryRunner.dropColumn('expense_documents', 'storage_bucket');
+    await queryRunner.dropColumn('expense_documents', 'storage_type');
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "receiptStandards": [
+    {
+      "required_data": "Supplier business name",
+      "travel_non_travel_both": "Both",
+      "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Mileage, Entertainment, Utilities, Professional services, Medical",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Document must show supplier business name"
+    },
+    {
+      "required_data": "Transaction date",
+      "travel_non_travel_both": "Both",
+      "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Mileage, Entertainment, Utilities, Professional services, Medical",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Document must show transaction date"
+    },
+    {
+      "required_data": "Total amount in local currency",
+      "travel_non_travel_both": "Both",
+      "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Mileage, Entertainment, Utilities, Professional services, Medical",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Document must show total amount"
+    },
+    {
+      "required_data": "ICP company details",
+      "travel_non_travel_both": "Non-Travel",
+      "expense_type": "Office supplies, Software, Equipment, Training, Utilities, Professional services",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Invoice must show Global People IT-Services GmbH, Kärntner Ring 12, A-1010 Vienna, Austria VAT ID: ATU77112189 - The Local Employers name and details should appear on invoices, not the workers"
+    },
+    {
+      "required_data": "Employee name as guest/traveler",
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Hotel, Flight",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Hotel/flights invoices should indicate the name of the worker not the end client"
+    },
+    {
+      "required_data": "Tax receipt or invoice format",
+      "travel_non_travel_both": "Both",
+      "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Mileage, Entertainment, Utilities, Professional services, Medical",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+    },
+    {
+      "required_data": "Kilometers traveled",
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Mileage",
+      "icp_name": "Global People IT-Services GmbH",
+      "mandatory_optional": "Mandatory",
+      "rule": "To claim mileage, a record of kilometers traveled must be submitted"
+    }
+  ],
+  "compliancePoliciesGrossUpRelated": [
+    {
+      "travel_non_travel_both": "Non-Travel",
+      "expense_type": "Office supplies, Software, Equipment, Utilities, Professional services",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": false,
+      "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt"
+    },
+    {
+      "travel_non_travel_both": "Non-Travel",
+      "expense_type": "Training",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": true,
+      "gross_up_rule": "All expenses that has been approved by the client as a business expense will be NET to the employee (grossed up if not tax free)"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Mileage",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": true,
+      "gross_up_rule": "Maximum €0.42 per betrieblich gefahrenen kilometer, maximum €12,600 per year steuerfrei. Parking tickets taxed if paid outside of Mileage payment"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Hotel",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": true,
+      "gross_up_rule": "Lodging should be paid separately upon receiving the proper invoice/receipt or €15 without a receipt. With proper receipt can be reimbursed in full tax-free"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Restaurant",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": true,
+      "gross_up_rule": "Domestic: maximum €26.40 per day tax-free (12 hours maximum). If meals provided by employer/host, per diem reduced by 50%. International: government per diem rates apply, daily rate may be increased but receipt required for amount above set rate to be tax-exempt"
+    },
+    {
+      "travel_non_travel_both": "Both",
+      "expense_type": "Entertainment, Medical",
+      "icp_name": "Global People IT-Services GmbH",
+      "gross_up": true,
+      "gross_up_rule": "Other expenses are subject to varying tax rules. All approved expenses will be NET to employee (grossed up) if not tax free"
+    }
+  ],
+  "compliancePoliciesAdditionalInfoRelated": [
+    {
+      "travel_non_travel_both": "Non-Travel",
+      "expense_type": "Training",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "Training expenses require the approval of the direct manager"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Mileage",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "Travel reporting template must be submitted. Map with the relevant route (google maps is sufficient) required. Voraussetzung für die steuerfreie Behandlung der Kilometergelder ist die genaue fortlaufende Führung eines Fahrtenbuches oder eines anderen gleichwertigen Nachweises"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Restaurant, Hotel, Flight",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "Travel expenses must be submitted using the travel report template"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Restaurant",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "Domestic business trips: per diem entitlement for workers who travel more than 25 kilometres from their place of business. Per diem method cannot be mixed with actual expenses - need to agree with worker on one method per business trip"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Restaurant",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "International business trips: per diem method cannot be mixed with actual expenses - need to agree with worker on one method per business trip. If lunch and dinner are provided on trip, per diem allowance reduced by two thirds"
+    },
+    {
+      "travel_non_travel_both": "Travel",
+      "expense_type": "Restaurant",
+      "icp_name": "Global People IT-Services GmbH",
+      "additional_info_required": true,
+      "additional_info_rule": "International travel: can choose to pay worker the per diem rate in advance of the trip or upon their return"
+    }
+  ]
+}
