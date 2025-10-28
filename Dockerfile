@@ -3,6 +3,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /usr/src/app
 
+# Install build dependencies required for native modules
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
@@ -11,8 +14,8 @@ COPY nest-cli.json ./
 RUN npm ci
 
 COPY . .
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
-
 # Production stage
 FROM node:22-alpine AS production
 
@@ -21,8 +24,12 @@ ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /usr/src/app
 
-# Install curl for health checks with pinned version
-RUN apk add --no-cache curl=8.9.1-r2
+# Install system dependencies including Python and build tools for native modules
+RUN apk add --no-cache \
+    curl=8.14.1-r2 \
+    python3 \
+    make \
+    g++
 
 COPY package*.json ./
 
@@ -33,6 +40,9 @@ COPY --from=builder /usr/src/app/dist ./dist
 
 # Copy the expense schema file needed at runtime
 COPY expense_file_schema.json ./
+
+# Copy country seed data for migrations
+COPY country_seed ./country_seed
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
@@ -67,4 +77,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Use entrypoint script for flexible migration control
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

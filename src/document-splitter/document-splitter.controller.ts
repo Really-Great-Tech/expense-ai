@@ -55,22 +55,24 @@ export class DocumentSplitterController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'PDF document file (max 50MB)',
+          description: 'document file (max 50MB)',
         },
         userId: {
           type: 'string',
-          description: 'User ID initiating the split and used for storage/processing ownership',
+          description: 'unique identifier for the user uploading the document',
           example: 'user_12345',
         },
         country: {
           type: 'string',
           description: 'Country code for downstream compliance processing',
-          example: 'US',
+          example: 'Germany',
+          default: 'Germany',
         },
         icp: {
           type: 'string',
           description: 'ICP (Internal Control Procedure) or policy context for downstream processing',
-          example: 'DEFAULT',
+          default: 'Global People',
+          example: 'Global People',
         },
         documentReader: {
           type: 'string',

@@ -36,7 +36,9 @@ lerna-debug.log*
 
 # Environment Variables
 .env
+# Ignore private keys but allow public certs in certs/ directory
 *.pem
+!certs/*.pem
 
 # Lock files (only use npm)
 bun.lock

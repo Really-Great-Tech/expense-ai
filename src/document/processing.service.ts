@@ -70,18 +70,24 @@ export class ExpenseProcessingService {
 
       const parallelGroup2Start = Date.now();
 
-      const [compliance, citations] = await Promise.all([
-        this.runIssueDetection(
-          country,
-          classification.expense_type || 'unknown',
-          icp,
-          complianceData,
-          extraction,
-          timing,
-          agents.issueDetectionAgent,
-        ),
-        this.runCitationGeneration(extraction, markdownContent, filename, timing, agents.citationGeneratorAgent),
-      ]);
+      const compliance = await this.runIssueDetection(
+        country,
+        classification.expense_type || 'unknown',
+        icp,
+        complianceData,
+        extraction,
+        timing,
+        agents.issueDetectionAgent,
+      );
+
+      const citations={}
+      // const citations = await this.runCitationGeneration(
+      //   extraction,
+      //   markdownContent,
+      //   filename,
+      //   timing,
+      //   agents.citationGeneratorAgent,
+      // );
 
       const parallelGroup2End = Date.now();
       const parallelGroup2Duration = (parallelGroup2End - parallelGroup2Start) / 1000;
