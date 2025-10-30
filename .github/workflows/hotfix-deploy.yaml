@@ -1,0 +1,31 @@
+name: Hotfix-CICD
+
+on:
+  workflow_dispatch:
+    inputs:
+      environments:
+        description: 'Which environments to release to'
+        required: true
+        type: choice
+        options:
+          - '["customer-sandbox-1"]'
+          - '["production"]'
+          - '["customer-sandbox-1", "production"]'
+
+jobs:
+  Tests:
+    uses: ./.github/workflows/run-tests.yaml
+    secrets: inherit
+  CICD:
+    uses: papayaglobal/workflows/.github/workflows/manual-deploy.yaml@main
+    needs: Tests
+    with:
+      service-name: ${{ github.event.repository.name }}
+      node-ver: 22
+      docker-context: ./
+      dockerfile-path: ./Dockerfile
+      runners: payroll
+      account: core
+      environments: ${{ inputs.environments }}
+      hotfix-tag: 'true'
+    secrets: inherit
