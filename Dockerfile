@@ -71,10 +71,7 @@ ENV CI=true
 EXPOSE 3000
 EXPOSE 9229
 
-# Health check instruction
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/health-check || exit 1
 
 # Use entrypoint script for flexible migration control
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/main"]
