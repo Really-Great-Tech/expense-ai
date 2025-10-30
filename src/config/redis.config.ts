@@ -153,13 +153,13 @@ export class RedisConfigService implements BullOptionsFactory, SharedBullConfigu
     const tlsEnabled = this.configService.get('REDIS_TLS_ENABLED', 'true') === 'true';
     // Use configuration endpoint for automatic node discovery
     // Format: my-cluster.xxxx.clustercfg.use1.cache.amazonaws.com
-    const clusterEndpoint = this.configService.get('REDIS_CLUSTER_ENDPOINT');
+    const clusterEndpoint = this.configService.get('REDIS_HOST');
     const port = parseInt(this.configService.get('REDIS_PORT', '6379'), 10);
     const username = this.configService.get('REDIS_USERNAME'); // Optional: Only needed if ACL is enabled
     const password = this.configService.get('REDIS_PASSWORD');
 
     if (!clusterEndpoint) {
-      throw new Error('REDIS_CLUSTER_ENDPOINT is required when REDIS_CLUSTER_ENABLED=true');
+      throw new Error('REDIS_HOST is required when REDIS_CLUSTER_ENABLED=true');
     }
 
     // Configuration endpoint auto-discovers all cluster nodes
