@@ -10,7 +10,7 @@ import { RedisHealthIndicator } from './redis-health.indicator';
  * Used by load balancers, monitoring systems, and DevOps tooling.
  */
 @ApiTags('health')
-@Controller('health')
+@Controller('expenses-ai')
 export class HealthController {
   constructor(
     private health: HealthCheckService,
@@ -21,7 +21,7 @@ export class HealthController {
   /**
    * Complete health check - checks all dependencies
    */
-  @Get()
+  @Get('health')
   @HealthCheck()
   @ApiOperation({ summary: 'Check overall system health' })
   @ApiResponse({ status: 200, description: 'System is healthy' })
@@ -37,9 +37,24 @@ export class HealthController {
   }
 
   /**
+   * Readiness check endpoint - indicates pod is ready to accept traffic
+   * Returns 200 immediately without checking dependencies
+   */
+  @Get('ready')
+  @ApiOperation({ summary: 'Check if application is ready to accept requests' })
+  @ApiResponse({ status: 200, description: 'Application is ready' })
+  ready() {
+    return {
+      status: 'ok',
+      message: 'Application is ready to accept requests',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
    * Redis-only health check
    */
-  @Get('/redis')
+  @Get('health/redis')
   @HealthCheck()
   @ApiOperation({ summary: 'Check Redis/Queue health only' })
   @ApiResponse({ status: 200, description: 'Redis is healthy' })
@@ -53,7 +68,7 @@ export class HealthController {
   /**
    * Database-only health check
    */
-  @Get('/database')
+  @Get('health/database')
   @HealthCheck()
   @ApiOperation({ summary: 'Check database health only' })
   @ApiResponse({ status: 200, description: 'Database is healthy' })
