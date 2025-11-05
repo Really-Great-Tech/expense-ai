@@ -7,6 +7,7 @@ metadata:
     github.com/project-slug: papayaglobal/expenses-ai
     backstage.io/techdocs-ref: dir:.
     backstage.io/code-coverage: enabled
+    grafana/tag-selector: 'expenses-ai'
     backstage.io/kubernetes-namespace: "papaya"
     backstage.io/kubernetes-label-selector: 'app.kubernetes.io/name=expenses-ai'
     argocd/app-name: "expenses-ai"
