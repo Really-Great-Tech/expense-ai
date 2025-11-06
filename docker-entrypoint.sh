@@ -12,14 +12,14 @@ TYPEORM_MIGRATIONS_RUN=${TYPEORM_MIGRATIONS_RUN:-false}
 
 if [ "$TYPEORM_MIGRATIONS_RUN" = "true" ]; then
     echo "📦 Running database migrations..."
-    npx typeorm migration:run -d dist/src/config/database.js || {
+    npx typeorm migration:run -d dist/config/database.js || {
         echo "❌ Migration failed! Exiting..."
         exit 1
     }
     echo "✅ Migrations completed successfully"
 elif [ "$TYPEORM_MIGRATIONS_RUN" = "check" ]; then
     echo "🔍 Checking migration status..."
-    npx typeorm migration:show -d dist/src/config/database.js
+    npx typeorm migration:show -d dist/config/database.js
 else
     echo "⏭️  Skipping migrations (TYPEORM_MIGRATIONS_RUN=${TYPEORM_MIGRATIONS_RUN})"
 fi
@@ -32,7 +32,7 @@ if [ "$CHECK_DB_CONNECTION" = "true" ]; then
     attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if npx typeorm query "SELECT 1" -d dist/src/config/database.js >/dev/null 2>&1; then
+        if npx typeorm query "SELECT 1" -d dist/config/database.js >/dev/null 2>&1; then
             echo "✅ Database connection successful"
             break
         fi

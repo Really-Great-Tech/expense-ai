@@ -32,9 +32,14 @@ RUN apk add --no-cache \
     g++
 
 COPY package*.json ./
+COPY tsconfig*.json ./
 
 # Install only production dependencies
 RUN npm ci --omit=dev
+
+# Install TypeORM CLI dependencies needed for migration commands
+# These are required for 'npx typeorm migration:run' to work
+RUN npm install --save-dev typeorm ts-node @types/node
 
 COPY --from=builder /usr/src/app/dist ./dist
 
