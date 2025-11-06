@@ -89,13 +89,13 @@ export class RedisHealthIndicator extends HealthIndicator {
    * Create managed Redis connection (AWS ElastiCache)
    */
   private createManagedRedisConnection(): Redis {
-    const endpoint = this.configService.get('REDIS_ENDPOINT');
+    const endpoint = this.configService.get('REDIS_HOST');
     const port = this.configService.get('REDIS_PORT', 6379);
     const password = this.configService.get('REDIS_PASSWORD');
     const tlsEnabled = this.configService.get('REDIS_TLS_ENABLED', 'false') === 'true';
 
     if (!endpoint) {
-      throw new Error('REDIS_ENDPOINT is required when REDIS_MODE=managed');
+      throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
     }
 
     const config: any = {
