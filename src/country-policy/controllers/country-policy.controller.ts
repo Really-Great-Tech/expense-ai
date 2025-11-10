@@ -7,13 +7,14 @@ import {
   ParseIntPipe,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiExcludeController } from '@nestjs/swagger';
 import { CountryPolicyService } from '../services/country-policy.service';
 import { Country } from '../entities/country.entity';
 import { Version } from '../entities/version.entity';
 import { CountryPolicy } from '../entities/country-policy.entity';
 import { Datasource } from '../entities/datasource.entity';
 
+@ApiExcludeController()
 @ApiTags('Country Policies')
 @Controller('country-policies')
 export class CountryPolicyController {

@@ -75,6 +75,11 @@ async function bootstrap() {
       }),
     );
 
+    // Set global API prefix for all routes except health endpoints
+    app.setGlobalPrefix('expenses-ai/api', {
+      exclude: ['expenses-ai/health', 'expenses-ai/ready', 'expenses-ai/health/redis', 'expenses-ai/health/database', 'health-check'],
+    });
+
     // Swagger configuration
     const config = new DocumentBuilder()
       .setTitle('Expense ai ')
@@ -84,7 +89,7 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api', app, document);
+    SwaggerModule.setup('expenses-ai/api/docs', app, document);
 
     const port = configService.get('PORT', 3000);
     app.enableShutdownHooks();

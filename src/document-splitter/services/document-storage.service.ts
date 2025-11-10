@@ -68,6 +68,33 @@ export class DocumentStorageService {
     return { storagePath: storageKey, storageDetails };
   }
 
+  /**
+   * Upload original file directly without splitting
+   * Used by single-receipt fast-path
+   */
+  async uploadOriginalFile(
+    file: Express.Multer.File,
+    expenseDocumentId: string,
+    uploadedBy: string,
+  ): Promise<{ storagePath: string; storageDetails: StorageDetails }> {
+    const safeFileName = file.originalname;
+    const key = `receipts/${uploadedBy}/${expenseDocumentId}/${safeFileName}`;
+
+    // Upload returns logical key (same for both local and S3)
+    const storageKey = await this.storageService.uploadFile(file.buffer, key, {
+      originalName: safeFileName,
+      source: 'single-receipt',
+      parentDocument: expenseDocumentId,
+    });
+
+    // Build storage metadata using resolver
+    const storageDetails = this.storageResolver.buildStorageMetadata(storageKey);
+
+    this.logger.log(`Uploaded original file: ${storageKey} (${storageDetails.storageType})`);
+
+    return { storagePath: storageKey, storageDetails };
+  }
+
   async cleanupTempDirectory(tempDir: string): Promise<void> {
     try {
       await fs.rm(tempDir, { recursive: true, force: true });

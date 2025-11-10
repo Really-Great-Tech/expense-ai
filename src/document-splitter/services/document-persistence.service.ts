@@ -14,6 +14,13 @@ export interface ReceiptCreationData {
   sourceDocumentId: string;
 }
 
+export interface SingleReceiptCreationData {
+  storageDetails: StorageDetails;
+  sourceDocumentId: string;
+  fileName: string;
+  fileSize: number;
+}
+
 @Injectable()
 export class DocumentPersistenceService {
   private readonly logger = new Logger(DocumentPersistenceService.name);
@@ -131,6 +138,41 @@ export class DocumentPersistenceService {
   async getReceiptsByDocumentId(documentId: string): Promise<Receipt[]> {
     return await this.receiptRepository.find({
       where: { sourceDocumentId: documentId },
+    });
+  }
+
+  /**
+   * Create a single receipt from a document that doesn't require splitting
+   * Used by the single-receipt endpoint
+   */
+  async createSingleReceipt(data: SingleReceiptCreationData): Promise<Receipt> {
+    return await this.expenseDocumentRepository.manager.transaction(async (manager) => {
+      const receiptRepository = manager.getRepository(Receipt);
+
+      const receipt = receiptRepository.create({
+        sourceDocumentId: data.sourceDocumentId,
+        storageKey: data.storageDetails.storageKey,
+        storageBucket: data.storageDetails.storageBucket,
+        storageType: data.storageDetails.storageType,
+        storageUrl: data.storageDetails.storageUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        status: ReceiptStatus.CREATED,
+        extractedText: '', // Will be populated during receipt processing
+        metadata: {
+          receiptNumber: 1,
+          pageNumbers: [1],
+          totalPages: 1,
+          splitConfidence: 1.0,
+          splitReasoning: 'Single receipt upload (no splitting required)',
+          singleReceiptFastPath: true,
+        },
+      });
+
+      const savedReceipt = await receiptRepository.save(receipt);
+      this.logger.log(`Created single receipt`, { receiptId: savedReceipt.id });
+
+      return savedReceipt;
     });
   }
 

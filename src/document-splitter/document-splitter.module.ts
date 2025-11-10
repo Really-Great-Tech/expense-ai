@@ -2,6 +2,8 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentSplitterController } from './document-splitter.controller';
+import { SingleReceiptController } from './single-receipt.controller';
+import { CleanupController } from './cleanup.controller';
 import { DocumentSplitterService } from './document-splitter.service';
 import { FileValidationService } from './services/file-validation.service';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
@@ -31,7 +33,7 @@ import { DocumentReference } from '../document/entities/document-reference.entit
       name: QUEUE_NAMES.EXPENSE_PROCESSING,
     }),
   ],
-  controllers: [DocumentSplitterController],
+  controllers: [DocumentSplitterController, SingleReceiptController, CleanupController],
   providers: [
     DocumentSplitterService,
     FileValidationService,

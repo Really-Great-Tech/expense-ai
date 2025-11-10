@@ -2,17 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DocumentController } from './document.controller';
 import { DocumentService } from './document.service';
-import { createMockFile, mockProcessingStatus, mockJobData } from '../../test/utils/test-helpers';
+import { mockProcessingStatus } from '../../test/utils/test-helpers';
 
 describe('DocumentController', () => {
   let controller: DocumentController;
   let documentService: DocumentService;
 
   const mockDocumentService = {
-    queueDocumentProcessing: jest.fn(),
     getProcessingStatus: jest.fn(),
     getProcessingResults: jest.fn(),
-    getComplianceResults: jest.fn(),
     listJobs: jest.fn(),
     cancelJob: jest.fn(),
     getProcessingMetrics: jest.fn(),
@@ -35,86 +33,6 @@ describe('DocumentController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('processDocument', () => {
-    const mockFile = createMockFile();
-    const validBody = {
-      userId: 'test-user-123',
-      country: 'Germany',
-      icp: 'Global People',
-      documentReader: 'textract',
-      metadata: {
-        userAgent: 'TestApp/1.0',
-        ipAddress: '192.168.1.1',
-        clientId: 'client-123',
-      },
-    };
-
-    it('should successfully process a document', async () => {
-      mockDocumentService.queueDocumentProcessing.mockResolvedValue(mockJobData);
-
-      const result = await controller.processDocument(mockFile, validBody);
-
-      expect(documentService.queueDocumentProcessing).toHaveBeenCalledWith({
-        file: mockFile,
-        userId: validBody.userId,
-        country: validBody.country,
-        icp: validBody.icp,
-        documentReader: validBody.documentReader,
-        actualUserId: validBody.userId,
-        metadata: validBody.metadata,
-      });
-
-      expect(result).toEqual({
-        success: true,
-        message: 'Expense document processing job created successfully',
-        data: mockJobData,
-      });
-    });
-
-    it('should use default values when optional parameters are not provided', async () => {
-      const minimalBody = { userId: 'test-user-123' };
-      mockDocumentService.queueDocumentProcessing.mockResolvedValue(mockJobData);
-
-      await controller.processDocument(mockFile, minimalBody);
-
-      expect(documentService.queueDocumentProcessing).toHaveBeenCalledWith({
-        file: mockFile,
-        userId: minimalBody.userId,
-        country: 'Germany',
-        icp: 'Global People',
-        documentReader: 'textract',
-        actualUserId: minimalBody.userId,
-        metadata: undefined,
-      });
-    });
-
-    it('should throw HttpException when no file is uploaded', async () => {
-      await expect(controller.processDocument(null, validBody)).rejects.toThrow(
-        new HttpException('No file uploaded', HttpStatus.BAD_REQUEST)
-      );
-    });
-
-    it('should throw HttpException when userId is missing', async () => {
-      const bodyWithoutUserId = { ...validBody, userId: undefined };
-
-      await expect(controller.processDocument(mockFile, bodyWithoutUserId as any)).rejects.toThrow(
-        new HttpException('userId is required', HttpStatus.BAD_REQUEST)
-      );
-    });
-
-    it('should handle service errors', async () => {
-      const serviceError = new Error('Service unavailable');
-      mockDocumentService.queueDocumentProcessing.mockRejectedValue(serviceError);
-
-      await expect(controller.processDocument(mockFile, validBody)).rejects.toThrow(
-        new HttpException(
-          'Failed to queue expense document processing: Service unavailable',
-          HttpStatus.INTERNAL_SERVER_ERROR
-        )
-      );
-    });
   });
 
   describe('getProcessingStatus', () => {
@@ -180,35 +98,6 @@ describe('DocumentController', () => {
 
       await expect(controller.getProcessingResults(jobId)).rejects.toThrow(
         new HttpException('Failed to get job results: Processing error', HttpStatus.INTERNAL_SERVER_ERROR)
-      );
-    });
-  });
-
-  describe('getComplianceResults', () => {
-    const jobId = 'test-job-123';
-
-    it('should return compliance results for completed job', async () => {
-      const mockComplianceResults = {
-        classification: { is_expense: true },
-        extraction: { amount: 100 },
-        compliance: { validation_result: { is_valid: true, issues: [] } },
-      };
-      mockDocumentService.getComplianceResults.mockResolvedValue(mockComplianceResults);
-
-      const result = await controller.getComplianceResults(jobId);
-
-      expect(documentService.getComplianceResults).toHaveBeenCalledWith(jobId);
-      expect(result).toEqual({
-        success: true,
-        data: mockComplianceResults,
-      });
-    });
-
-    it('should throw HttpException when job is not found or not completed', async () => {
-      mockDocumentService.getComplianceResults.mockResolvedValue(null);
-
-      await expect(controller.getComplianceResults(jobId)).rejects.toThrow(
-        new HttpException('Job not found or not completed', HttpStatus.NOT_FOUND)
       );
     });
   });

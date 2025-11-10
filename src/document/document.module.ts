@@ -23,6 +23,8 @@ import { ReceiptProcessingResult } from './entities/receipt-processing-result.en
 import { ReceiptProcessingResultRepository } from './repositories/receipt-processing-result.repository';
 import { ReceiptResultsQueryService } from './services/receipt-results-query.service';
 import { ReceiptResultsController } from './controllers/receipt-results.controller';
+import { ExpenseStatusService } from './services/expense-status.service';
+import { ExpenseStatusController } from './controllers/expense-status.controller';
 
 // Import document splitter dependencies
 import { DocumentSplitterModule } from '../document-splitter/document-splitter.module';
@@ -104,7 +106,7 @@ import * as path from 'path';
       },
     ]),
   ],
-  controllers: [DocumentController, ReceiptResultsController],
+  controllers: [DocumentController, ReceiptResultsController, ExpenseStatusController],
   providers: [
     DocumentService,
     AgentFactoryService,
@@ -117,6 +119,8 @@ import * as path from 'path';
     // New providers for receipt processing results
     ReceiptProcessingResultRepository,
     ReceiptResultsQueryService,
+    // Expense status service
+    ExpenseStatusService,
   ],
   exports: [
     DocumentService,

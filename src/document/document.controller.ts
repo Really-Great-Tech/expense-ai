@@ -1,216 +1,20 @@
 import {
   Controller,
-  Post,
   Get,
   Delete,
   Param,
   Query,
-  UploadedFile,
-  UseInterceptors,
-  Body,
   HttpStatus,
   HttpException,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { DocumentService } from './document.service';
-import { ProcessDocumentResponseDto, ProcessingStatusResponseDto, ErrorResponseDto, ValidationErrorResponseDto } from './dto';
+import { ProcessingStatusResponseDto, ErrorResponseDto } from './dto';
 
-@ApiTags('documents')
-@Controller('documents')
+@ApiTags('Processing Jobs')
+@Controller('jobs')
 export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
-
-  @Post('process')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      dest: './uploads/temp', // Temporary upload directory
-      limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB limit (matching env config)
-      },
-      fileFilter: (req, file, cb) => {
-        const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/tiff'];
-        if (allowedMimes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new Error('Invalid file type. Only PDF, PNG, JPG, JPEG, and TIFF files are allowed.'), false);
-        }
-      },
-    }),
-  )
-  @UsePipes(new ValidationPipe({ transform: true }))
-  @ApiOperation({
-    summary: 'Upload and process an expense document',
-    description:
-      'Upload an expense document (PDF, PNG, JPG, JPEG, TIFF) for AI-powered processing. The document will be analyzed to classify the expense type, extract structured data, detect compliance issues, and generate citations linking extracted data to source content.',
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    description: 'Expense document upload with processing parameters',
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description: 'Expense document file (PDF, PNG, JPG, JPEG, TIFF, max 10MB)',
-        },
-        userId: {
-          type: 'string',
-          description: 'User ID for hierarchical trace grouping (enables filename-based Job IDs)',
-          example: 'user_john_doe_123',
-        },
-        country: {
-          type: 'string',
-          description: 'Country for compliance requirements (default: Germany)',
-          example: 'Germany',
-          default: 'Germany',
-        },
-        icp: {
-          type: 'string',
-          description: 'ICP provider for compliance rules (default: Global People)',
-          example: 'Global People',
-          default: 'Global People',
-        },
-        documentReader: {
-          type: 'string',
-          description: 'Document reader to use for content extraction (default: textract)',
-          enum: ['textract', 'textract'],
-          example: 'textract',
-          default: 'textract',
-        },
-        metadata: {
-          type: 'object',
-          description: 'Optional metadata for user session tracking',
-          properties: {
-            userAgent: { type: 'string', example: 'MyApp/1.0' },
-            ipAddress: { type: 'string', example: '192.168.1.100' },
-            clientId: { type: 'string', example: 'client-abc-123' },
-          },
-        },
-      },
-      required: ['file', 'userId'],
-    },
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Document processing job created successfully',
-    type: ProcessDocumentResponseDto,
-    schema: {
-      example: {
-        success: true,
-        message: 'Document processing job created successfully',
-        data: {
-          jobId: 'restaurant_receipt.pdf_user_john_doe_123',
-          status: 'queued',
-          userId: 'user_john_doe_123',
-          sessionId: 'session_user_john_doe_123_2025-08-14T15-21-00-000Z_abc12345',
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid file or request parameters',
-    type: ErrorResponseDto,
-    schema: {
-      example: {
-        success: false,
-        message: 'Invalid file type. Only PDF, PNG, JPG, JPEG, and TIFF files are allowed.',
-        statusCode: 400,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/documents/process',
-      },
-    },
-  })
-  @ApiResponse({
-    status: 413,
-    description: 'File too large (max 10MB)',
-    type: ErrorResponseDto,
-    schema: {
-      example: {
-        success: false,
-        message: 'File size exceeds the 10MB limit',
-        statusCode: 413,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/documents/process',
-      },
-    },
-  })
-  @ApiResponse({
-    status: 422,
-    description: 'Validation error',
-    type: ValidationErrorResponseDto,
-    schema: {
-      example: {
-        success: false,
-        message: 'Validation failed',
-        statusCode: 422,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/documents/process',
-        errors: ['userId should not be empty', 'file must be provided'],
-      },
-    },
-  })
-  @ApiResponse({
-    status: 500,
-    description: 'Internal server error',
-    type: ErrorResponseDto,
-    schema: {
-      example: {
-        success: false,
-        message: 'Failed to queue document processing: Service temporarily unavailable',
-        statusCode: 500,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/documents/process',
-      },
-    },
-  })
-  async processDocument(
-    @UploadedFile() file: Express.Multer.File,
-    @Body()
-    body: {
-      userId: string; // Now this is the actual user ID (simplified)
-      country?: string;
-      icp?: string;
-      documentReader?: string;
-      metadata?: {
-        userAgent?: string;
-        ipAddress?: string;
-        clientId?: string;
-      };
-    },
-  ) {
-    if (!file) {
-      throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
-    }
-
-    if (!body.userId) {
-      throw new HttpException('userId is required', HttpStatus.BAD_REQUEST);
-    }
-
-    try {
-      const result = await this.documentService.queueDocumentProcessing({
-        file,
-        userId: body.userId, // This is now the actual user ID
-        country: body.country || 'Germany',
-        icp: body.icp || 'Global People',
-        documentReader: body.documentReader || 'textract',
-        actualUserId: body.userId, // Same as userId (simplified)
-        metadata: body.metadata,
-      });
-
-      return {
-        success: true,
-        message: 'Expense document processing job created successfully',
-        data: result,
-      };
-    } catch (error) {
-      throw new HttpException(`Failed to queue expense document processing: ${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
 
   @Get('status/:jobId')
   @ApiOperation({
@@ -263,7 +67,7 @@ export class DocumentController {
         message: 'Job not found',
         statusCode: 404,
         timestamp: '2025-01-15T10:30:00Z',
-        path: '/documents/status/job_123456789',
+        path: '/jobs/status/job_123456789',
       },
     },
   })
@@ -320,76 +124,7 @@ export class DocumentController {
     }
   }
 
-  @Get('compliance/:jobId')
-  @ApiOperation({
-    summary: 'Get filtered compliance results for a completed job',
-    description:
-      'Retrieve filtered processing results containing only classification, extraction, and compliance data with enhanced issue detection from image quality assessment',
-  })
-  @ApiParam({ name: 'jobId', description: 'Job ID to get compliance results for' })
-  @ApiResponse({
-    status: 200,
-    description: 'Compliance results retrieved successfully',
-    schema: {
-      example: {
-        success: true,
-        data: {
-          classification: {
-            is_expense: true,
-            expense_type: 'invoice',
-            language: 'English',
-          },
-          extraction: {
-            supplier_name: 'ABC Company',
-            amount: 100.5,
-            currency: 'EUR',
-          },
-          compliance: {
-            validation_result: {
-              is_valid: false,
-              issues_count: 2,
-              issues: [
-                {
-                  index: 1,
-                  issue_type: 'Standards & Compliance | Fix Identified',
-                  description: 'Missing VAT number',
-                  recommendation: 'Add VAT number to invoice',
-                },
-                {
-                  index: 2,
-                  issue_type: 'Image related | Blur Detection',
-                  description: 'Document shows significant blur affecting readability',
-                  recommendation: 'Rescan document with better focus',
-                },
-              ],
-            },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Job not found or not completed' })
-  async getComplianceResults(@Param('jobId') jobId: string) {
-    try {
-      const results = await this.documentService.getComplianceResults(jobId);
-
-      if (!results) {
-        throw new HttpException('Job not found or not completed', HttpStatus.NOT_FOUND);
-      }
-
-      return {
-        success: true,
-        data: results,
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(`Failed to get compliance results: ${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('jobs')
+  @Get()
   @ApiOperation({ summary: 'List processing jobs with optional filtering' })
   @ApiQuery({
     name: 'status',
@@ -435,7 +170,7 @@ export class DocumentController {
     }
   }
 
-  @Delete('jobs/:jobId')
+  @Delete(':jobId')
   @ApiOperation({ summary: 'Cancel a processing job' })
   @ApiParam({ name: 'jobId', description: 'Job ID to cancel' })
   @ApiResponse({ status: 200, description: 'Job cancelled successfully' })

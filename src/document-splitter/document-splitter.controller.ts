@@ -1,8 +1,6 @@
 import {
   Controller,
   Post,
-  Delete,
-  Param,
   UploadedFile,
   UseInterceptors,
   Body,
@@ -14,15 +12,14 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DocumentSplitterService } from './document-splitter.service';
 import { FileValidationService } from './services/file-validation.service';
 import { SplitRequestDto } from './dto/split-request.dto';
 import { SplitAnalysisResponseDto } from './dto/split-response.dto';
-import { SecurityFlag } from './types/file-validation.types';
 
-@ApiTags('document-splitter')
-@Controller('document-splitter')
+@ApiTags('Multi-Receipt Document Processing')
+@Controller('expenses/multi-receipt')
 export class DocumentSplitterController {
   private readonly logger = new Logger(DocumentSplitterController.name);
 
@@ -31,7 +28,7 @@ export class DocumentSplitterController {
     private readonly fileValidationService: FileValidationService,
   ) {}
 
-  @Post('analyze')
+  @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -43,40 +40,63 @@ export class DocumentSplitterController {
   )
   @UsePipes(new ValidationPipe({ transform: true }))
   @ApiOperation({
-    summary: 'Analyze document for multiple invoices and split into separate files',
-    description: 'Analyze document for multiple invoices and split into separate files',
+    summary: 'Upload Multi-Receipt Document & Split into Individual Receipts',
+    description: `
+**Process a document containing multiple expense receipts/invoices and automatically split them into individual files.**
+
+This endpoint intelligently analyzes PDF documents to:
+- 🔍 Detect multiple receipts/invoices within a single document
+- 📄 Split them into separate PDF files for each expense
+- 🤖 Use AI to identify receipt boundaries and extract key information
+- ✅ Validate file security and integrity before processing
+
+**Use Cases:**
+- Employee submits a scanned document with 5 restaurant receipts
+- Batch processing of multiple invoice pages from email attachments
+- Mobile app uploads of multi-page receipt documents
+
+**Processing Flow:**
+1. Upload document (PDF, up to 50MB)
+2. AI analyzes and detects individual receipts/invoices
+3. Creates separate PDF files for each expense
+4. Returns metadata with file paths and extracted information
+5. Each split file can be processed individually downstream
+
+**Note:** The splitter uses AWS Textract for OCR and page detection.
+The documentReader parameter specifies the reader for downstream processing of split files.
+    `,
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'PDF document upload with analysis parameters',
+    description: 'Upload a multi-expense document with processing parameters',
     schema: {
       type: 'object',
       properties: {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'document file (max 50MB)',
+          description: '📎 PDF document containing multiple receipts/invoices (max 50MB)',
         },
         userId: {
           type: 'string',
-          description: 'unique identifier for the user uploading the document',
+          description: '👤 Unique identifier for the user submitting expenses',
           example: 'user_12345',
         },
         country: {
           type: 'string',
-          description: 'Country code for downstream compliance processing',
+          description: '🌍 Country for compliance and policy validation (e.g., tax rules, receipt requirements)',
           example: 'Germany',
           default: 'Germany',
         },
         icp: {
           type: 'string',
-          description: 'ICP (Internal Control Procedure) or policy context for downstream processing',
+          description: '📋 Internal Control Procedure / Policy context (e.g., department, cost center)',
           default: 'Global People',
           example: 'Global People',
         },
         documentReader: {
           type: 'string',
-          description: 'Downstream document reader for receipt processing (splitter uses Textract internally)',
+          description: '🔧 OCR engine for downstream processing of split receipts (Textract is used internally for splitting)',
           enum: ['textract'],
           example: 'textract',
           default: 'textract',
@@ -87,37 +107,48 @@ export class DocumentSplitterController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Document analysis completed successfully',
+    description: '✅ Multi-expense document successfully split into individual receipts',
     type: SplitAnalysisResponseDto,
     schema: {
       example: {
         success: true,
         data: {
-          originalFileName: 'multi_invoices.pdf',
-          totalPages: 5,
+          originalFileName: 'employee_receipts_march_2025.pdf',
+          totalPages: 7,
           hasMultipleInvoices: true,
-          totalInvoices: 2,
+          totalInvoices: 3,
           invoices: [
             {
               invoiceNumber: 1,
               pages: [1, 2],
-              content: '# Page 1\n\nINVOICE #INV-001...\n\n---\n\n# Page 2\n\nContinued...',
+              content: '# Page 1\n\nRESTAURANT RECEIPT\nDate: 2025-03-15\nTotal: €45.50...',
               confidence: 0.95,
-              reasoning: 'Pages 1-2: Invoice #INV-001 from Company A',
+              reasoning: 'Pages 1-2: Restaurant receipt from Italian Bistro dated March 15, 2025',
               totalPages: 2,
-              pdfPath: '/temp/invoice-splits/1640995200000/invoice_1.pdf',
-              fileName: 'invoice_1.pdf',
+              pdfPath: '/temp/invoice-splits/1640995200000/expense_1_restaurant.pdf',
+              fileName: 'expense_1_restaurant.pdf',
               fileSize: 45823,
             },
             {
               invoiceNumber: 2,
-              pages: [3, 4, 5],
-              content: '# Page 3\n\nINVOICE #INV-002...',
+              pages: [3, 4],
+              content: '# Page 3\n\nHOTEL INVOICE\nDate: 2025-03-17\nTotal: €320.00...',
+              confidence: 0.92,
+              reasoning: 'Pages 3-4: Hotel invoice from Grand Hotel dated March 17, 2025',
+              totalPages: 2,
+              pdfPath: '/temp/invoice-splits/1640995200000/expense_2_hotel.pdf',
+              fileName: 'expense_2_hotel.pdf',
+              fileSize: 52341,
+            },
+            {
+              invoiceNumber: 3,
+              pages: [5, 6, 7],
+              content: '# Page 5\n\nTAXI RECEIPT\nDate: 2025-03-18\nTotal: €28.50...',
               confidence: 0.88,
-              reasoning: 'Pages 3-5: Invoice #INV-002 from Company B',
+              reasoning: 'Pages 5-7: Taxi receipts from various trips during March 18-20, 2025',
               totalPages: 3,
-              pdfPath: '/temp/invoice-splits/1640995200000/invoice_2.pdf',
-              fileName: 'invoice_2.pdf',
+              pdfPath: '/temp/invoice-splits/1640995200000/expense_3_transport.pdf',
+              fileName: 'expense_3_transport.pdf',
               fileSize: 67234,
             },
           ],
@@ -128,40 +159,40 @@ export class DocumentSplitterController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid file or request parameters',
+    description: '❌ Invalid file or missing required parameters',
     schema: {
       example: {
         success: false,
-        message: 'Invalid file type. Only PDF files are allowed for invoice splitting.',
+        message: 'Invalid file type. Only PDF files are supported for expense splitting.',
         statusCode: 400,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/invoice-splitter/analyze',
+        timestamp: '2025-03-15T10:30:00Z',
+        path: '/expenses/multi-receipt/upload',
       },
     },
   })
   @ApiResponse({
     status: 413,
-    description: 'File too large (max 50MB)',
+    description: '❌ File exceeds maximum allowed size',
     schema: {
       example: {
         success: false,
-        message: 'File size exceeds the 50MB limit',
+        message: 'File size exceeds the 50MB limit. Please compress or split your document.',
         statusCode: 413,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/invoice-splitter/analyze',
+        timestamp: '2025-03-15T10:30:00Z',
+        path: '/expenses/multi-receipt/upload',
       },
     },
   })
   @ApiResponse({
     status: 500,
-    description: 'Internal server error during analysis',
+    description: '❌ Processing failed due to internal error',
     schema: {
       example: {
         success: false,
-        message: 'Invoice analysis failed: LLM service unavailable',
+        message: 'Document analysis failed: AI service temporarily unavailable. Please try again.',
         statusCode: 500,
-        timestamp: '2025-01-15T10:30:00Z',
-        path: '/invoice-splitter/analyze',
+        timestamp: '2025-03-15T10:30:00Z',
+        path: '/expenses/multi-receipt/upload',
       },
     },
   })
@@ -263,52 +294,4 @@ export class DocumentSplitterController {
     }
   }
 
-  @Delete('cleanup/:tempDirectory')
-  @ApiOperation({
-    summary: 'Clean up temporary files from invoice splitting',
-  })
-  @ApiParam({
-    name: 'tempDirectory',
-    description: 'Temporary directory name to clean up (from analyze response)',
-    example: '1640995200000',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Temporary files cleaned up successfully',
-    schema: {
-      example: {
-        success: true,
-        message: 'Temporary files cleaned up successfully',
-      },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid directory parameter',
-    schema: {
-      example: {
-        success: false,
-        message: 'Invalid temp directory parameter',
-        statusCode: 400,
-      },
-    },
-  })
-  async cleanupTempFiles(@Param('tempDirectory') tempDirectory: string) {
-    if (!tempDirectory || tempDirectory.includes('..') || tempDirectory.includes('/')) {
-      throw new HttpException('Invalid temp directory parameter', HttpStatus.BAD_REQUEST);
-    }
-
-    try {
-      // Reconstruct full temp directory path
-      const fullTempPath = `uploads/invoice-splits/${tempDirectory}`;
-      await this.documentSplitterService.cleanupTempFiles(fullTempPath);
-
-      return {
-        success: true,
-        message: 'Temporary files cleaned up successfully',
-      };
-    } catch (error) {
-      throw new HttpException(`Cleanup failed: ${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
 }

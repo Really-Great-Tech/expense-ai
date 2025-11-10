@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, Logger } from '@nestjs/common';
 import { ReceiptResultsQueryService } from '../services/receipt-results-query.service';
 import { ProcessingStatus } from '../entities/receipt-processing-result.entity';
 
-@Controller('api/v1/receipts')
+@Controller('receipts')
 export class ReceiptResultsController {
   private readonly logger = new Logger(ReceiptResultsController.name);
 
@@ -10,7 +10,7 @@ export class ReceiptResultsController {
 
   /**
    * Get complete processing results for a specific receipt
-   * GET /api/v1/receipts/:receiptId/results
+   * GET /api/v1/expenses/results/:receiptId
    */
   @Get(':receiptId/results')
   async getResults(@Param('receiptId') receiptId: string) {
@@ -36,22 +36,6 @@ export class ReceiptResultsController {
       return await this.receiptResultsQuery.getReceiptStatus(receiptId);
     } catch (error) {
       this.logger.error(`Failed to fetch status for receipt ${receiptId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all receipt processing results for a document
-   * GET /api/v1/receipts/document/:documentId/results
-   */
-  @Get('document/:documentId/results')
-  async getDocumentResults(@Param('documentId') documentId: string) {
-    this.logger.log(`Fetching results for document ${documentId}`);
-
-    try {
-      return await this.receiptResultsQuery.getDocumentResults(documentId);
-    } catch (error) {
-      this.logger.error(`Failed to fetch results for document ${documentId}:`, error);
       throw error;
     }
   }

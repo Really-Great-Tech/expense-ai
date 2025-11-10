@@ -324,6 +324,131 @@ export class DocumentSplitterService {
     };
   }
 
+  /**
+   * Process a single receipt without splitting
+   * Fast-path that skips Textract OCR, LLM boundary detection, and PDF splitting
+   * @param file Uploaded file
+   * @param options Processing options
+   * @returns Processing response with single receipt
+   */
+  async processSingleReceipt(
+    file: Express.Multer.File,
+    options: {
+      documentReader?: string;
+      userId?: string;
+      country?: string;
+      icp?: string;
+    },
+  ): Promise<SplitAnalysisResponse> {
+    let expenseDocument: ExpenseDocument;
+
+    try {
+      this.logger.log(`Processing single receipt (fast-path): ${file.originalname}`, {
+        userId: options.userId,
+        fileSize: file.size,
+      });
+
+      // STEP A: Create ExpenseDocument
+      expenseDocument = await this.persistenceService.createOrGetExpenseDocument(file, options);
+
+      // Check if already processed
+      if (expenseDocument.status === DocumentStatus.COMPLETED) {
+        const existingReceipts = await this.persistenceService.getReceiptsByDocumentId(expenseDocument.id);
+        if (existingReceipts.length > 0) {
+          return this.buildResponseFromExisting(expenseDocument, existingReceipts);
+        }
+      }
+
+      // STEP B: Set PROCESSING status
+      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.PROCESSING, {
+        totalPages: 1,
+        processingMetadata: {
+          ...expenseDocument.processingMetadata,
+          singleReceiptFastPath: true,
+          startedAt: new Date().toISOString(),
+        },
+      });
+
+      // STEP C: Upload original file directly (no splitting)
+      const { storagePath, storageDetails } = await this.storageService.uploadOriginalFile(
+        file,
+        expenseDocument.id,
+        options.userId || 'anonymous',
+      );
+
+      // STEP D: Create single receipt entity
+      const receipt = await this.persistenceService.createSingleReceipt({
+        storageDetails,
+        sourceDocumentId: expenseDocument.id,
+        fileName: file.originalname,
+        fileSize: file.size,
+      });
+
+      // STEP E: Update document completion
+      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.COMPLETED, {
+        totalReceipts: 1,
+        processingMetadata: {
+          ...expenseDocument.processingMetadata,
+          completedAt: new Date().toISOString(),
+          totalReceipts: 1,
+          singleReceiptFastPath: true,
+        },
+      });
+
+      // STEP F: Enqueue receipt for downstream processing
+      await this.queueService.enqueueReceiptProcessing([receipt], options);
+
+      this.logger.log(`Single receipt processing completed (fast-path)`, {
+        expenseDocumentId: expenseDocument.id,
+        receiptId: receipt.id,
+      });
+
+      return {
+        success: true,
+        data: {
+          originalFileName: file.originalname,
+          totalPages: 1,
+          hasMultipleInvoices: false,
+          totalInvoices: 1,
+          invoices: [
+            {
+              invoiceNumber: 1,
+              pages: [1],
+              content: '',
+              confidence: 1.0,
+              reasoning: 'Single receipt upload (no splitting required)',
+              totalPages: 1,
+              pdfPath: null,
+              fileName: file.originalname,
+              fileSize: file.size,
+              storagePath: storagePath,
+              receiptId: receipt.id,
+            },
+          ],
+          tempDirectory: '',
+          expenseDocumentId: expenseDocument.id,
+          receiptIds: [receipt.id],
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Single receipt processing failed:`, error, {
+        expenseDocumentId: expenseDocument?.id,
+      });
+
+      if (expenseDocument) {
+        await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.FAILED, {
+          processingMetadata: {
+            ...expenseDocument.processingMetadata,
+            error: error.message,
+            failedAt: new Date().toISOString(),
+          },
+        });
+      }
+
+      throw error;
+    }
+  }
+
   async cleanupTempFiles(tempDirectory: string): Promise<void> {
     await this.storageService.cleanupTempDirectory(tempDirectory);
   }

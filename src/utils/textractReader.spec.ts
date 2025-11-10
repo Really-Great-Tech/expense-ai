@@ -1,6 +1,17 @@
-import * as fs from 'fs';
 import { TextractApiService } from './textractReader';
 import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand } from '@aws-sdk/client-textract';
+
+// Mock fs module with controllable implementations
+const mockExistsSync = jest.fn();
+const mockStatSync = jest.fn();
+const mockReadFileSync = jest.fn();
+
+jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
+  existsSync: (...args: any[]) => mockExistsSync(...args),
+  statSync: (...args: any[]) => mockStatSync(...args),
+  readFileSync: (...args: any[]) => mockReadFileSync(...args),
+}));
 
 jest.mock('@aws-sdk/client-textract', () => {
   const actual = jest.requireActual('@aws-sdk/client-textract');
@@ -18,19 +29,21 @@ describe('TextractApiService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
+    mockExistsSync.mockReset();
+    mockStatSync.mockReset();
+    mockReadFileSync.mockReset();
   });
 
   const mockExists = (exists: boolean) => {
-    jest.spyOn(fs, 'existsSync').mockReturnValue(exists);
+    mockExistsSync.mockReturnValue(exists);
   };
 
   const mockStat = (size: number) => {
-    jest.spyOn(fs, 'statSync').mockReturnValue({ size } as any);
+    mockStatSync.mockReturnValue({ size } as any);
   };
 
   const mockReadBuffer = (buffer: Buffer) => {
-    jest.spyOn(fs, 'readFileSync').mockReturnValue(buffer);
+    mockReadFileSync.mockReturnValue(buffer);
   };
 
   const getSendMock = () => {

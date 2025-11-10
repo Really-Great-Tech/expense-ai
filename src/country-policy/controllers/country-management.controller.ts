@@ -1,27 +1,28 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  Query, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
   HttpStatus,
   ParseIntPipe,
   NotFoundException,
   ConflictException,
   Logger
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiExcludeController } from '@nestjs/swagger';
 import { CountryValidationService } from '../services/country-validation.service';
 import { CreateCountryDto } from '../dto/create-country.dto';
 import { UpdateCountryDto } from '../dto/update-country.dto';
 import { CountryQueryDto } from '../dto/country-query.dto';
 import { Country } from '../entities/country.entity';
 
+@ApiExcludeController()
 @ApiTags('country-management')
-@Controller('api/v1/countries')
+@Controller('countries')
 export class CountryManagementController {
   private readonly logger = new Logger(CountryManagementController.name);
 
