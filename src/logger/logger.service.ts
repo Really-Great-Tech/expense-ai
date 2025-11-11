@@ -47,29 +47,45 @@ export class LoggerService extends ConsoleLogger {
   }
 
   override log(message: any, context?: string) {
-    super.log(message, context);
+    this.printJson('log', message, context);
     this.forwardToCoralogix('log', message, context);
   }
 
   override error(message: any, stack?: string, context?: string) {
-    super.error(message, stack, context);
+    this.printJson('error', message, context, stack);
     const metadata = stack ? { stack } : undefined;
     this.forwardToCoralogix('error', message, context, metadata);
   }
 
   override warn(message: any, context?: string) {
-    super.warn(message, context);
+    this.printJson('warn', message, context);
     this.forwardToCoralogix('warn', message, context);
   }
 
   override debug(message: any, context?: string) {
-    super.debug(message, context);
+    this.printJson('debug', message, context);
     this.forwardToCoralogix('debug', message, context);
   }
 
   override verbose(message: any, context?: string) {
-    super.verbose(message, context);
+    this.printJson('verbose', message, context);
     this.forwardToCoralogix('verbose', message, context);
+  }
+
+  private printJson(level: LogLevel, message: any, context?: string, stack?: string): void {
+    const logEntry: Record<string, any> = {
+      timestamp: new Date().toISOString(),
+      level,
+      context,
+      message: typeof message === 'string' ? message : JSON.stringify(message),
+    };
+
+    if (stack) {
+      logEntry.stack = stack;
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(logEntry));
   }
 
   private forwardToCoralogix(

@@ -38,7 +38,6 @@ export class RedisHealthIndicator extends HealthIndicator {
 
       if (pingResult === 'PONG') {
         const result = this.getStatus(key, true, { message: 'Redis is reachable' });
-        this.logger.debug(`Redis health check passed: ${key}`);
         return result;
       }
 
