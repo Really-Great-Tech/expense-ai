@@ -64,7 +64,9 @@ Workflows are trigged by different events: pushing into head branch of PR to mai
 
 [Deploy workflow](/.github/workflows/deploy.yaml) runs when PR is merged to `main`. It calculates new version, builds and pushes image to ECR, pushes version tag to main. Then it initiates deployment jobs to all environments.
 
-[Manual deploy workflow](/.github/workflows/manual-deploy.yaml) is triggered manually from GitHub Actions UI. It builds and pushes image to ECR and Then it initiates deployment jobs to chosen environments. Useful when you want to test your code from PR before merge or when need to release a hotfix.
+[Development deploy workflow](/.github/workflows/development-deploy.yaml) is triggered manually from GitHub Actions UI. It builds and pushes image to ECR and Then it initiates deployment jobs to chosen environments. Useful when you want to test your code from PR before merge.
+
+[Hotfix deploy workflow](/.github/workflows/hotfix-deploy.yaml) is triggered manually from GitHub Actions UI. It builds and pushes image to ECR and Then it initiates deployment jobs to chosen environments. Useful when you when need to release a hotfix.
 
 ## GitHub Repository Settings
 
