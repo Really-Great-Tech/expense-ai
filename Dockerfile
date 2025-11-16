@@ -78,5 +78,5 @@ EXPOSE 9229
 
 
 # Use entrypoint script for flexible migration control
-ENTRYPOINT ["docker-entrypoint.sh"]
+# ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

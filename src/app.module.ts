@@ -16,6 +16,8 @@ import { DocumentSplitterModule } from './document-splitter/document-splitter.mo
 import { LoggerModule } from './logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseConfigValidator } from './config/database-validation';
+import { MigrationService } from './config/migration.service';
+import { MigrationController } from './config/migration.controller';
 
 @Module({
   imports: [
@@ -60,8 +62,8 @@ import { DatabaseConfigValidator } from './config/database-validation';
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
   ],
-  controllers: [AppController],
-  providers: [AppService, RedisConfigService],
+  controllers: [AppController, MigrationController],
+  providers: [AppService, RedisConfigService, MigrationService],
 })
 export class AppModule implements OnModuleInit {
   constructor(private configService: ConfigService) {}
