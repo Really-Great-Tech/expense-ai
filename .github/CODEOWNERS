@@ -5,7 +5,8 @@
 /.github/cicd-doc.md @papayaglobal/devops
 /.github/dependabot.yaml @papayaglobal/devops
 /.github/workflows/deploy.yaml @papayaglobal/devops
+/.github/workflows/development-deploy.yaml @papayaglobal/devops
+/.github/workflows/hotfix-deploy.yaml @papayaglobal/devops
 /.github/workflows/jira-validation.yaml @papayaglobal/devops
-/.github/workflows/manual-deploy.yaml @papayaglobal/devops
 /.github/workflows/run-tests.yaml @papayaglobal/devops
 /.github/CODEOWNERS @papayaglobal/devops
