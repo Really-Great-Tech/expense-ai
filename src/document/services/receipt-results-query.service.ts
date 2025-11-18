@@ -3,8 +3,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ReceiptProcessingResultRepository } from '../repositories/receipt-processing-result.repository';
 import { ProcessingStatus, ReceiptProcessingResult } from '../entities/receipt-processing-result.entity';
-import { ExpenseDocument } from '../entities/expense-document.entity';
+import { ExpenseDocument, DocumentStatus } from '../entities/expense-document.entity';
 import { Receipt } from '../entities/receipt.entity';
+
+export enum OverallExpenseStatus {
+  /** Document upload and splitting in progress */
+  SPLITTING = 'SPLITTING',
+  /** Splitting complete, receipts queued or being processed */
+  PROCESSING_RECEIPTS = 'PROCESSING_RECEIPTS',
+  /** All receipts completed successfully */
+  COMPLETED = 'COMPLETED',
+  /** Some receipts failed, but no active processing */
+  PARTIALLY_COMPLETE = 'PARTIALLY_COMPLETE',
+  /** Document splitting failed */
+  FAILED = 'FAILED',
+}
 
 @Injectable()
 export class ReceiptResultsQueryService {
@@ -88,6 +101,9 @@ export class ReceiptResultsQueryService {
     });
     const results = await this.receiptProcessingResultRepo.findByDocumentId(documentId);
 
+    // Calculate overall status
+    const overallStatus = this.deriveOverallStatus(document, receipts, results);
+
     return {
       document: {
         id: document.id,
@@ -99,8 +115,35 @@ export class ReceiptResultsQueryService {
         uploadedBy: document.uploadedBy,
         createdAt: document.createdAt,
       },
+      overallStatus,
       receipts: receipts.map((receipt) => {
         const result = results.find((r) => r.receiptId === receipt.id);
+
+        // Build compliance-style results if processing is completed
+        let complianceResults = null;
+        if (result && result.status === ProcessingStatus.COMPLETED) {
+          // Extract image quality issues
+          const imageQualityIssues = this.extractImageQualityIssues(result.qualityAssessment);
+
+          // Merge all issues
+          const mergedIssues = this.mergeComplianceIssues(
+            result.complianceValidation?.validation_result?.issues || [],
+            imageQualityIssues
+          );
+
+          complianceResults = {
+            extraction: result.extractedData || {},
+            meta: {
+              receiptId: result.receiptId,
+              sourceDocumentId: result.sourceDocumentId,
+              processingCompletedAt: result.processingCompletedAt,
+              processingTime: result.processingMetadata?.processingTime,
+              processed_at: result.processingMetadata?.processedAt,
+            },
+            issues: mergedIssues,
+          };
+        }
+
         return {
           receiptId: receipt.id,
           fileName: receipt.fileName,
@@ -112,6 +155,7 @@ export class ReceiptResultsQueryService {
           processingCompletedAt: result?.processingCompletedAt,
           hasResults: !!result && result.status === ProcessingStatus.COMPLETED,
           hasErrors: !!result?.errorMessage,
+          results: complianceResults,
         };
       }),
       overallProgress: this.calculateOverallProgress(results),
@@ -216,8 +260,8 @@ export class ReceiptResultsQueryService {
 
   /**
    * Get compliance-focused results for a receipt
-   * Returns filtered data containing only classification, extraction, and compliance information
-   * with enhanced issue detection that merges quality issues into the compliance issues list
+   * Returns only extraction, meta (metadata), and issues
+   * Merges image quality issues into the compliance issues list for unified display
    */
   async getReceiptComplianceResults(receiptId: string): Promise<any> {
     const result = await this.receiptProcessingResultRepo.findByReceiptId(receiptId);
@@ -240,33 +284,22 @@ export class ReceiptResultsQueryService {
       imageQualityIssues
     );
 
-    // Build compliance-focused response
+    // Build compliance-focused response with only extraction, meta, and issues
     return {
-      receiptId: result.receiptId,
-      sourceDocumentId: result.sourceDocumentId,
-      processingCompletedAt: result.processingCompletedAt,
-
-      // Classification data
-      classification: result.classificationResult || {},
-
       // Extracted data
       extraction: result.extractedData || {},
 
-      // Enhanced compliance with merged issues
-      compliance: {
-        validation_result: {
-          is_valid: mergedIssues.length === 0,
-          issues_count: mergedIssues.length,
-          issues: mergedIssues,
-        },
-      },
-
       // Metadata
-      metadata: {
+      meta: {
+        receiptId: result.receiptId,
+        sourceDocumentId: result.sourceDocumentId,
+        processingCompletedAt: result.processingCompletedAt,
         processingTime: result.processingMetadata?.processingTime,
         processed_at: result.processingMetadata?.processedAt,
-        timing: result.processingMetadata?.timing,
       },
+
+      // All issues (compliance + image quality)
+      issues: mergedIssues,
     };
   }
 
@@ -385,5 +418,94 @@ export class ReceiptResultsQueryService {
       index: index + 1,
       ...issue,
     }));
+  }
+
+  /**
+   * Derive overall status from document and child receipt states
+   * Logic: If no child is actively processing, consider master complete/failed
+   */
+  private deriveOverallStatus(
+    document: ExpenseDocument,
+    receipts: Receipt[],
+    processingResults: ReceiptProcessingResult[],
+  ): OverallExpenseStatus {
+    // If document splitting failed
+    if (document.status === DocumentStatus.FAILED) {
+      return OverallExpenseStatus.FAILED;
+    }
+
+    // If document is still splitting (not yet completed)
+    if (document.status !== DocumentStatus.COMPLETED) {
+      return OverallExpenseStatus.SPLITTING;
+    }
+
+    // If no receipts created yet (shouldn't happen, but handle gracefully)
+    if (receipts.length === 0) {
+      return OverallExpenseStatus.SPLITTING;
+    }
+
+    // Check if any receipt is actively processing
+    const hasActiveProcessing = processingResults.some((result) =>
+      this.isActiveProcessingStatus(result.status),
+    );
+
+    // Count completed and failed
+    const completedCount = processingResults.filter(
+      (r) => r.status === ProcessingStatus.COMPLETED,
+    ).length;
+    const failedCount = processingResults.filter(
+      (r) => r.status === ProcessingStatus.FAILED,
+    ).length;
+
+    // If there are active processing jobs, status is PROCESSING_RECEIPTS
+    if (hasActiveProcessing) {
+      return OverallExpenseStatus.PROCESSING_RECEIPTS;
+    }
+
+    // No active processing - determine final state
+    // All completed successfully
+    if (completedCount === receipts.length) {
+      return OverallExpenseStatus.COMPLETED;
+    }
+
+    // All failed
+    if (failedCount === receipts.length) {
+      return OverallExpenseStatus.FAILED;
+    }
+
+    // Some succeeded, some failed, none processing
+    if (completedCount > 0 && failedCount > 0) {
+      return OverallExpenseStatus.PARTIALLY_COMPLETE;
+    }
+
+    // Some receipts haven't been processed yet (no results), but none are actively processing
+    // This could happen if jobs were cancelled or never started
+    if (processingResults.length < receipts.length) {
+      // If some are complete, consider it partially complete
+      if (completedCount > 0) {
+        return OverallExpenseStatus.PARTIALLY_COMPLETE;
+      }
+      // Nothing completed and nothing processing = consider it partially complete (cancelled/stopped)
+      return OverallExpenseStatus.PARTIALLY_COMPLETE;
+    }
+
+    // Default fallback
+    return OverallExpenseStatus.PROCESSING_RECEIPTS;
+  }
+
+  /**
+   * Check if a processing status represents active processing
+   */
+  private isActiveProcessingStatus(status: ProcessingStatus): boolean {
+    return [
+      ProcessingStatus.QUEUED,
+      ProcessingStatus.PROCESSING,
+      ProcessingStatus.CLASSIFICATION,
+      ProcessingStatus.EXTRACTION,
+      ProcessingStatus.VALIDATION,
+      ProcessingStatus.QUALITY_ASSESSMENT,
+      ProcessingStatus.CITATION_GENERATION,
+      ProcessingStatus.RETRYING,
+    ].includes(status);
   }
 }

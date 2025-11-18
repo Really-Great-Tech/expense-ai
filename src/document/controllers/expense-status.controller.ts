@@ -123,19 +123,28 @@ complete or partially complete. This handles cancelled/stopped jobs gracefully.
 
 This endpoint returns:
 - 📄 Expense document metadata (filename, country, ICP, upload info)
-- 🧾 Array of all child receipts with their processing status
+- 🎯 **overallStatus**: Derived status (SPLITTING, PROCESSING_RECEIPTS, COMPLETED, PARTIALLY_COMPLETE, FAILED)
+- 🧾 Array of all child receipts with their processing status and compliance results
 - 📊 Aggregate statistics (total, completed, failed, processing, queued)
 - 📈 Overall progress percentage
 
+**Each receipt includes:**
+- Basic info (receiptId, fileName, fileSize, storageKey, status)
+- Processing status and progress
+- **results** object (only for completed receipts) containing:
+  - extraction: All extracted receipt data
+  - meta: Metadata (receiptId, timestamps, processing info)
+  - issues: Unified list of compliance and image quality issues
+
 **Difference from /expenses/:expenseId/status:**
 - \`/status\` → Lightweight status check with overall state
-- \`/results\` → Detailed breakdown of each receipt's processing status
+- \`/results\` → Detailed breakdown with full compliance data for each receipt
 
 **Use Cases:**
-- Display list of all receipts in an expense with their individual statuses
-- Show which specific receipts succeeded/failed
-- Get detailed receipt-level information (filename, fileSize, storageKey)
-- Track per-receipt processing progress
+- Display list of all receipts with their compliance results
+- Show which receipts have issues requiring attention
+- Get complete extraction data for all receipts in one call
+- Track per-receipt processing progress with detailed results
     `,
   })
   @ApiParam({
@@ -158,6 +167,7 @@ This endpoint returns:
           uploadedBy: 'user_12345',
           createdAt: '2025-03-15T10:00:00Z',
         },
+        overallStatus: 'COMPLETED',
         receipts: [
           {
             receiptId: 'receipt_001',
@@ -170,6 +180,31 @@ This endpoint returns:
             processingCompletedAt: '2025-03-15T10:03:30Z',
             hasResults: true,
             hasErrors: false,
+            results: {
+              extraction: {
+                merchant_name: 'Restaurant ABC',
+                total_amount: 45.50,
+                currency: 'EUR',
+                date: '2025-03-10',
+              },
+              meta: {
+                receiptId: 'receipt_001',
+                sourceDocumentId: 'e1b2c3d4-5678-90ab-cdef-1234567890ab',
+                processingCompletedAt: '2025-03-15T10:03:30Z',
+                processingTime: 12.5,
+                processed_at: '2025-03-15T10:03:30Z',
+              },
+              issues: [
+                {
+                  index: 1,
+                  issue_type: 'Missing Receipt Number',
+                  field: 'receipt_number',
+                  description: 'Receipt number is missing',
+                  recommendation: 'Request receipt with number',
+                  severity: 'medium',
+                },
+              ],
+            },
           },
           {
             receiptId: 'receipt_002',
@@ -182,6 +217,7 @@ This endpoint returns:
             processingCompletedAt: null,
             hasResults: false,
             hasErrors: false,
+            results: null,
           },
         ],
         overallProgress: 45,

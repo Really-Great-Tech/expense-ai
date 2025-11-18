@@ -154,7 +154,7 @@ const baseDBConfig: DataSourceOptions = {
   // Migrations should ALWAYS be run manually via CLI for safety
   // Can be overridden via TYPEORM_MIGRATIONS_RUN=true (use only in dev/staging with caution)
   // Default: false (opt-in pattern for safety)
-  migrationsRun: configService.get<string>('TYPEORM_MIGRATIONS_RUN') === 'true',
+  migrationsRun: true,
 
   // Enable transaction per migration for rollback safety
   migrationsTransactionMode: 'each' as const,

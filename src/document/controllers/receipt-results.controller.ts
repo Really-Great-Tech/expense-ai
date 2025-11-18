@@ -93,8 +93,8 @@ export class ReceiptResultsController {
 
   /**
    * Get compliance-focused results for a specific receipt
-   * Returns filtered data with classification, extraction, and compliance issues
-   * Merges image quality issues into the compliance issues list for unified display
+   * Returns only extraction, meta (metadata), and issues
+   * Merges image quality issues with compliance issues for unified display
    * GET /api/v1/receipts/:receiptId/compliance
    */
   @Get(':receiptId/compliance')
