@@ -68,6 +68,7 @@ Workflows are trigged by different events: pushing into head branch of PR to mai
 
 [Hotfix deploy workflow](/.github/workflows/hotfix-deploy.yaml) is triggered manually from GitHub Actions UI. It builds and pushes image to ECR and Then it initiates deployment jobs to chosen environments. Useful when you when need to release a hotfix.
 
+
 ## GitHub Repository Settings
 
 Default branch: `main`.
