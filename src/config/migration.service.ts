@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
+import { glob } from 'glob';
 
 /**
  * MigrationService - Provides manual database migration control via API endpoints
@@ -53,6 +56,24 @@ export class MigrationService {
 
       // Verify connection health
       await this.verifyConnection();
+
+      // Log migration configuration for debugging
+      this.logger.log('Migration configuration:', {
+        migrationsTableName: this.dataSource.options.migrationsTableName,
+        migrationsPath: this.dataSource.options.migrations,
+        totalMigrationsRegistered: this.dataSource.migrations?.length || 0,
+      });
+
+      // List all registered migrations
+      if (this.dataSource.migrations && this.dataSource.migrations.length > 0) {
+        this.logger.log('Registered migrations:');
+        this.dataSource.migrations.forEach((migration, index) => {
+          this.logger.log(`  ${index + 1}. ${migration.name}`);
+        });
+      } else {
+        this.logger.warn(' No migrations are registered with TypeORM!');
+        this.logger.warn('This usually means migration files are not being loaded.');
+      }
 
       // Get list of pending migrations
       const pendingMigrations = await this.dataSource.showMigrations();
@@ -133,9 +154,9 @@ export class MigrationService {
       const migrations = await this.dataSource.showMigrations();
 
       if (migrations) {
-        this.logger.warn('⚠ There are still pending migrations in the database');
+        this.logger.warn('There are still pending migrations in the database');
       } else {
-        this.logger.log('✓ All migrations have been applied successfully');
+        this.logger.log(' All migrations have been applied successfully');
       }
     } catch (error) {
       this.logger.warn('Could not retrieve migration status:', error);
@@ -148,14 +169,36 @@ export class MigrationService {
    */
   async getMigrationHistory(): Promise<any[]> {
     try {
+      // Log the table name being queried
+      const tableName = this.dataSource.options.migrationsTableName || 'migrations';
+      this.logger.log(`Querying migration history from table: ${tableName}`);
+
       const queryRunner = this.dataSource.createQueryRunner();
-      const migrations = await queryRunner.query(
-        `SELECT * FROM ${this.dataSource.options.migrationsTableName || 'migrations'} ORDER BY timestamp DESC`,
+
+      // Check if table exists first
+      const tableExists = await queryRunner.query(
+        `SHOW TABLES LIKE '${tableName}'`,
       );
+
+      if (!tableExists || tableExists.length === 0) {
+        this.logger.warn(`Migration table '${tableName}' does not exist. No migrations have been run yet.`);
+        await queryRunner.release();
+        return [];
+      }
+
+      const migrations = await queryRunner.query(
+        `SELECT * FROM ${tableName} ORDER BY timestamp DESC`,
+      );
+
+      this.logger.log(`Found ${migrations.length} migration(s) in history`);
       await queryRunner.release();
       return migrations;
     } catch (error) {
       this.logger.error('Failed to retrieve migration history:', error);
+      this.logger.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return [];
     }
   }
@@ -170,6 +213,117 @@ export class MigrationService {
     } catch (error) {
       this.logger.error('Failed to check pending migrations:', error);
       return false;
+    }
+  }
+
+  /**
+   * List actual migration files on disk
+   * Scans the filesystem to find physical migration files
+   */
+  async listMigrationFiles(): Promise<{
+    filesFound: string[];
+    pathsChecked: string[];
+    workingDirectory: string;
+  }> {
+    const cwd = process.cwd();
+    const filesFound: string[] = [];
+    const pathsChecked: string[] = [];
+
+    // Define paths to check (same as database.ts)
+    const pathsToCheck = [
+      path.join(cwd, 'dist', 'src', 'migrations'),
+      path.join(cwd, 'dist', 'migrations'),
+      path.join(cwd, 'src', 'migrations'),
+    ];
+
+    this.logger.log('Scanning filesystem for migration files...');
+    this.logger.log(`Working directory: ${cwd}`);
+
+    for (const checkPath of pathsToCheck) {
+      pathsChecked.push(checkPath);
+
+      // Check if directory exists
+      if (fs.existsSync(checkPath)) {
+        this.logger.log(`Found directory: ${checkPath}`);
+
+        try {
+          // Find all .js or .ts migration files
+          const pattern = path.join(checkPath, '*.{js,ts}');
+          const files = await glob(pattern);
+
+          if (files.length > 0) {
+            this.logger.log(`Found ${files.length} file(s) in ${checkPath}`);
+            files.forEach((file: string) => {
+              const relativePath = path.relative(cwd, file);
+              filesFound.push(relativePath);
+              this.logger.log(`  - ${relativePath}`);
+            });
+          } else {
+            this.logger.log(`Directory exists but no migration files found: ${checkPath}`);
+          }
+        } catch (error) {
+          this.logger.warn(`Error scanning ${checkPath}:`, error);
+        }
+      } else {
+        this.logger.log(`Directory does not exist: ${checkPath}`);
+      }
+    }
+
+    return {
+      filesFound,
+      pathsChecked,
+      workingDirectory: cwd,
+    };
+  }
+
+  /**
+   * Get comprehensive migration diagnostics
+   * Returns detailed information about migration loading and execution
+   */
+  async getDiagnostics(): Promise<{
+    totalMigrationsRegistered: number;
+    registeredMigrationNames: string[];
+    executedMigrationsCount: number;
+    migrationsTableName: string;
+    migrationPaths: any;
+    hasMigrationTable: boolean;
+  }> {
+    try {
+      const tableName = this.dataSource.options.migrationsTableName || 'migrations';
+      const totalRegistered = this.dataSource.migrations?.length || 0;
+      const migrationNames = this.dataSource.migrations?.map((m) => m.name) || [];
+
+      // Check if migration table exists
+      const queryRunner = this.dataSource.createQueryRunner();
+      const tableExists = await queryRunner.query(`SHOW TABLES LIKE '${tableName}'`);
+      const hasMigrationTable = tableExists && tableExists.length > 0;
+
+      // Get executed migrations count
+      let executedCount = 0;
+      if (hasMigrationTable) {
+        const executed = await queryRunner.query(`SELECT COUNT(*) as count FROM ${tableName}`);
+        executedCount = executed[0]?.count || 0;
+      }
+      await queryRunner.release();
+
+      return {
+        totalMigrationsRegistered: totalRegistered,
+        registeredMigrationNames: migrationNames,
+        executedMigrationsCount: executedCount,
+        migrationsTableName: tableName,
+        migrationPaths: this.dataSource.options.migrations,
+        hasMigrationTable,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get migration diagnostics:', error);
+      return {
+        totalMigrationsRegistered: 0,
+        registeredMigrationNames: [],
+        executedMigrationsCount: 0,
+        migrationsTableName: 'unknown',
+        migrationPaths: [],
+        hasMigrationTable: false,
+      };
     }
   }
 }

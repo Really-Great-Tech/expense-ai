@@ -10,6 +10,12 @@ dotenv.config();
 
 const configService = new ConfigService();
 
+// Simple logger for database config (before NestJS logger is available)
+const log = (message: string, ...args: any[]) => {
+  // eslint-disable-next-line no-console
+  console.log(`[TypeORM Config] ${message}`, ...args);
+};
+
 const mysqlSslEnabled = configService.get<string>('MYSQL_SSL') === 'true';
 const isProduction = configService.get<string>('NODE_ENV') === 'production';
 const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
@@ -25,16 +31,34 @@ const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true
  *
  * This prevents duplicate detection while supporting both environments
  */
-const distMigrationsExist = existsSync(join(process.cwd(), 'dist', 'src', 'migrations'));
+const cwd = process.cwd();
+const distSrcMigrations = join(cwd, 'dist', 'src', 'migrations');
+const distMigrations = join(cwd, 'dist', 'migrations');
+const srcMigrations = join(cwd, 'src', 'migrations');
+
+// Check multiple possible locations for compiled migrations
+const distMigrationsExist = existsSync(distSrcMigrations) || existsSync(distMigrations);
+
+// Log the detected paths for debugging
+log('Working directory:', cwd);
+log('Checking migration paths:');
+log('  - dist/src/migrations:', existsSync(distSrcMigrations));
+log('  - dist/migrations:', existsSync(distMigrations));
+log('  - src/migrations:', existsSync(srcMigrations));
+log('Using compiled migrations:', distMigrationsExist);
 
 // Use dist if it exists and has migrations, otherwise use src
+// Include both possible dist locations for maximum compatibility
 const entityPaths = distMigrationsExist
-  ? ['dist/src/**/*.entity.js']
+  ? ['dist/src/**/*.entity.js', 'dist/**/*.entity.js']
   : ['src/**/*.entity.ts'];
 
 const migrationPaths = distMigrationsExist
-  ? ['dist/src/migrations/*.js']
+  ? ['dist/src/migrations/*.js', 'dist/migrations/*.js']
   : ['src/migrations/*.ts'];
+
+log('Entity paths:', entityPaths);
+log('Migration paths:', migrationPaths);
 
 /**
  * Get authentication password/token for database connection
@@ -151,9 +175,9 @@ const baseDBConfig: DataSourceOptions = {
   // CRITICAL: Production safeguards - NEVER enable synchronize in production
   synchronize: false,
 
-  // Migrations should ALWAYS be run manually via CLI for safety
-  // Can be overridden via TYPEORM_MIGRATIONS_RUN=true (use only in dev/staging with caution)
-  // Default: false (opt-in pattern for safety)
+  // Automatically run migrations on application startup
+  // Migrations run in transactions (migrationsTransactionMode: 'each') for safety
+  // This ensures database schema is always up-to-date with the application code
   migrationsRun: true,
 
   // Enable transaction per migration for rollback safety

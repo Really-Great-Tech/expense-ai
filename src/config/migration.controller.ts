@@ -92,16 +92,23 @@ export class MigrationController {
       example: {
         hasPendingMigrations: false,
         message: 'All migrations have been applied',
+        registeredMigrations: 3,
+        executedMigrations: 3,
       },
     },
   })
   async getMigrationStatus() {
+    const diagnostics = await this.migrationService.getDiagnostics();
     const hasPending = await this.migrationService.hasPendingMigrations();
+
     return {
       hasPendingMigrations: hasPending,
       message: hasPending
         ? 'There are pending migrations that need to be executed'
         : 'All migrations have been applied',
+      registeredMigrations: diagnostics.totalMigrationsRegistered,
+      executedMigrations: diagnostics.executedMigrationsCount,
+      warning: diagnostics.totalMigrationsRegistered === 0 ? 'WARNING: No migrations are registered! Check migration file loading.' : undefined,
     };
   }
 
@@ -145,5 +152,110 @@ export class MigrationController {
     return {
       migrations: history,
     };
+  }
+
+  /**
+   * Get comprehensive migration diagnostics
+   *
+   * Use this endpoint for:
+   * - Debugging why migrations aren't running
+   * - Verifying migration file loading
+   * - Checking migration configuration
+   *
+   * @returns Detailed migration system diagnostics
+   */
+  @Get('diagnostics')
+  @ApiOperation({
+    summary: 'Get migration diagnostics',
+    description: 'Returns comprehensive diagnostics about migration loading, execution, and configuration. Use this to debug migration issues.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Migration diagnostics retrieved successfully',
+    schema: {
+      example: {
+        totalMigrationsRegistered: 3,
+        registeredMigrationNames: ['CreateInitialSchema1736500000000', 'SeedCountryPolicies1736504407000', 'AddTestMigrationField1760508674074'],
+        executedMigrationsCount: 3,
+        migrationsTableName: 'expense_ai_migrations',
+        migrationPaths: ['dist/src/migrations/*.js', 'dist/migrations/*.js'],
+        hasMigrationTable: true,
+        status: 'healthy',
+        issues: [],
+      },
+    },
+  })
+  async getDiagnostics() {
+    const diagnostics = await this.migrationService.getDiagnostics();
+
+    // Analyze for issues
+    const issues: string[] = [];
+    if (diagnostics.totalMigrationsRegistered === 0) {
+      issues.push('CRITICAL: No migrations are registered with TypeORM. Migration files may not be loading.');
+      issues.push('Check: 1) Migration files exist in src/migrations/, 2) Files are being compiled to dist/, 3) TypeORM paths are correct');
+    }
+    if (!diagnostics.hasMigrationTable) {
+      issues.push('WARNING: Migration tracking table does not exist. Migrations have never been run.');
+    }
+    if (diagnostics.totalMigrationsRegistered > 0 && diagnostics.executedMigrationsCount === 0) {
+      issues.push('WARNING: Migrations are registered but none have been executed. Run migrations or check migrationsRun setting.');
+    }
+
+    const status = issues.length === 0 ? 'healthy' : issues.some((i) => i.startsWith('CRITICAL')) ? 'critical' : 'warning';
+
+    return {
+      ...diagnostics,
+      status,
+      issues,
+      recommendations:
+        status === 'critical'
+          ? [
+              'Verify migration files exist in src/migrations/',
+              'Check Docker build is compiling TypeScript migrations',
+              'Verify TypeORM configuration includes correct migration paths',
+              'Check application logs for migration loading errors',
+            ]
+          : status === 'warning'
+            ? [
+                'Consider running migrations via POST /migrations/run endpoint',
+                'Or ensure migrationsRun: true in database configuration',
+                'Check database connectivity',
+              ]
+            : ['Migration system is operating normally'],
+    };
+  }
+
+  /**
+   * List actual migration files on disk
+   *
+   * Use this endpoint for:
+   * - Verifying which files TypeORM can see
+   * - Debugging migration file loading
+   * - Confirming file compilation in Docker
+   *
+   * @returns List of migration files found on filesystem
+   */
+  @Get('files')
+  @ApiOperation({
+    summary: 'List migration files on disk',
+    description: 'Scans the filesystem to find actual migration files. Checks dist/src/migrations, dist/migrations, and src/migrations.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Migration files listed successfully',
+    schema: {
+      example: {
+        filesFound: [
+          'dist/migrations/1736500000000-CreateInitialSchema.js',
+          'dist/migrations/1736504407000-SeedCountryPolicies.js',
+          'dist/migrations/1760508674074-AddTestMigrationField.js',
+        ],
+        pathsChecked: ['/usr/src/app/dist/src/migrations', '/usr/src/app/dist/migrations', '/usr/src/app/src/migrations'],
+        workingDirectory: '/usr/src/app',
+      },
+    },
+  })
+  async listMigrationFiles() {
+    return await this.migrationService.listMigrationFiles();
   }
 }

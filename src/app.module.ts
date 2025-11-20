@@ -66,12 +66,32 @@ import { MigrationController } from './config/migration.controller';
   providers: [AppService, RedisConfigService, MigrationService],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private configService: ConfigService) {}
+  private readonly logger = new (require('@nestjs/common').Logger)(AppModule.name);
 
-  onModuleInit() {
+  constructor(
+    private configService: ConfigService,
+    private migrationService: MigrationService,
+  ) {}
+
+  async onModuleInit() {
     // Validate database configuration on startup
     // This prevents dangerous misconfigurations in production
     DatabaseConfigValidator.validate(this.configService);
+
+    // Log migration status on startup (migrations run automatically via migrationsRun: true)
+    this.logger.log('🔍 Checking migration status after startup...');
+    try {
+      const hasPending = await this.migrationService.hasPendingMigrations();
+      const history = await this.migrationService.getMigrationHistory();
+
+      if (hasPending) {
+        this.logger.warn(' WARNING: There are still pending migrations after startup!');
+      } else {
+        this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to check migration status:', error);
+    }
   }
 
   configure(consumer: MiddlewareConsumer) {

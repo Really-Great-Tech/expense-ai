@@ -77,6 +77,8 @@ EXPOSE 3000
 EXPOSE 9229
 
 
-# Use entrypoint script for flexible migration control
-# ENTRYPOINT ["docker-entrypoint.sh"]
+# Migrations run automatically via TypeORM's migrationsRun: true config
+# No need for entrypoint script - TypeORM handles migrations on app startup
+# Clear any inherited ENTRYPOINT from base image
+ENTRYPOINT []
 CMD ["node", "dist/main"]
