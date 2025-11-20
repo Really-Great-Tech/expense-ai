@@ -49,6 +49,13 @@ COPY expense_file_schema.json ./
 # Copy country seed data for migrations
 COPY country_seed ./country_seed
 
+# Copy template directory structure (will be preserved unless volume-mounted)
+COPY .docker-template/uploads ./uploads
+COPY .docker-template/splits ./splits
+COPY .docker-template/receipts ./receipts
+COPY .docker-template/validation_results ./validation_results
+COPY .docker-template/markdown_extractions ./markdown_extractions
+
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
@@ -57,14 +64,18 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # This includes the global-bundle.pem for secure Aurora connections
 COPY certs ./certs
 
-# Create uploads directory with proper permissions
-RUN mkdir -p uploads && chmod 755 uploads
+# Add non-root user with configurable UID/GID for Linux compatibility
+# Build arg allows matching host user: docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)
+ARG USER_UID=1001
+ARG USER_GID=1001
 
-# Add non-root user
-RUN addgroup -g 1001 nodejs && \
-  adduser -S -u 1001 -G nodejs nodejs
+RUN addgroup -g ${USER_GID} nodejs && \
+  adduser -S -u ${USER_UID} -G nodejs nodejs
 
-# Change ownership of app directory to nodejs user
+# Set proper permissions on all directories (already copied from template)
+RUN chmod -R 755 uploads splits receipts validation_results markdown_extractions
+
+# Change ownership of app directory to nodejs user (including all directories)
 RUN chown -R nodejs:nodejs /usr/src/app
 
 USER nodejs
