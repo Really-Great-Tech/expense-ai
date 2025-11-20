@@ -72,11 +72,13 @@ ARG USER_GID=1001
 RUN addgroup -g ${USER_GID} nodejs && \
   adduser -S -u ${USER_UID} -G nodejs nodejs
 
-# Set proper permissions on all directories (already copied from template)
-RUN chmod -R 755 uploads splits receipts validation_results markdown_extractions
-
-# Change ownership of app directory to nodejs user (including all directories)
+# Change ownership of app directory to nodejs user FIRST (including all directories)
 RUN chown -R nodejs:nodejs /usr/src/app
+
+# Set proper permissions on all directories - 777 ensures write access for the nodejs user
+# This prevents "EACCES: permission denied" errors when creating subdirectories
+# Critical for STORAGE_TYPE=local mode where the app creates nested receipt directories
+RUN chmod -R 777 uploads splits receipts validation_results markdown_extractions
 
 USER nodejs
 
