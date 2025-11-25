@@ -6,6 +6,7 @@ import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
 import { RedisDebugService } from './redis-debug.service';
+import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -16,6 +17,7 @@ describe('HealthController', () => {
   let mockDatabaseHealthIndicator: jest.Mocked<DatabaseHealthIndicator>;
   let mockRedisHealthEnhancedIndicator: jest.Mocked<RedisHealthEnhancedIndicator>;
   let mockRedisDebugService: jest.Mocked<RedisDebugService>;
+  let mockAwsServicesHealthIndicator: jest.Mocked<AwsServicesHealthIndicator>;
 
   beforeEach(async () => {
     mockHealthCheckService = {
@@ -72,6 +74,12 @@ describe('HealthController', () => {
       }),
     } as any;
 
+    mockAwsServicesHealthIndicator = {
+      checkTextract: jest.fn().mockResolvedValue({ textract: { status: 'up' } }),
+      checkBedrock: jest.fn().mockResolvedValue({ bedrock: { status: 'up' } }),
+      checkAllServices: jest.fn().mockResolvedValue({ 'aws-services': { status: 'up' } }),
+    } as any;
+
     moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
       providers: [
@@ -81,6 +89,7 @@ describe('HealthController', () => {
         { provide: DatabaseHealthIndicator, useValue: mockDatabaseHealthIndicator },
         { provide: RedisHealthEnhancedIndicator, useValue: mockRedisHealthEnhancedIndicator },
         { provide: RedisDebugService, useValue: mockRedisDebugService },
+        { provide: AwsServicesHealthIndicator, useValue: mockAwsServicesHealthIndicator },
       ],
     }).compile();
 
@@ -177,6 +186,33 @@ describe('HealthController', () => {
       expect(result.cluster_redis_test).toBeDefined();
       expect(result.diagnosis).toBeDefined();
       expect(mockRedisDebugService.runFullDiagnostic).toHaveBeenCalled();
+    });
+  });
+
+  describe('checkTextract', () => {
+    it('should check AWS Textract health', async () => {
+      const result = await controller.checkTextract();
+
+      expect(result).toBeDefined();
+      expect(mockAwsServicesHealthIndicator.checkTextract).toHaveBeenCalledWith('textract');
+    });
+  });
+
+  describe('checkBedrock', () => {
+    it('should check AWS Bedrock health', async () => {
+      const result = await controller.checkBedrock();
+
+      expect(result).toBeDefined();
+      expect(mockAwsServicesHealthIndicator.checkBedrock).toHaveBeenCalledWith('bedrock');
+    });
+  });
+
+  describe('checkAwsServices', () => {
+    it('should check all AWS services health', async () => {
+      const result = await controller.checkAwsServices();
+
+      expect(result).toBeDefined();
+      expect(mockAwsServicesHealthIndicator.checkAllServices).toHaveBeenCalledWith('aws-services');
     });
   });
 });

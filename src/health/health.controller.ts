@@ -5,6 +5,7 @@ import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
 import { RedisDebugService } from './redis-debug.service';
+import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
 
 /**
  * Health Check Controller
@@ -27,6 +28,7 @@ export class HealthController {
     private dbEnhanced: DatabaseHealthIndicator,
     private redisEnhanced: RedisHealthEnhancedIndicator,
     private redisDebug: RedisDebugService,
+    private awsServices: AwsServicesHealthIndicator,
   ) {}
 
   /**
@@ -282,5 +284,150 @@ This endpoint tests BOTH standalone and cluster Redis configurations to identify
   })
   async debugRedis() {
     return this.redisDebug.runFullDiagnostic();
+  }
+
+  /**
+   * AWS Textract health check
+   * Tests connectivity and functionality of AWS Textract service
+   */
+  @Get('health/aws/textract')
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Check AWS Textract service health',
+    description: 'Tests AWS Textract connectivity by processing a minimal test image',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Textract is operational',
+    schema: {
+      example: {
+        status: 'ok',
+        info: {
+          textract: {
+            status: 'up',
+            message: 'Textract is operational',
+            latency: '245ms',
+            details: {
+              region: 'us-east-1',
+              blocksDetected: 1,
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 503, description: 'Textract is unavailable' })
+  checkTextract() {
+    return this.health.check([() => this.awsServices.checkTextract('textract')]);
+  }
+
+  /**
+   * AWS Bedrock health check
+   * Tests connectivity and functionality of AWS Bedrock service
+   */
+  @Get('health/aws/bedrock')
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Check AWS Bedrock service health',
+    description: 'Tests AWS Bedrock connectivity by sending a minimal test prompt',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bedrock is operational',
+    schema: {
+      example: {
+        status: 'ok',
+        info: {
+          bedrock: {
+            status: 'up',
+            message: 'Bedrock is operational',
+            latency: '1823ms',
+            details: {
+              region: 'eu-west-1',
+              credentialsSource: 'explicit',
+              modelId: 'us.amazon.nova-pro-v1:0',
+              modelType: 'nova',
+              apiUsed: 'Converse',
+              responseText: 'OK',
+              usage: {
+                inputTokens: 12,
+                outputTokens: 3,
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 503, description: 'Bedrock is unavailable' })
+  checkBedrock() {
+    return this.health.check([() => this.awsServices.checkBedrock('bedrock')]);
+  }
+
+  /**
+   * AWS Services comprehensive health check
+   * Tests both Textract and Bedrock services
+   */
+  @Get('health/aws')
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Check all AWS services health',
+    description: 'Tests connectivity and functionality of both AWS Textract and Bedrock services',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All AWS services are operational',
+    schema: {
+      example: {
+        status: 'ok',
+        info: {
+          'aws-services': {
+            status: 'up',
+            message: 'All AWS services are operational',
+            services: {
+              textract: {
+                status: 'up',
+                message: 'Textract is operational',
+                latency: '245ms',
+              },
+              bedrock: {
+                status: 'up',
+                message: 'Bedrock is operational',
+                latency: '1823ms',
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Some AWS services are unavailable',
+    schema: {
+      example: {
+        status: 'error',
+        error: {
+          'aws-services': {
+            status: 'down',
+            message: 'Some AWS services are unavailable',
+            services: {
+              textract: {
+                status: 'up',
+                message: 'Textract is operational',
+              },
+              bedrock: {
+                status: 'down',
+                message: 'Bedrock is unavailable',
+                error: 'AccessDeniedException: User not authorized',
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  checkAwsServices() {
+    return this.health.check([() => this.awsServices.checkAllServices('aws-services')]);
   }
 }

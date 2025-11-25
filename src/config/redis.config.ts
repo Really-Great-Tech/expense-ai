@@ -193,6 +193,9 @@ export class RedisConfigService implements BullOptionsFactory, SharedBullConfigu
 
     // Return createClient factory - required by Bull for cluster mode
     return {
+      // CRITICAL: prefix with hash tag ensures all Bull keys for a job hash to the same slot
+      // This prevents CROSSSLOT errors in Redis Cluster
+      prefix: '{bull}',
       createClient: (type: string) => {
         const cluster = new IORedis.Cluster(nodes, {
           // scaleReads: Distributes read commands across replicas for load balancing

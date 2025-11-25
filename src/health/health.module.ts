@@ -5,6 +5,7 @@ import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
 import { RedisDebugService } from './redis-debug.service';
+import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
 
 /**
  * Health Module
@@ -26,12 +27,14 @@ import { RedisDebugService } from './redis-debug.service';
     DatabaseHealthIndicator,
     RedisHealthEnhancedIndicator,
     RedisDebugService,
+    AwsServicesHealthIndicator,
   ],
   exports: [
     RedisHealthIndicator,
     DatabaseHealthIndicator,
     RedisHealthEnhancedIndicator,
     RedisDebugService,
+    AwsServicesHealthIndicator,
   ],
 })
 export class HealthModule {}
