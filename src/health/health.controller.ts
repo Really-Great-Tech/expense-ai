@@ -4,6 +4,7 @@ import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs
 import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
+import { RedisDebugService } from './redis-debug.service';
 
 /**
  * Health Check Controller
@@ -25,6 +26,7 @@ export class HealthController {
     private redis: RedisHealthIndicator,
     private dbEnhanced: DatabaseHealthIndicator,
     private redisEnhanced: RedisHealthEnhancedIndicator,
+    private redisDebug: RedisDebugService,
   ) {}
 
   /**
@@ -222,5 +224,63 @@ export class HealthController {
   })
   checkMigrations() {
     return this.health.check([() => this.dbEnhanced.checkMigrationStatus()]);
+  }
+
+  /**
+   * Redis/Bull Debug Diagnostic Endpoint
+   * Tests both standalone and cluster Redis configurations with Bull queue operations
+   * Use this to diagnose why jobs are not being triggered
+   */
+  @Get('health/redis/debug')
+  @ApiOperation({
+    summary: 'Debug Redis/Bull configuration',
+    description: `
+**Comprehensive diagnostic endpoint for debugging Redis and Bull queue issues.**
+
+This endpoint tests BOTH standalone and cluster Redis configurations to identify:
+- Which Redis connection mode works (standalone vs cluster)
+- Whether Bull queue can add/remove jobs successfully
+- Configuration mismatches (e.g., REDIS_CLUSTER_ENABLED=true when ElastiCache is not in cluster mode)
+
+**Tests performed:**
+1. Standalone Redis: connect, ping, write, read, delete
+2. Cluster Redis: connect, ping, write, read, delete
+3. Standalone Bull: create queue, add job, get counts, remove job
+4. Cluster Bull: create queue, add job, get counts, remove job
+
+**Use when:**
+- Jobs are not being triggered (504 timeout on upload)
+- Redis health checks pass but Bull operations fail
+- Uncertain whether ElastiCache is in cluster mode or not
+
+**Note:** This endpoint may take 30-60 seconds to complete all tests.
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Debug diagnostic completed',
+    schema: {
+      example: {
+        timestamp: '2025-01-15T10:30:00Z',
+        environment: {
+          REDIS_MODE: 'managed',
+          REDIS_HOST: 'my-elasticache...',
+          REDIS_CLUSTER_ENABLED: 'true',
+        },
+        standalone_redis_test: { overall_status: 'success', steps: [] },
+        cluster_redis_test: { overall_status: 'failed', steps: [] },
+        standalone_bull_test: { overall_status: 'success', steps: [] },
+        cluster_bull_test: { overall_status: 'failed', steps: [] },
+        diagnosis: {
+          working_modes: ['standalone-redis', 'standalone-bull'],
+          failing_modes: ['cluster-redis', 'cluster-bull'],
+          root_cause: 'MISMATCH: REDIS_CLUSTER_ENABLED=true but ElastiCache is NOT in cluster mode',
+          recommended_fix: 'Set REDIS_CLUSTER_ENABLED=false',
+        },
+      },
+    },
+  })
+  async debugRedis() {
+    return this.redisDebug.runFullDiagnostic();
   }
 }

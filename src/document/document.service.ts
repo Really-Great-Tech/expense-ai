@@ -323,7 +323,7 @@ export class DocumentService {
       const receiptType = results.classification?.expense_type || 'All';
       const filename = results.metadata?.filename || `job_${jobId}`;
 
-      this.logger.log(`🔍 Starting LLM-as-judge validation for job ${jobId} (${filename})`);
+      this.logger.log(` Starting LLM-as-judge validation for job ${jobId} (${filename})`);
 
       // Get compliance data - we need to reconstruct this from the results
       // In a real scenario, this would be stored or retrieved from the original processing
@@ -340,7 +340,7 @@ export class DocumentService {
         filename,
       );
 
-      this.logger.log(`✅ LLM-as-judge validation completed for job ${jobId} with confidence: ${validationResult?.overall_score || 0}`);
+      this.logger.log(` LLM-as-judge validation completed for job ${jobId} with confidence: ${validationResult?.overall_score || 0}`);
 
       return {
         jobId,
@@ -355,7 +355,7 @@ export class DocumentService {
         },
       };
     } catch (error) {
-      this.logger.error(`❌ LLM validation failed for job ${jobId}:`, error);
+      this.logger.error(` LLM validation failed for job ${jobId}:`, error);
       throw new Error(`LLM validation failed: ${error.message}`);
     }
   }
@@ -365,7 +365,7 @@ export class DocumentService {
    */
   async validateAllCompletedJobs(): Promise<any> {
     try {
-      this.logger.log('🚀 Starting batch LLM-as-judge validation for all completed jobs');
+      this.logger.log(' Starting batch LLM-as-judge validation for all completed jobs');
 
       // Get all completed jobs
       const allJobs = await this.listJobs({
@@ -378,7 +378,7 @@ export class DocumentService {
         throw new Error('No completed jobs found for validation');
       }
 
-      this.logger.log(`📊 Found ${allJobs.jobs.length} completed jobs for batch validation`);
+      this.logger.log(` Found ${allJobs.jobs.length} completed jobs for batch validation`);
 
       const batchStartTime = Date.now();
       const validationResults = [];
@@ -390,7 +390,7 @@ export class DocumentService {
       // Process each completed job
       for (const job of allJobs.jobs) {
         try {
-          this.logger.log(`🔍 Validating job: ${job.jobId}`);
+          this.logger.log(` Validating job: ${job.jobId}`);
 
           const validationStart = Date.now();
           const validationResult = await this.validateJobResults(job.jobId);
@@ -417,10 +417,10 @@ export class DocumentService {
             status: 'completed',
           });
 
-          this.logger.log(`✅ Validation completed for ${job.jobId} - Score: ${overallScore}, Reliability: ${reliability}`);
+          this.logger.log(` Validation completed for ${job.jobId} - Score: ${overallScore}, Reliability: ${reliability}`);
         } catch (error) {
           failedValidations++;
-          this.logger.error(`❌ Validation failed for job ${job.jobId}:`, error);
+          this.logger.error(` Validation failed for job ${job.jobId}:`, error);
 
           validationResults.push({
             jobId: job.jobId,
@@ -457,12 +457,12 @@ export class DocumentService {
       await this.saveBatchValidationSummary(batchSummary);
 
       this.logger.log(
-        `🎯 Batch validation completed: ${successfulValidations}/${allJobs.jobs.length} successful in ${totalValidationTime.toFixed(1)}s`,
+        ` Batch validation completed: ${successfulValidations}/${allJobs.jobs.length} successful in ${totalValidationTime.toFixed(1)}s`,
       );
 
       return batchSummary;
     } catch (error) {
-      this.logger.error('❌ Batch validation failed:', error);
+      this.logger.error(' Batch validation failed:', error);
       throw new Error(`Batch validation failed: ${error.message}`);
     }
   }
@@ -476,7 +476,7 @@ export class DocumentService {
       const summaryKey = 'batch_validation_summary.json';
       await this.storageService.saveValidationResult(summaryKey, summary);
 
-      this.logger.log(`📄 Batch validation summary saved using storage service: ${summaryKey}`);
+      this.logger.log(` Batch validation summary saved using storage service: ${summaryKey}`);
     } catch (error) {
       this.logger.error('Failed to save batch validation summary:', error);
       // Don't throw error - saving is optional

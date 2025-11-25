@@ -18,20 +18,20 @@ export class ValidationOrchestratorService {
       const useParallelValidation = this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') !== 'false';
 
       if (useParallelValidation) {
-        this.logger.log('🚀 Initializing PARALLEL LLM-as-judge compliance validator...');
+        this.logger.log(' Initializing PARALLEL LLM-as-judge compliance validator...');
         this.complianceValidator = new ParallelExpenseComplianceUQLMValidator(this.logger, this.configService);
-        this.logger.log('✅ PARALLEL LLM-as-judge compliance validator initialized successfully');
-        this.logger.log('📊 Parallel Configuration:');
+        this.logger.log(' PARALLEL LLM-as-judge compliance validator initialized successfully');
+        this.logger.log(' Parallel Configuration:');
         this.logger.log(`   - Dimension Concurrency: ${this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6')}`);
         this.logger.log(`   - Judge Concurrency: ${this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3')}`);
         this.logger.log(`   - Rate Limit: ${this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10')} req/sec`);
       } else {
-        this.logger.log('🔄 Initializing SEQUENTIAL LLM-as-judge compliance validator...');
+        this.logger.log(' Initializing SEQUENTIAL LLM-as-judge compliance validator...');
         this.complianceValidator = new ExpenseComplianceUQLMValidator(this.logger, this.configService);
-        this.logger.log('✅ Sequential LLM-as-judge compliance validator initialized successfully');
+        this.logger.log(' Sequential LLM-as-judge compliance validator initialized successfully');
       }
     } catch (error) {
-      this.logger.error('❌ Failed to initialize LLM-as-judge compliance validator:', error);
+      this.logger.error(' Failed to initialize LLM-as-judge compliance validator:', error);
       this.logger.error('Stack trace:', error.stack);
       this.complianceValidator = null;
     }
@@ -47,7 +47,7 @@ export class ValidationOrchestratorService {
     timing: ProcessingTiming,
   ): Promise<void> {
     if (!this.complianceValidator) {
-      this.logger.warn('⚠️ LLM-as-judge validation skipped (validator not available)');
+      this.logger.warn('️ LLM-as-judge validation skipped (validator not available)');
       timing.phase_timings.llm_validation_seconds = '0.0';
       return;
     }
@@ -58,25 +58,25 @@ export class ValidationOrchestratorService {
       const isParallelValidator = this.complianceValidator instanceof ParallelExpenseComplianceUQLMValidator;
       const parallelEnabled = this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') !== 'false';
 
-      this.logger.log('🔍 Phase 5: LLM-as-Judge Validation');
+      this.logger.log(' Phase 5: LLM-as-Judge Validation');
       this.logger.log(
-        `📊 Validator Type: ${isParallelValidator ? 'ParallelExpenseComplianceUQLMValidator' : 'ExpenseComplianceUQLMValidator'}`,
+        ` Validator Type: ${isParallelValidator ? 'ParallelExpenseComplianceUQLMValidator' : 'ExpenseComplianceUQLMValidator'}`,
       );
-      this.logger.log(`⚡ Parallel Processing: ${parallelEnabled ? 'ENABLED' : 'DISABLED'}`);
+      this.logger.log(` Parallel Processing: ${parallelEnabled ? 'ENABLED' : 'DISABLED'}`);
 
       let executionMode = 'sequential';
       if (isParallelValidator && parallelEnabled) {
-        this.logger.log('🚀 STARTING PARALLEL LLM VALIDATION');
-        this.logger.log('📈 Configuration:');
+        this.logger.log(' STARTING PARALLEL LLM VALIDATION');
+        this.logger.log(' Configuration:');
         this.logger.log(`   - Dimension Concurrency: ${this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6')}`);
         this.logger.log(`   - Judge Concurrency: ${this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3')}`);
         this.logger.log(`   - Rate Limit: ${this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10')} req/sec`);
         executionMode = 'parallel';
       } else {
-        this.logger.log('🔄 Using sequential validation');
+        this.logger.log(' Using sequential validation');
       }
 
-      this.logger.log('⏱️ Starting validation execution...');
+      this.logger.log('️ Starting validation execution...');
       const validationResult = await this.complianceValidator.validateComplianceResponse(
         JSON.stringify(compliance),
         country,
@@ -94,10 +94,10 @@ export class ValidationOrchestratorService {
         parallelMetrics = parallelResult.performance_metrics;
         executionMode = parallelResult.performance_metrics.execution_mode || executionMode;
 
-        this.logger.log(`📊 Validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
+        this.logger.log(` Validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
 
         if (parallelResult.performance_metrics.speedup_factor) {
-          this.logger.log(`⚡ Speedup: ${parallelResult.performance_metrics.speedup_factor}x faster`);
+          this.logger.log(` Speedup: ${parallelResult.performance_metrics.speedup_factor}x faster`);
         }
       }
 
@@ -113,9 +113,9 @@ export class ValidationOrchestratorService {
         parallel_enabled: isParallelValidator && parallelEnabled,
       };
 
-      this.logger.log(`✅ LLM-as-judge validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
+      this.logger.log(` LLM-as-judge validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
     } catch (error) {
-      this.logger.error(`❌ LLM-as-judge validation failed: ${error.message}`);
+      this.logger.error(` LLM-as-judge validation failed: ${error.message}`);
       this.logger.error('Stack trace:', error.stack);
       timing.phase_timings.llm_validation_seconds = '0.0';
       timing.agent_performance.llm_validation = {
@@ -141,7 +141,7 @@ export class ValidationOrchestratorService {
       throw new Error('LLM-as-judge compliance validator not available');
     }
 
-    this.logger.log('🔍 Running standalone LLM-as-judge validation');
+    this.logger.log(' Running standalone LLM-as-judge validation');
 
     try {
       const validationResult = await this.complianceValidator.validateComplianceResponse(
@@ -153,10 +153,10 @@ export class ValidationOrchestratorService {
         extractedData,
       );
 
-      this.logger.log(`✅ LLM-as-judge validation completed with confidence: ${validationResult?.overall_score || 0}`);
+      this.logger.log(` LLM-as-judge validation completed with confidence: ${validationResult?.overall_score || 0}`);
       return validationResult;
     } catch (error) {
-      this.logger.error('❌ LLM-as-judge validation failed:', error);
+      this.logger.error(' LLM-as-judge validation failed:', error);
       throw new Error(`LLM validation failed: ${error.message}`);
     }
   }

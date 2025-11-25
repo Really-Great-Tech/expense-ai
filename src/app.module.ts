@@ -79,13 +79,13 @@ export class AppModule implements OnModuleInit {
     DatabaseConfigValidator.validate(this.configService);
 
     // Log migration status on startup (migrations run automatically via migrationsRun: true)
-    this.logger.log('🔍 Checking migration status after startup...');
+    this.logger.log('Checking migration status after startup...');
     try {
       const hasPending = await this.migrationService.hasPendingMigrations();
       const history = await this.migrationService.getMigrationHistory();
 
       if (hasPending) {
-        this.logger.warn(' WARNING: There are still pending migrations after startup!');
+        this.logger.warn('WARNING: There are still pending migrations after startup!');
       } else {
         this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
       }

@@ -251,17 +251,17 @@ export class ExpenseProcessor {
         const countryRecord = await this.countryPolicyService.findCountryByName(country);
 
         if (countryRecord && countryRecord.activePolicy && countryRecord.activePolicy.rules) {
-          this.logger.log(`✅ Loaded compliance data for ${country} from database (Policy ID: ${countryRecord.activePolicyId})`);
+          this.logger.log(` Loaded compliance data for ${country} from database (Policy ID: ${countryRecord.activePolicyId})`);
           return countryRecord.activePolicy.rules;
         } else if (countryRecord) {
-          this.logger.warn(`⚠️ Country ${country} found in database but has no active policy set`);
+          this.logger.warn(`️ Country ${country} found in database but has no active policy set`);
         }
       } catch (dbError) {
         this.logger.warn(`Database lookup failed for ${country}: ${dbError.message}`);
       }
 
       // Step 2: Fall back to JSON file in country_seed directory
-      this.logger.log(`📁 Attempting to load compliance data from country_seed/${country.toLowerCase()}.json`);
+      this.logger.log(` Attempting to load compliance data from country_seed/${country.toLowerCase()}.json`);
 
       const seedFilePath = path.join(process.cwd(), 'country_seed', `${country.toLowerCase()}.json`);
 
@@ -271,15 +271,15 @@ export class ExpenseProcessor {
 
         if (complianceData && typeof complianceData === 'object') {
           const sections = Object.keys(complianceData).length;
-          this.logger.log(`✅ Loaded compliance data for ${country} from JSON file (${sections} sections)`);
+          this.logger.log(` Loaded compliance data for ${country} from JSON file (${sections} sections)`);
           return complianceData;
         }
       } else {
-        this.logger.warn(`⚠️ Seed file not found: ${seedFilePath}`);
+        this.logger.warn(`️ Seed file not found: ${seedFilePath}`);
       }
 
       // Step 3: No data found
-      this.logger.error(`❌ No compliance data found for ${country} (tried database and country_seed/${country.toLowerCase()}.json)`);
+      this.logger.error(` No compliance data found for ${country} (tried database and country_seed/${country.toLowerCase()}.json)`);
       return {};
 
     } catch (error) {

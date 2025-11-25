@@ -25,7 +25,7 @@ export class TextractApiService implements DocumentReader {
   constructor(options: TextractApiServiceOptions = {}) {
     const awsRegion = options.region || 'us-east-1';
     this.uploadPath = options.uploadPath || './uploads';
-    this.logger.log(`🌍 Initializing Textract client for region: ${awsRegion}`);
+    this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
 
     const credentials =
       options.accessKeyId && options.secretAccessKey
@@ -132,7 +132,7 @@ export class TextractApiService implements DocumentReader {
     // Validate file path for security
     const pathValidation = this.validateFilePath(filePath);
     if (!pathValidation.isValid) {
-      this.logger.error(`🚫 Security: ${pathValidation.error}`);
+      this.logger.error(` Security: ${pathValidation.error}`);
       return {
         success: false,
         error: `Security validation failed: ${pathValidation.error}`,
@@ -180,7 +180,7 @@ export class TextractApiService implements DocumentReader {
       // Re-validate file path for additional security
       const pathValidation = this.validateFilePath(filePath);
       if (!pathValidation.isValid) {
-        this.logger.error(`🚫 Security: ${pathValidation.error}`);
+        this.logger.error(` Security: ${pathValidation.error}`);
         return {
           success: false,
           error: `Security validation failed: ${pathValidation.error}`,
@@ -204,7 +204,7 @@ export class TextractApiService implements DocumentReader {
       const fileStats = fs.statSync(sanitizedPath);
 
       // Log diagnostic information
-      this.logger.log(`📄 File diagnostics for ${filePath}:`);
+      this.logger.log(` File diagnostics for ${filePath}:`);
       this.logger.log(`   Size: ${fileStats.size} bytes (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
       this.logger.log(`   Buffer length: ${fileBuffer.length}`);
       this.logger.log(`   File extension: ${filePath.split('.').pop()}`);
@@ -283,7 +283,7 @@ export class TextractApiService implements DocumentReader {
         this.logger.log(`   Estimated pages: ${estimatedPages}`);
 
         if (estimatedPages > 100) {
-          this.logger.log(`   ⚠️ High page count detected (${estimatedPages} pages)`);
+          this.logger.log(`   ️ High page count detected (${estimatedPages} pages)`);
         }
       } else {
         // Images are always single page
@@ -300,7 +300,7 @@ export class TextractApiService implements DocumentReader {
       }
     } catch (error) {
       this.logger.error(
-        `❌ Error parsing document with Textract: ${error instanceof Error ? error.message : error}`,
+        ` Error parsing document with Textract: ${error instanceof Error ? error.message : error}`,
         error instanceof Error ? error.stack : undefined,
       );
 
@@ -314,7 +314,7 @@ export class TextractApiService implements DocumentReader {
         // Check for specific AWS Textract error types
         if (error.message.includes('unsupported document format')) {
           errorCode = 'UNSUPPORTED_FORMAT';
-          this.logger.error(`🚫 UNSUPPORTED_FORMAT: The PDF format is not supported by Textract`);
+          this.logger.error(` UNSUPPORTED_FORMAT: The PDF format is not supported by Textract`);
           this.logger.error(`   Common causes:`);
           this.logger.error(`   - Encrypted or password-protected PDF`);
           this.logger.error(`   - Corrupted PDF file`);
@@ -322,13 +322,13 @@ export class TextractApiService implements DocumentReader {
           this.logger.error(`   - PDF version incompatibility`);
         } else if (error.message.includes('InvalidParameterException')) {
           errorCode = 'INVALID_PARAMETER';
-          this.logger.error(`🚫 INVALID_PARAMETER: Invalid request parameters`);
+          this.logger.error(` INVALID_PARAMETER: Invalid request parameters`);
         } else if (error.message.includes('ProvisionedThroughputExceededException')) {
           errorCode = 'THROTTLED';
-          this.logger.error(`🚫 THROTTLED: Textract rate limit exceeded`);
+          this.logger.error(` THROTTLED: Textract rate limit exceeded`);
         } else if (error.message.includes('InternalServerError')) {
           errorCode = 'INTERNAL_ERROR';
-          this.logger.error(`🚫 INTERNAL_ERROR: AWS Textract internal error`);
+          this.logger.error(` INTERNAL_ERROR: AWS Textract internal error`);
         }
       }
 
@@ -363,7 +363,7 @@ export class TextractApiService implements DocumentReader {
         this.logger.log(`   Sending AnalyzeDocument request to Textract...`);
         const analyzeResponse = await this.textractClient.send(analyzeCommand);
         blocks = analyzeResponse.Blocks || [];
-        this.logger.log(`   ✅ AnalyzeDocument successful, received ${blocks.length} blocks`);
+        this.logger.log(`    AnalyzeDocument successful, received ${blocks.length} blocks`);
       } else {
         // Use DetectDocumentText for simple text extraction
         const detectCommand = new DetectDocumentTextCommand({
@@ -375,7 +375,7 @@ export class TextractApiService implements DocumentReader {
         this.logger.log(`   Sending DetectDocumentText request to Textract...`);
         const detectResponse = await this.textractClient.send(detectCommand);
         blocks = detectResponse.Blocks || [];
-        this.logger.log(`   ✅ DetectDocumentText successful, received ${blocks.length} blocks`);
+        this.logger.log(`    DetectDocumentText successful, received ${blocks.length} blocks`);
       }
 
       // Convert blocks to markdown
@@ -389,7 +389,7 @@ export class TextractApiService implements DocumentReader {
       };
     } catch (error) {
       this.logger.error(
-        `❌ Error in single-page processing: ${error instanceof Error ? error.message : error}`,
+        ` Error in single-page processing: ${error instanceof Error ? error.message : error}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error; // Re-throw to be handled by main error handler
@@ -406,31 +406,31 @@ export class TextractApiService implements DocumentReader {
     pageCount: number,
   ): Promise<ApiResponse<string>> {
     try {
-      this.logger.log(`   📄 Processing ${pageCount}-page document by splitting into individual pages`);
+      this.logger.log(`    Processing ${pageCount}-page document by splitting into individual pages`);
 
       // Step 1: Split PDF into individual pages
       const pageBuffers = await this.splitPdfIntoPages(fileBuffer);
-      this.logger.log(`   ✂️ PDF split into ${pageBuffers.length} pages`);
+      this.logger.log(`   ️ PDF split into ${pageBuffers.length} pages`);
 
       // Step 2: Process each page individually
       const pageResults: string[] = [];
 
       for (let i = 0; i < pageBuffers.length; i++) {
-        this.logger.log(`   📄 Processing page ${i + 1}/${pageBuffers.length}...`);
+        this.logger.log(`    Processing page ${i + 1}/${pageBuffers.length}...`);
 
         try {
           const pageResult = await this.processSinglePageDocument(pageBuffers[i], config);
 
           if (pageResult.success && pageResult.data) {
             pageResults.push(`\n## Page ${i + 1}\n\n${pageResult.data}`);
-            this.logger.log(`   ✅ Page ${i + 1} processed successfully (${pageResult.data.length} chars)`);
+            this.logger.log(`    Page ${i + 1} processed successfully (${pageResult.data.length} chars)`);
           } else {
             const errorMsg = 'error' in pageResult ? pageResult.error : 'Unknown error';
-            this.logger.log(`   ⚠️ Page ${i + 1} failed: ${errorMsg}`);
+            this.logger.log(`   ️ Page ${i + 1} failed: ${errorMsg}`);
             pageResults.push(`\n## Page ${i + 1}\n\n*[Page processing failed: ${errorMsg}]*`);
           }
         } catch (pageError) {
-          this.logger.log(`   ❌ Page ${i + 1} error: ${pageError.message}`);
+          this.logger.log(`    Page ${i + 1} error: ${pageError.message}`);
           pageResults.push(`\n## Page ${i + 1}\n\n*[Page processing error: ${pageError.message}]*`);
         }
       }
@@ -446,7 +446,7 @@ export class TextractApiService implements DocumentReader {
       };
     } catch (error) {
       this.logger.error(
-        `❌ Error in multi-page splitting processing: ${error instanceof Error ? error.message : error}`,
+        ` Error in multi-page splitting processing: ${error instanceof Error ? error.message : error}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error; // Re-throw to be handled by main error handler
@@ -461,18 +461,18 @@ export class TextractApiService implements DocumentReader {
       // Import pdf-lib dynamically
       const { PDFDocument } = await import('pdf-lib');
 
-      this.logger.log(`   📄 Loading PDF for splitting...`);
+      this.logger.log(`    Loading PDF for splitting...`);
 
       // Load the PDF document
       const pdfDoc = await PDFDocument.load(pdfBuffer);
       const pageCount = pdfDoc.getPageCount();
 
-      this.logger.log(`   📄 Splitting PDF with ${pageCount} pages`);
+      this.logger.log(`    Splitting PDF with ${pageCount} pages`);
 
       const pageBuffers: Buffer[] = [];
 
       for (let i = 0; i < pageCount; i++) {
-        this.logger.log(`   ✂️ Extracting page ${i + 1}/${pageCount}...`);
+        this.logger.log(`   ️ Extracting page ${i + 1}/${pageCount}...`);
 
         // Create new PDF with single page
         const newPdf = await PDFDocument.create();
@@ -484,11 +484,11 @@ export class TextractApiService implements DocumentReader {
         pageBuffers.push(Buffer.from(pdfBytes));
       }
 
-      this.logger.log(`   ✂️ Successfully split into ${pageBuffers.length} individual pages`);
+      this.logger.log(`   ️ Successfully split into ${pageBuffers.length} individual pages`);
       return pageBuffers;
     } catch (error) {
       this.logger.error(
-        `   ❌ Error splitting PDF: ${error instanceof Error ? error.message : error}`,
+        `    Error splitting PDF: ${error instanceof Error ? error.message : error}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new Error(`Failed to split PDF: ${error.message}`);

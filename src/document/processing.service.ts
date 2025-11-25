@@ -32,10 +32,10 @@ export class ExpenseProcessingService {
     markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string },
     userId?: string,
   ): Promise<CompleteProcessingResult> {
-    this.logger.log(`🚀 Starting PARALLEL expense processing for: ${filename}`);
-    this.logger.log(`📍 Country: ${country}, ICP: ${icp}`);
+    this.logger.log(` Starting PARALLEL expense processing for: ${filename}`);
+    this.logger.log(` Country: ${country}, ICP: ${icp}`);
     if (userId) {
-      this.logger.log(`👤 User: ${userId}`);
+      this.logger.log(` User: ${userId}`);
     }
 
     const { timing, trueStartTime } = this.metricsService.createTimingObject(markdownExtractionInfo);
@@ -48,7 +48,7 @@ export class ExpenseProcessingService {
     try {
       // PARALLEL GROUP 1: Independent phases that can run simultaneously
       progressCallback?.('parallelPhase1', 10);
-      this.logger.log('🚀 Starting Parallel Group 1: Image Quality + Classification + Data Extraction');
+      this.logger.log(' Starting Parallel Group 1: Image Quality + Classification + Data Extraction');
 
       const parallelGroup1Start = Date.now();
 
@@ -61,12 +61,12 @@ export class ExpenseProcessingService {
       const parallelGroup1End = Date.now();
       const parallelGroup1Duration = (parallelGroup1End - parallelGroup1Start) / 1000;
 
-      this.logger.log(`✅ Parallel Group 1 completed in ${parallelGroup1Duration.toFixed(2)}s`);
+      this.logger.log(` Parallel Group 1 completed in ${parallelGroup1Duration.toFixed(2)}s`);
       progressCallback?.('parallelPhase1Complete', 60);
 
       // PARALLEL GROUP 2: Phases that depend on extraction results
       progressCallback?.('parallelPhase2', 65);
-      this.logger.log('🚀 Starting Parallel Group 2: Issue Detection + Citation Generation');
+      this.logger.log(' Starting Parallel Group 2: Issue Detection + Citation Generation');
 
       const parallelGroup2Start = Date.now();
 
@@ -92,7 +92,7 @@ export class ExpenseProcessingService {
       const parallelGroup2End = Date.now();
       const parallelGroup2Duration = (parallelGroup2End - parallelGroup2Start) / 1000;
 
-      this.logger.log(`✅ Parallel Group 2 completed in ${parallelGroup2Duration.toFixed(2)}s`);
+      this.logger.log(` Parallel Group 2 completed in ${parallelGroup2Duration.toFixed(2)}s`);
       progressCallback?.('parallelPhase2Complete', 95);
 
       // Phase 5: LLM-as-Judge Validation
@@ -130,14 +130,14 @@ export class ExpenseProcessingService {
       };
 
       progressCallback?.('complete', 100);
-      this.logger.log(`🎉 PARALLEL expense processing finished for ${filename} in ${timing.total_processing_time_seconds}s`);
+      this.logger.log(` PARALLEL expense processing finished for ${filename} in ${timing.total_processing_time_seconds}s`);
 
       // Save results
       await this.storageService.saveResults(filename, result);
 
       return result;
     } catch (error) {
-      this.logger.error(`❌ PARALLEL expense processing failed for ${filename}:`, error);
+      this.logger.error(` PARALLEL expense processing failed for ${filename}:`, error);
       throw new Error(`Parallel expense processing failed: ${error.message}`);
     } finally {
       // Cleanup temp file if it was downloaded from S3
@@ -149,7 +149,7 @@ export class ExpenseProcessingService {
 
   private async runImageQualityAssessment(imagePath: string, timing: any, agent: any) {
     const start = Date.now();
-    this.logger.log('📸 Phase 0: Image Quality Assessment (parallel)');
+    this.logger.log(' Phase 0: Image Quality Assessment (parallel)');
 
     const result = await agent.assessImageQuality(imagePath);
     const formattedResult = agent.formatAssessmentForWorkflow(result, imagePath);
@@ -164,7 +164,7 @@ export class ExpenseProcessingService {
 
   private async runFileClassification(markdownContent: string, country: string, expenseSchema: any, timing: any, agent: any) {
     const start = Date.now();
-    this.logger.log('📋 Phase 1: File Classification (parallel)');
+    this.logger.log(' Phase 1: File Classification (parallel)');
 
     const result = await agent.classifyFile(markdownContent, country, expenseSchema);
 
@@ -178,7 +178,7 @@ export class ExpenseProcessingService {
 
   private async runDataExtraction(markdownContent: string, complianceData: any, timing: any, agent: any) {
     const start = Date.now();
-    this.logger.log('🔍 Phase 2: Data Extraction (parallel)');
+    this.logger.log(' Phase 2: Data Extraction (parallel)');
 
     const result = await agent.extractData(markdownContent, complianceData);
 
@@ -200,7 +200,7 @@ export class ExpenseProcessingService {
     agent: any,
   ) {
     const start = Date.now();
-    this.logger.log('⚠️ Phase 3: Issue Detection (parallel)');
+    this.logger.log('️ Phase 3: Issue Detection (parallel)');
 
     const result = await agent.analyzeCompliance(country, receiptType, icp, complianceData, extractedData);
 
@@ -214,7 +214,7 @@ export class ExpenseProcessingService {
 
   private async runCitationGeneration(extractedData: any, markdownContent: string, filename: string, timing: any, agent: any) {
     const start = Date.now();
-    this.logger.log('📝 Phase 4: Citation Generation (parallel)');
+    this.logger.log(' Phase 4: Citation Generation (parallel)');
 
     const result = await agent.generateCitations(extractedData, markdownContent, filename);
 
