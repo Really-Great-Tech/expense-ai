@@ -1,6 +1,23 @@
 import 'reflect-metadata';
 import { BedrockLlmService, ChatMessage } from './bedrockLlm';
 
+// Mock @nestjs/config first to control ConfigService behavior
+jest.mock('@nestjs/config', () => {
+  return {
+    ConfigService: jest.fn().mockImplementation(() => ({
+      get: jest.fn((key: string, defaultValue?: any) => {
+        const values: Record<string, string> = {
+          AWS_REGION: 'us-east-1',
+          AWS_ACCESS_KEY_ID: 'AKIA_ENV_TEST',
+          AWS_SECRET_ACCESS_KEY: 'SECRET_ENV_TEST',
+          USING_APPLICATION_PROFILE: 'false',
+        };
+        return values[key] ?? defaultValue;
+      }),
+    })),
+  };
+});
+
 // Mock @aws-sdk/client-bedrock-runtime
 const mockState = {
   sendMock: jest.fn(),

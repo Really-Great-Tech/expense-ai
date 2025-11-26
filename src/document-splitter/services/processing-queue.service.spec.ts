@@ -200,13 +200,15 @@ describe('ProcessingQueueService', () => {
 
     it('should handle queue errors gracefully', async () => {
       mockQueue.add.mockRejectedValueOnce(new Error('Queue error'));
-      const warnSpy = jest.spyOn(service['logger'], 'warn');
+      const errorSpy = jest.spyOn(service['logger'], 'error');
 
       await service.enqueueReceiptProcessing([mockReceipt], options);
 
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to enqueue processing'),
-        expect.any(Error)
+        expect.objectContaining({
+          error: 'Queue error',
+        })
       );
     });
 
@@ -214,11 +216,11 @@ describe('ProcessingQueueService', () => {
       mockPersistenceService.updateReceiptStatus.mockRejectedValueOnce(
         new Error('Update failed')
       );
-      const warnSpy = jest.spyOn(service['logger'], 'warn');
+      const errorSpy = jest.spyOn(service['logger'], 'error');
 
       await service.enqueueReceiptProcessing([mockReceipt], options);
 
-      expect(warnSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
     });
 
     it('should continue processing other receipts if one fails', async () => {
@@ -242,7 +244,7 @@ describe('ProcessingQueueService', () => {
       await service.enqueueReceiptProcessing([mockReceipt], options);
 
       expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Enqueued processing job'),
+        expect.stringContaining('Successfully enqueued processing job'),
         expect.objectContaining({ jobId: expect.any(String) })
       );
     });
