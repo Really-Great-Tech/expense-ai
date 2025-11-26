@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { QUEUE_NAMES, JOB_TYPES } from '../../types';
 
 @Injectable()
@@ -80,8 +80,9 @@ export class ProcessingService {
 
   async cleanQueue(grace: number = 5000) {
     try {
-      await this.medicalQueue.clean(grace, 'completed');
-      await this.medicalQueue.clean(grace, 'failed');
+      // BullMQ clean() signature: clean(grace, limit, type)
+      await this.medicalQueue.clean(grace, 100, 'completed');
+      await this.medicalQueue.clean(grace, 100, 'failed');
       this.logger.log(`Medical processing queue cleaned`);
       return { success: true, message: `Medical processing queue cleaned` };
     } catch (error) {
@@ -99,9 +100,9 @@ export class ProcessingService {
         id: job.id,
         name: job.name,
         data: job.data,
-        status: job.finishedOn ? (job.failedReason ? 'failed' : 'completed') : 
+        status: job.finishedOn ? (job.failedReason ? 'failed' : 'completed') :
                 job.processedOn ? 'active' : 'waiting',
-        progress: job.progress(),
+        progress: job.progress,
         createdAt: new Date(job.timestamp),
         processedAt: job.processedOn ? new Date(job.processedOn) : null,
         finishedAt: job.finishedOn ? new Date(job.finishedOn) : null,

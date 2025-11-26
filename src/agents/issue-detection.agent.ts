@@ -21,7 +21,7 @@ export class IssueDetectionAgent extends BaseAgent {
     this.currentProvider = provider;
     this.defaultModelId = defaultModelId;
     this.logger.log(`Initializing IssueDetectionAgent with provider: ${provider}`);
-    this.llm = new BedrockLlmService();
+    this.llm = new BedrockLlmService({ modelType: 'nova' });
 
     // Load expense schema
     this.loadExpenseSchema();

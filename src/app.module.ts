@@ -9,7 +9,7 @@ import { DocumentModule } from './document/document.module';
 import { ProcessingModule } from './processing/processing.module';
 import { CountryPolicyModule } from './country-policy/country-policy.module';
 import { RedisConfigService } from './config/redis.config';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityMiddleware } from './middleware/security.middleware';
 import { DocumentSplitterModule } from './document-splitter/document-splitter.module';

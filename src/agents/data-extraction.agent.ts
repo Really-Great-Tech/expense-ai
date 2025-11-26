@@ -19,7 +19,7 @@ export class DataExtractionAgent extends BaseAgent {
     this.defaultModelId = defaultModelId;
     this.logger.log(`Initializing DataExtractionAgent with provider: ${provider}`);
 
-    this.llm = new BedrockLlmService();
+    this.llm = new BedrockLlmService({ modelType: 'nova' });
   }
 
   /**

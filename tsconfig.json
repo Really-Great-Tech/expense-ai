@@ -22,5 +22,5 @@
       "@config/*": ["src/config/*"]
     }
   },
-  "exclude": ["*.test.ts", "*.spec.ts","docs"]
+  "exclude": ["*.test.ts", "*.spec.ts", "docs", "test-*.ts"]
 }

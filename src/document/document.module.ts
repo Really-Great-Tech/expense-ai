@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -61,8 +61,8 @@ import * as path from 'path';
           type: 'exponential',
           delay: 2000,
         },
-        // 10 minute timeout for all processing jobs
-        timeout: 10 * 60 * 1000, // 600,000ms = 10 minutes
+        // Note: BullMQ doesn't support timeout in defaultJobOptions
+        // Implement timeout handling in the processor if needed
       },
     }),
 

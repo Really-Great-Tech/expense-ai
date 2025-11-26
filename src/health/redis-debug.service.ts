@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis, { Cluster } from 'ioredis';
-import Queue from 'bull';
+import { Queue } from 'bullmq';
 
 interface DebugStep {
   step: number;
@@ -303,7 +303,7 @@ export class RedisDebugService {
   }): Promise<BullQueueDebugResult> {
     const steps: DebugStep[] = [];
     const startTime = Date.now();
-    let queue: Queue.Queue | null = null;
+    let queue: Queue | null = null;
     let configDetails: any = {};
 
     this.logger.log(`📦 [${config.name}] Starting Bull config test...`);
@@ -339,14 +339,12 @@ export class RedisDebugService {
         details: { queueName },
       });
 
-      // Step 3: Wait for ready
+      // Step 3: Wait for ready (BullMQ queues are ready immediately, but we can verify connection)
       const step3Start = Date.now();
-      this.logger.log(`📦 [${config.name}] Step 3: Waiting for queue ready...`);
+      this.logger.log(`📦 [${config.name}] Step 3: Verifying queue is ready...`);
 
-      await Promise.race([
-        queue.isReady(),
-        this.timeout(20000, 'Queue ready timeout after 20s'),
-      ]);
+      // In BullMQ, use waitUntilReady() to ensure connection is established
+      await Promise.race([queue.waitUntilReady(), this.timeout(20000, 'Queue ready timeout after 20s')]);
 
       steps.push({
         step: 3,
@@ -1014,7 +1012,7 @@ export class RedisDebugService {
     }
   }
 
-  private async safeCloseQueue(queue: Queue.Queue): Promise<void> {
+  private async safeCloseQueue(queue: Queue): Promise<void> {
     try {
       await queue.close();
     } catch {

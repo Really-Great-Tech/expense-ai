@@ -20,7 +20,7 @@ export class CitationGeneratorAgent extends BaseAgent {
 
     // Use Nova Micro for citations - better for structured output
     this.citationModelId = citationModelId;
-    this.llm = new BedrockLlmService({ modelId: this.citationModelId });
+    this.llm = new BedrockLlmService({ modelId: this.citationModelId, modelType: 'nova' });
     this.logger.log(`Using model for citations: ${this.citationModelId}`);
   }
 

@@ -117,6 +117,7 @@ export class ParallelExpenseComplianceUQLMValidator {
         new BedrockLlmService({
           modelId: config.modelId,
           temperature: config.temperature,
+          modelType: 'claude',
         }),
     );
 

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getQueueToken } from '@nestjs/bull';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ProcessingQueueService } from './processing-queue.service';
 import { DocumentPersistenceService } from './document-persistence.service';
 import { ReceiptProcessingResultRepository } from '@/document/repositories/receipt-processing-result.repository';
