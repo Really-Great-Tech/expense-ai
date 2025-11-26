@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue, Job } from 'bull';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue, Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -145,7 +145,7 @@ export class DocumentService {
       }
 
       // Since all processing is now done in one job, we just need to check the main job
-      const jobProgress = documentJob.progress();
+      const jobProgress = documentJob.progress;
       const isCompleted = documentJob.finishedOn !== null;
       const isActive = documentJob.processedOn !== null && !isCompleted;
 

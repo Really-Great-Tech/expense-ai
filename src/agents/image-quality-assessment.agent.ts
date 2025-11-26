@@ -19,7 +19,7 @@ export class ImageQualityAssessmentAgent extends BaseAgent {
     super();
     this.currentProvider = provider;
     this.defaultModelId = defaultModelId;
-    this.llm = new BedrockLlmService();
+    this.llm = new BedrockLlmService({ modelType: 'nova' });
   }
 
   /**

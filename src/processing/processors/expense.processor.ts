@@ -1,7 +1,7 @@
-import { Processor, Process, InjectQueue } from '@nestjs/bull';
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Job } from 'bull';
+import { Job } from 'bullmq';
 import { DocumentReaderFactory } from '../../utils/documentReaderFactory';
 import { DocumentProcessingData, QUEUE_NAMES, JOB_TYPES, JobResult } from '../../types';
 import { ExpenseProcessingService } from '@/document/processing.service';
@@ -19,11 +19,13 @@ import * as fs from 'fs';
  * Expense Processor
  *
  * Processes expense documents through the BullMQ queue.
- * Concurrency is configured at the @Process decorator level.
- * By default, processes 5 receipts concurrently (configurable via WORKER_CONCURRENCY env var).
+ * Concurrency is configured via WORKER_CONCURRENCY env var.
+ * By default, processes 5 receipts concurrently.
  */
-@Processor(QUEUE_NAMES.EXPENSE_PROCESSING)
-export class ExpenseProcessor {
+@Processor(QUEUE_NAMES.EXPENSE_PROCESSING, {
+  concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
+})
+export class ExpenseProcessor extends WorkerHost {
   private readonly logger = new Logger(ExpenseProcessor.name);
 
   constructor(
@@ -35,13 +37,11 @@ export class ExpenseProcessor {
     private readonly receiptProcessingResultRepo: ReceiptProcessingResultRepository,
     private readonly documentPersistenceService: DocumentPersistenceService,
     private readonly countryPolicyService: CountryPolicyService,
-  ) {}
+  ) {
+    super();
+  }
 
-  @Process({
-    name: JOB_TYPES.PROCESS_DOCUMENT,
-    concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
-  })
-  async processDocument(job: Job<DocumentProcessingData>): Promise<JobResult> {
+  async process(job: Job<DocumentProcessingData>): Promise<JobResult> {
     const startTime = Date.now();
     const { jobId, storageKey, storageType, fileName, userId, country, icp, documentReader, receiptId } = job.data;
 
@@ -85,7 +85,7 @@ export class ExpenseProcessor {
           complianceData,
           expenseSchema,
           async (stage: string, progress: number) => {
-            await job.progress(progress);
+            await job.updateProgress(progress);
             this.logger.log(`${stage}: ${progress}%`);
 
             // Update stage status in database
@@ -334,5 +334,25 @@ ${markdownContent}`;
     } catch (error) {
       this.logger.error('Failed to save markdown content:', error);
     }
+  }
+
+  @OnWorkerEvent('completed')
+  onCompleted(job: Job<DocumentProcessingData>, result: JobResult) {
+    const receiptId = job?.data?.receiptId ?? 'unknown';
+    this.logger.log(
+      `Job ${job?.id} (${job?.name}) for receipt ${receiptId} completed with status: ${result.success ? 'success' : 'failure'}`,
+    );
+  }
+
+  @OnWorkerEvent('failed')
+  onFailed(job: Job<DocumentProcessingData> | undefined, error: Error) {
+    const jobId = job?.id ?? 'unknown';
+    const receiptId = job?.data?.receiptId ?? 'unknown';
+    this.logger.error(`Job ${jobId} for receipt ${receiptId} failed: ${error.message}`, error.stack);
+  }
+
+  @OnWorkerEvent('error')
+  onWorkerError(error: Error) {
+    this.logger.error(`Worker error: ${error.message}`, error.stack);
   }
 }

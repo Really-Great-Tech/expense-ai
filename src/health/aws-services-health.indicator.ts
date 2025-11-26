@@ -12,6 +12,24 @@ interface ServiceTestResult {
   error?: string;
 }
 
+interface ModelTestResult {
+  name: string;
+  modelId: string;
+  modelType: 'nova' | 'claude';
+  status: 'up' | 'down';
+  latency: string;
+  responseText?: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  error?: string;
+}
+
+interface BedrockModelConfig {
+  envVar: string;
+  defaultValue: string;
+  modelType: 'nova' | 'claude';
+  description: string;
+}
+
 /**
  * AWS Services Health Indicator
  * Tests connectivity and operational status of AWS Textract and Bedrock services
@@ -59,7 +77,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
 
       // Initialize Bedrock client (same config as BedrockLlmService)
       this.bedrockClient = new BedrockRuntimeClient({
-        region: bedrockRegion,
+        region: "us-east-1",
         credentials: bedrockCredentials,
       });
 
@@ -132,15 +150,132 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   }
 
   /**
-   * Detect if the current model is Nova or Claude (matches BedrockLlmService logic)
+   * Derive model type from model ID string at runtime
+   * Works with both regular model IDs and application inference profile ARNs
    */
-  private isNovaModel(modelId: string): boolean {
-    return modelId.includes('amazon.nova');
+  private deriveModelType(modelId: string): 'nova' | 'claude' {
+    const lowerModelId = modelId.toLowerCase();
+    if (lowerModelId.includes('nova')) {
+      return 'nova';
+    }
+    if (lowerModelId.includes('claude') || lowerModelId.includes('anthropic')) {
+      return 'claude';
+    }
+    // Default to nova for unknown models (BEDROCK_MODEL defaults to Nova)
+    return 'nova';
   }
 
   /**
-   * Test AWS Bedrock connectivity and functionality
-   * Uses same model detection logic as BedrockLlmService
+   * Get all Bedrock models to test
+   */
+  private getModelsToTest(): BedrockModelConfig[] {
+    return [
+      {
+        envVar: 'BEDROCK_MODEL',
+        defaultValue: 'us.amazon.nova-pro-v1:0',
+        modelType: 'nova',
+        description: 'Primary model (extraction, quality, compliance, splitter)',
+      },
+      {
+        envVar: 'CITATION_MODEL',
+        defaultValue: 'us.amazon.nova-micro-v1:0',
+        modelType: 'nova',
+        description: 'Citation generation model',
+      },
+      {
+        envVar: 'BEDROCK_JUDGE_MODEL_1',
+        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        modelType: 'claude',
+        description: 'Judge model 1 (validation)',
+      },
+      {
+        envVar: 'BEDROCK_JUDGE_MODEL_2',
+        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        modelType: 'claude',
+        description: 'Judge model 2 (validation)',
+      },
+      {
+        envVar: 'BEDROCK_JUDGE_MODEL_3',
+        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        modelType: 'claude',
+        description: 'Judge model 3 (validation)',
+      },
+    ];
+  }
+
+  /**
+   * Test a single Bedrock model
+   */
+  private async testSingleModel(config: BedrockModelConfig): Promise<ModelTestResult> {
+    const startTime = Date.now();
+    const modelId = this.configService.get<string>(config.envVar, config.defaultValue);
+
+    // Determine model type - use config type, but verify with string if using application profiles
+    const usingApplicationProfile = this.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
+    const modelType = usingApplicationProfile ? this.deriveModelType(modelId) : config.modelType;
+    const isNova = modelType === 'nova';
+
+    try {
+      let responseText = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+
+      if (isNova) {
+        const command = new ConverseCommand({
+          modelId,
+          messages: [{ role: 'user', content: [{ text: 'Reply with only the word "OK"' }] }],
+          inferenceConfig: { maxTokens: 10, temperature: 0, topP: 0.9 },
+        });
+        const response = await this.bedrockClient!.send(command);
+        responseText = response.output?.message?.content?.[0]?.text || '';
+        inputTokens = response.usage?.inputTokens || 0;
+        outputTokens = response.usage?.outputTokens || 0;
+      } else {
+        const requestBody = {
+          anthropic_version: 'bedrock-2023-05-31',
+          max_tokens: 10,
+          temperature: 0,
+          messages: [{ role: 'user', content: 'Reply with only the word "OK"' }],
+        };
+        const command = new InvokeModelCommand({
+          modelId,
+          contentType: 'application/json',
+          accept: 'application/json',
+          body: JSON.stringify(requestBody),
+        });
+        const response = await this.bedrockClient!.send(command);
+        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+        responseText = responseBody.content[0].text;
+        inputTokens = responseBody.usage?.input_tokens || 0;
+        outputTokens = responseBody.usage?.output_tokens || 0;
+      }
+
+      const latency = Date.now() - startTime;
+      return {
+        name: config.envVar,
+        modelId,
+        modelType,
+        status: 'up',
+        latency: `${latency}ms`,
+        responseText,
+        usage: { inputTokens, outputTokens },
+      };
+    } catch (error) {
+      const latency = Date.now() - startTime;
+      return {
+        name: config.envVar,
+        modelId,
+        modelType,
+        status: 'down',
+        latency: `${latency}ms`,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Test AWS Bedrock connectivity and functionality for all configured models
+   * Tests: BEDROCK_MODEL, CITATION_MODEL, BEDROCK_JUDGE_MODEL_1/2/3
    */
   async checkBedrock(key: string): Promise<HealthIndicatorResult> {
     const startTime = Date.now();
@@ -150,91 +285,51 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         throw new Error('Bedrock client not initialized');
       }
 
-      const modelId = this.configService.get<string>('BEDROCK_MODEL', 'us.amazon.nova-pro-v1:0');
-      const isNova = this.isNovaModel(modelId);
+      const modelsToTest = this.getModelsToTest();
+      const modelResults: ModelTestResult[] = [];
 
-      let responseText = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
-
-      if (isNova) {
-        // Use Converse API for Nova models (same as BedrockLlmService.chatWithNova)
-        const command = new ConverseCommand({
-          modelId,
-          messages: [
-            {
-              role: 'user',
-              content: [{ text: 'Reply with only the word "OK"' }],
-            },
-          ],
-          inferenceConfig: {
-            maxTokens: 10,
-            temperature: 0,
-            topP: 0.9,
-          },
-        });
-
-        const response = await this.bedrockClient.send(command);
-        responseText = response.output?.message?.content?.[0]?.text || '';
-        inputTokens = response.usage?.inputTokens || 0;
-        outputTokens = response.usage?.outputTokens || 0;
-      } else {
-        // Use Invoke API for Claude models (same as BedrockLlmService.chatWithBedrock)
-        const requestBody = {
-          anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 10,
-          temperature: 0,
-          messages: [
-            {
-              role: 'user',
-              content: 'Reply with only the word "OK"',
-            },
-          ],
-        };
-
-        const command = new InvokeModelCommand({
-          modelId,
-          contentType: 'application/json',
-          accept: 'application/json',
-          body: JSON.stringify(requestBody),
-        });
-
-        const response = await this.bedrockClient.send(command);
-        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-        responseText = responseBody.content[0].text;
-        inputTokens = responseBody.usage?.input_tokens || 0;
-        outputTokens = responseBody.usage?.output_tokens || 0;
+      // Test all models
+      for (const config of modelsToTest) {
+        this.logger.log(`Testing ${config.envVar} (${config.description})...`);
+        const result = await this.testSingleModel(config);
+        modelResults.push(result);
+        this.logger.log(`  ${config.envVar}: ${result.status} (${result.latency})`);
       }
 
       const latency = Date.now() - startTime;
+      const allUp = modelResults.every((r) => r.status === 'up');
+      const upCount = modelResults.filter((r) => r.status === 'up').length;
+      const downCount = modelResults.filter((r) => r.status === 'down').length;
 
       const result: ServiceTestResult = {
-        status: 'up',
-        message: 'Bedrock is operational',
+        status: allUp ? 'up' : 'down',
+        message: allUp ? 'All Bedrock models operational' : `${downCount}/${modelResults.length} models down`,
         latency: `${latency}ms`,
         details: {
           region: this.configService.get('AWS_REGION', 'eu-west-1'),
           credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
-          modelId,
-          modelType: isNova ? 'nova' : 'claude',
-          apiUsed: isNova ? 'Converse' : 'Invoke',
-          responseText,
-          usage: {
-            inputTokens,
-            outputTokens,
-          },
+          usingApplicationProfile: this.configService.get<string>('USING_APPLICATION_PROFILE', 'false'),
+          summary: { total: modelResults.length, up: upCount, down: downCount },
+          models: modelResults,
         },
       };
 
-      this.logger.log(`Bedrock health check passed (${latency}ms, ${isNova ? 'Nova/Converse' : 'Claude/Invoke'})`);
+      if (!allUp) {
+        this.logger.error(`Bedrock health check failed: ${downCount} models down`);
+        throw new HealthCheckError('Bedrock health check failed', this.getStatus(key, false, result));
+      }
+
+      this.logger.log(`Bedrock health check passed (${latency}ms, ${upCount} models tested)`);
       return this.getStatus(key, true, result);
     } catch (error) {
+      if (error instanceof HealthCheckError) {
+        throw error;
+      }
+
       const latency = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
       this.logger.error(`Bedrock health check failed: ${errorMessage}`);
 
-      const modelId = this.configService.get('BEDROCK_MODEL', 'us.amazon.nova-pro-v1:0');
       const result: ServiceTestResult = {
         status: 'down',
         message: 'Bedrock is unavailable',
@@ -243,8 +338,6 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         details: {
           errorType: error.constructor.name,
           region: this.configService.get('AWS_REGION', 'eu-west-1'),
-          modelId,
-          modelType: this.isNovaModel(modelId) ? 'nova' : 'claude',
         },
       };
 

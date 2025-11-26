@@ -1,5 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentSplitterController } from './document-splitter.controller';
 import { SingleReceiptController } from './single-receipt.controller';

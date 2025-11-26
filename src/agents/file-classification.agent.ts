@@ -19,7 +19,7 @@ export class FileClassificationAgent extends BaseAgent {
     this.modelName = modelName || MODEL_CONFIG.CLASSIFICATION;
     this.logger.log(`Initializing FileClassificationAgent with provider: ${provider}`);
 
-    this.llm = new BedrockLlmService();
+    this.llm = new BedrockLlmService({ modelType: 'claude' });
   }
 
   /**

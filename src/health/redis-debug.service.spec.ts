@@ -42,22 +42,24 @@ jest.mock('ioredis', () => {
   };
 });
 
-// Mock bull
-jest.mock('bull', () => {
+// Mock bullmq
+jest.mock('bullmq', () => {
   const mockJob = {
     id: 'test-job-id',
     remove: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockQueue = {
-    isReady: jest.fn().mockResolvedValue(undefined),
+    waitUntilReady: jest.fn().mockResolvedValue(undefined),
     add: jest.fn().mockResolvedValue(mockJob),
     getJobCounts: jest.fn().mockResolvedValue({ waiting: 1, active: 0, completed: 0, failed: 0 }),
     getJob: jest.fn().mockResolvedValue(mockJob),
     close: jest.fn().mockResolvedValue(undefined),
   };
 
-  return jest.fn(() => mockQueue);
+  return {
+    Queue: jest.fn(() => mockQueue),
+  };
 });
 
 describe('RedisDebugService', () => {

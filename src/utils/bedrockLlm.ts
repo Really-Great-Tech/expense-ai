@@ -2,6 +2,8 @@ import { BedrockRuntimeClient, InvokeModelCommand, ConverseCommand } from '@aws-
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+export type ModelType = 'nova' | 'claude';
+
 export interface BedrockConfig {
   accessKeyId?: string;
   secretAccessKey?: string;
@@ -9,6 +11,11 @@ export interface BedrockConfig {
   region?: string;
   modelId?: string;
   temperature?: number;
+  /**
+   * Explicit model type - required when USING_APPLICATION_PROFILE=true
+   * since application inference profile ARNs don't contain model name info
+   */
+  modelType?: ModelType;
 }
 
 export interface ChatMessage {
@@ -38,6 +45,8 @@ export class BedrockLlmService {
   private bedrockClient: BedrockRuntimeClient | null = null;
   private modelId: string;
   private temperature: number;
+  private modelType?: ModelType;
+  private usingApplicationProfile: boolean;
 
   private static readonly configService = new ConfigService();
 
@@ -65,10 +74,27 @@ export class BedrockLlmService {
       };
 
       this.bedrockClient = new BedrockRuntimeClient(bedrockConfig);
+
+      // Check if using application inference profiles globally
+      this.usingApplicationProfile = BedrockLlmService.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
+
       // Prefer env var over config, use config as fallback, then hardcoded default
       this.modelId = BedrockLlmService.configService.get<string>('BEDROCK_MODEL') || config?.modelId || 'us.amazon.nova-pro-v1:0';
+
+      // Store model type from config (agents pass this based on their known model type)
+      this.modelType = config?.modelType;
+
+      // Validate: if using application profile, model type must be provided by caller
+      if (this.usingApplicationProfile && !this.modelType) {
+        throw new Error('modelType is required when USING_APPLICATION_PROFILE=true');
+      }
+
       this.temperature = config?.temperature ?? 0.7; // Default temperature
-      this.logger.log(`✅ Bedrock client initialized with model: ${this.modelId}, temperature: ${this.temperature}`);
+      this.logger.log(
+        `✅ Bedrock client initialized: model=${this.modelId}, ` +
+          `type=${this.modelType || 'auto-detect'}, ` +
+          `appProfile=${this.usingApplicationProfile}, temp=${this.temperature}`,
+      );
     } catch (error) {
       this.logger.warn(`⚠️ Failed to initialize Bedrock client: ${error.message}`);
       this.bedrockClient = null;
@@ -77,8 +103,13 @@ export class BedrockLlmService {
 
   /**
    * Detect if the current model is Nova or Claude
+   * When USING_APPLICATION_PROFILE=true, uses explicit modelType from config
+   * Otherwise, infers from model ID string
    */
   private isNovaModel(): boolean {
+    if (this.usingApplicationProfile) {
+      return this.modelType === 'nova';
+    }
     return this.modelId.includes('amazon.nova');
   }
 

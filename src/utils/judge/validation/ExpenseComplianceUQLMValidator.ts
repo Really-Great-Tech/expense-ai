@@ -44,11 +44,12 @@ export class ExpenseComplianceUQLMValidator {
       }
     ];
 
-    this.bedrockServices = judgeConfigs.map(config =>
+    this.bedrockServices = judgeConfigs.map((config) =>
       new BedrockLlmService({
         modelId: config.modelId,
-        temperature: config.temperature
-      })
+        temperature: config.temperature,
+        modelType: 'claude',
+      }),
     );
     
     this.logger.log('✅ ExpenseComplianceUQLMValidator initialized with 3 judge models and custom temperatures');
