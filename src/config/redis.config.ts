@@ -10,10 +10,10 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
   constructor(private configService: ConfigService) {}
 
   createSharedConfiguration(): BullRootModuleOptions {
-    const redisHost = this.configService.get<string>('REDIS_HOST', 'clustercfg.papya-elasticache-cluster.t7zk5x.euw1.cache.amazonaws.com');
+    const redisHost = this.configService.get<string>('REDIS_HOST','localhost',);
     const redisPort = parseInt(this.configService.get<string>('REDIS_PORT', '6379'), 10);
-    const useCluster = this.configService.get('REDIS_CLUSTER_ENABLED', 'false') === 'true';
-    const useTls = this.configService.get('REDIS_TLS_ENABLED', 'false') === 'true';
+    const useCluster = this.configService.get('REDIS_CLUSTER_ENABLED', 'true') === 'true';
+    const useTls = this.configService.get('REDIS_TLS_ENABLED', 'true') === 'true';
 
     const connection = useCluster
       ? new Cluster(
@@ -28,11 +28,11 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
             redisOptions: this.buildRedisOptions(useTls, redisHost),
           },
         )
-      : {
+      : new Redis({
           host: redisHost,
           port: redisPort,
           ...this.buildRedisOptions(useTls, redisHost),
-        };
+        } as RedisOptions);
 
     return {
       connection,
@@ -72,13 +72,6 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
     if (username) {
       options.username = username;
     }
-
-    const db = this.configService.get<string>('REDIS_DB');
-    if (db) {
-      options.db = parseInt(db, 10);
-    }
-    options.maxRetriesPerRequest = this.configService.get('REDIS_MAX_RETRIES_PER_REQUEST', 3);
-    options.enableReadyCheck = this.configService.get('REDIS_ENABLE_READY_CHECK', 'false') === 'true';
 
     return options;
   }
