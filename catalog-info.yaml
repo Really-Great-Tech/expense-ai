@@ -16,7 +16,7 @@ metadata:
     - backend
     - node
   labels:
-    tier: "666"
+    tier: "1"
     papayaglobal.com/division: payroll
   links:
     # Contacts:
@@ -68,4 +68,4 @@ spec:
   type: "service"
   owner: "group:papayaglobal/operations"
   lifecycle: "production"
-  tier: "666"
+  tier: "1"
