@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SharedBullConfigurationFactory, BullRootModuleOptions } from '@nestjs/bullmq';
-import Redis, { Cluster, RedisOptions } from 'ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class RedisConfigService implements SharedBullConfigurationFactory {
@@ -10,29 +10,7 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
   constructor(private configService: ConfigService) {}
 
   createSharedConfiguration(): BullRootModuleOptions {
-    const redisHost = this.configService.get<string>('REDIS_HOST','localhost',);
-    const redisPort = parseInt(this.configService.get<string>('REDIS_PORT', '6379'), 10);
-    const useCluster = this.configService.get('REDIS_CLUSTER_ENABLED', 'true') === 'true';
-    const useTls = this.configService.get('REDIS_TLS_ENABLED', 'true') === 'true';
-
-    const connection = useCluster
-      ? new Cluster(
-          [
-            {
-              host: redisHost,
-              port: redisPort,
-            },
-          ],
-          {
-            dnsLookup: (address, callback) => callback(null, address),
-            redisOptions: this.buildRedisOptions(useTls, redisHost),
-          },
-        )
-      : new Redis({
-          host: redisHost,
-          port: redisPort,
-          ...this.buildRedisOptions(useTls, redisHost),
-        } as RedisOptions);
+    const connection = this.createBullMQRedisConnection();
 
     return {
       connection,
@@ -53,26 +31,74 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
     };
   }
 
-  private buildRedisOptions(useTls: boolean, serverName: string): Partial<RedisOptions> {
-    const options: Partial<RedisOptions> = {};
+  /**
+   * Create Redis connection for BullMQ
+   * Routes to local or managed connection based on REDIS_MODE
+   */
+  private createBullMQRedisConnection(): Redis {
+    const redisMode = this.configService.get('REDIS_MODE', 'local');
 
-    if (useTls) {
-      options.tls = {
-        servername: serverName,
+    if (redisMode === 'managed') {
+      return this.createManagedBullMQRedisConnection();
+    }
+
+    return this.createLocalBullMQRedisConnection();
+  }
+
+  /**
+   * Create local Redis connection for BullMQ
+   * BullMQ requires maxRetriesPerRequest: null
+   */
+  private createLocalBullMQRedisConnection(): Redis {
+    const host = this.configService.get('REDIS_HOST', 'localhost');
+    const port = this.configService.get('REDIS_PORT', 6379);
+
+    this.logger.log(`Creating local BullMQ Redis connection to ${host}:${port}`);
+
+    return new Redis({
+      host,
+      port,
+      password: this.configService.get('REDIS_PASSWORD'),
+      db: this.configService.get('REDIS_DB', 0),
+      maxRetriesPerRequest: null, // Required by BullMQ
+      enableReadyCheck: false,
+    });
+  }
+
+  /**
+   * Create managed Redis connection for BullMQ (AWS ElastiCache)
+   * BullMQ requires maxRetriesPerRequest: null
+   */
+  private createManagedBullMQRedisConnection(): Redis {
+    const endpoint = this.configService.get('REDIS_HOST');
+    const port = this.configService.get('REDIS_PORT', 6379);
+    const password = this.configService.get('REDIS_PASSWORD');
+    const tlsEnabled = this.configService.get('REDIS_TLS_ENABLED', 'false') === 'true';
+
+    if (!endpoint) {
+      throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
+    }
+
+    this.logger.log(`Creating managed BullMQ Redis connection to ${endpoint}:${port} (TLS: ${tlsEnabled})`);
+
+    const config: any = {
+      host: endpoint,
+      port: parseInt(port.toString(), 10),
+      password: password || undefined,
+      db: this.configService.get('REDIS_DB', 0),
+      maxRetriesPerRequest: null, // Required by BullMQ
+      enableReadyCheck: false,
+      connectTimeout: 10000,
+    };
+
+    if (tlsEnabled) {
+      config.tls = {
+        servername: endpoint,
+        checkServerIdentity: () => undefined,
       };
-      this.logger.log(`TLS enabled for Redis connection (servername: ${serverName})`);
+      this.logger.log(`TLS enabled for Redis connection (servername: ${endpoint})`);
     }
 
-    const password = this.configService.get<string>('REDIS_PASSWORD');
-    if (password) {
-      options.password = password;
-    }
-
-    const username = this.configService.get<string>('REDIS_USERNAME');
-    if (username) {
-      options.username = username;
-    }
-
-    return options;
+    return new Redis(config);
   }
 }

@@ -8,6 +8,45 @@ import Redis from 'ioredis';
 // Mock ioredis
 jest.mock('ioredis');
 
+// Mock bullmq
+jest.mock('bullmq', () => {
+  const mockJob = {
+    id: 'test-job-id',
+    data: { healthCheck: true },
+    remove: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockQueue = {
+    waitUntilReady: jest.fn().mockResolvedValue(undefined),
+    add: jest.fn().mockResolvedValue(mockJob),
+    getJobCounts: jest.fn().mockResolvedValue({
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
+    }),
+    close: jest.fn().mockResolvedValue(undefined),
+  };
+
+  return {
+    Queue: jest.fn(() => mockQueue),
+    Job: {
+      fromId: jest.fn().mockImplementation((_queue, jobId) => {
+        // First call returns the job, subsequent calls return undefined (job removed)
+        if (jobId === 'test-job-id') {
+          const callCount = (jest.mocked(require('bullmq').Job.fromId).mock.calls.length);
+          if (callCount <= 1) {
+            return Promise.resolve(mockJob);
+          }
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve(undefined);
+      }),
+    },
+  };
+});
+
 const MockedRedis = jest.mocked(Redis);
 
 describe('RedisHealthEnhancedIndicator', () => {
@@ -68,6 +107,21 @@ describe('RedisHealthEnhancedIndicator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupDefaultMock();
+    
+    // Reset the Job.fromId mock to return job on first call, undefined on second
+    const bullmq = require('bullmq');
+    let fromIdCallCount = 0;
+    bullmq.Job.fromId = jest.fn().mockImplementation(() => {
+      fromIdCallCount++;
+      if (fromIdCallCount === 1) {
+        return Promise.resolve({
+          id: 'test-job-id',
+          data: { healthCheck: true },
+          remove: jest.fn().mockResolvedValue(undefined),
+        });
+      }
+      return Promise.resolve(undefined);
+    });
   });
 
   afterEach(async () => {
@@ -90,11 +144,15 @@ describe('RedisHealthEnhancedIndicator', () => {
       expect(result).toBeDefined();
       expect(result['redis-queue']).toBeDefined();
       expect(result['redis-queue'].status).toBe('up');
-      expect(result['redis-queue'].message).toBe('Redis is fully operational');
-      expect(result['redis-queue'].operations).toBeDefined();
-      expect(result['redis-queue'].operations.write).toBe('success');
-      expect(result['redis-queue'].operations.read).toBe('success');
-      expect(result['redis-queue'].operations.delete).toBe('success');
+      expect(result['redis-queue'].message).toBe('Redis and BullMQ are fully operational');
+      
+      // Check Redis operations
+      expect(result['redis-queue'].redis).toBeDefined();
+      expect(result['redis-queue'].redis.status).toBe('healthy');
+      expect(result['redis-queue'].redis.operations).toBeDefined();
+      expect(result['redis-queue'].redis.operations.write).toBe('success');
+      expect(result['redis-queue'].redis.operations.read).toBe('success');
+      expect(result['redis-queue'].redis.operations.delete).toBe('success');
     });
 
     it('should include latency information', async () => {
@@ -107,10 +165,13 @@ describe('RedisHealthEnhancedIndicator', () => {
       indicator = moduleRef.get(RedisHealthEnhancedIndicator);
       const result = await indicator.isHealthy('redis-queue');
 
-      expect(result['redis-queue'].latency).toBeDefined();
-      expect(result['redis-queue'].latency.write).toMatch(/\d+ms/);
-      expect(result['redis-queue'].latency.read).toMatch(/\d+ms/);
-      expect(result['redis-queue'].latency.total).toMatch(/\d+ms/);
+      // Redis latency
+      expect(result['redis-queue'].redis.latency).toBeDefined();
+      expect(result['redis-queue'].redis.latency.write).toMatch(/\d+ms/);
+      expect(result['redis-queue'].redis.latency.read).toMatch(/\d+ms/);
+      
+      // Total latency
+      expect(result['redis-queue'].totalLatency).toMatch(/\d+ms/);
     });
 
     it('should include server info', async () => {
@@ -123,10 +184,75 @@ describe('RedisHealthEnhancedIndicator', () => {
       indicator = moduleRef.get(RedisHealthEnhancedIndicator);
       const result = await indicator.isHealthy('redis-queue');
 
-      expect(result['redis-queue'].server).toBeDefined();
-      expect(result['redis-queue'].server.version).toBe('7.0.11');
-      expect(result['redis-queue'].server.uptimeSeconds).toBe(86400);
-      expect(result['redis-queue'].server.connectedClients).toBe(5);
+      expect(result['redis-queue'].redis.server).toBeDefined();
+      expect(result['redis-queue'].redis.server.version).toBe('7.0.11');
+      expect(result['redis-queue'].redis.server.uptimeSeconds).toBe(86400);
+      expect(result['redis-queue'].redis.server.connectedClients).toBe(5);
+    });
+
+    it('should include BullMQ health check results', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      const result = await indicator.isHealthy('redis-queue');
+
+      expect(result['redis-queue'].bullmq).toBeDefined();
+      expect(result['redis-queue'].bullmq.status).toBe('healthy');
+      expect(result['redis-queue'].bullmq.operations).toBeDefined();
+      expect(result['redis-queue'].bullmq.operations.queueConnect).toBe('success');
+      expect(result['redis-queue'].bullmq.operations.jobEnqueue).toBe('success');
+      expect(result['redis-queue'].bullmq.operations.jobRetrieve).toBe('success');
+      expect(result['redis-queue'].bullmq.operations.jobDelete).toBe('success');
+    });
+
+    it('should include BullMQ latency information', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      const result = await indicator.isHealthy('redis-queue');
+
+      expect(result['redis-queue'].bullmq.latency).toBeDefined();
+      expect(result['redis-queue'].bullmq.latency.queueConnect).toMatch(/\d+ms/);
+      expect(result['redis-queue'].bullmq.latency.jobLifecycle).toMatch(/\d+ms/);
+    });
+
+    it('should include BullMQ queue info', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      const result = await indicator.isHealthy('redis-queue');
+
+      expect(result['redis-queue'].bullmq.queueInfo).toBeDefined();
+      expect(result['redis-queue'].bullmq.queueInfo.name).toMatch(/^health-bullmq-\d+$/);
+      expect(result['redis-queue'].bullmq.queueInfo.jobCounts).toBeDefined();
+      expect(result['redis-queue'].bullmq.queueInfo.jobCounts.waiting).toBe(0);
+      expect(result['redis-queue'].bullmq.queueInfo.jobCounts.active).toBe(0);
+    });
+
+    it('should skip BullMQ health check when includeBullMQ is false', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      const result = await indicator.isHealthy('redis-queue', 5000, false);
+
+      expect(result['redis-queue'].bullmq).toBeDefined();
+      expect(result['redis-queue'].bullmq.status).toBe('skipped');
     });
 
     it('should work with managed mode and TLS', async () => {
@@ -199,6 +325,32 @@ describe('RedisHealthEnhancedIndicator', () => {
 
       await expect(indicator.isHealthy('redis-queue')).rejects.toThrow(HealthCheckError);
     });
+
+    it('should continue with unhealthy BullMQ status if BullMQ fails but Redis works', async () => {
+      // Mock BullMQ to fail
+      const bullmq = require('bullmq');
+      bullmq.Queue = jest.fn(() => ({
+        waitUntilReady: jest.fn().mockRejectedValue(new Error('BullMQ connection failed')),
+        close: jest.fn().mockResolvedValue(undefined),
+      }));
+
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      const result = await indicator.isHealthy('redis-queue');
+
+      // Redis should still be healthy
+      expect(result['redis-queue'].status).toBe('up');
+      expect(result['redis-queue'].redis.status).toBe('healthy');
+      
+      // BullMQ should be unhealthy
+      expect(result['redis-queue'].bullmq.status).toBe('unhealthy');
+      expect(result['redis-queue'].bullmq.error).toBeDefined();
+    });
   });
 
   describe('timeout handling', () => {
@@ -216,6 +368,43 @@ describe('RedisHealthEnhancedIndicator', () => {
       const duration = Date.now() - startTime;
 
       expect(duration).toBeLessThan(10000);
+    });
+  });
+
+  describe('BullMQ connection methods', () => {
+    it('should use local BullMQ connection for local mode', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'local',
+        REDIS_HOST: 'localhost',
+        REDIS_PORT: '6379',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      await indicator.isHealthy('redis-queue');
+
+      // Verify Redis was called with maxRetriesPerRequest: null for BullMQ
+      const redisCalls = MockedRedis.mock.calls;
+      const bullmqCall = redisCalls.find((call: any[]) => call[0]?.maxRetriesPerRequest === null);
+      expect(bullmqCall).toBeDefined();
+    });
+
+    it('should use managed BullMQ connection for managed mode', async () => {
+      moduleRef = await buildModule({
+        REDIS_MODE: 'managed',
+        REDIS_HOST: 'my-elasticache.cache.amazonaws.com',
+        REDIS_PORT: '6379',
+        REDIS_TLS_ENABLED: 'true',
+      });
+
+      indicator = moduleRef.get(RedisHealthEnhancedIndicator);
+      await indicator.isHealthy('redis-queue');
+
+      // Verify Redis was called with TLS config and maxRetriesPerRequest: null
+      const redisCalls = MockedRedis.mock.calls;
+      const bullmqCall = redisCalls.find(
+        (call: any[]) => call[0]?.maxRetriesPerRequest === null && call[0]?.tls
+      );
+      expect(bullmqCall).toBeDefined();
     });
   });
 });
