@@ -324,12 +324,13 @@ This endpoint tests BOTH standalone and cluster Redis configurations to identify
   /**
    * AWS Bedrock health check
    * Tests connectivity and functionality of AWS Bedrock service
+   * Uses Application Inference Profiles if USING_APPLICATION_PROFILE=true
    */
   @Get('health/aws/bedrock')
   @HealthCheck()
   @ApiOperation({
     summary: 'Check AWS Bedrock service health',
-    description: 'Tests AWS Bedrock connectivity by sending a minimal test prompt',
+    description: 'Tests AWS Bedrock connectivity. Uses Application Inference Profiles if configured.',
   })
   @ApiResponse({
     status: 200,
@@ -340,19 +341,22 @@ This endpoint tests BOTH standalone and cluster Redis configurations to identify
         info: {
           bedrock: {
             status: 'up',
-            message: 'Bedrock is operational',
-            latency: '1823ms',
+            message: 'All 5 Application Inference Profiles operational',
+            latency: '2104ms',
             details: {
               region: 'eu-west-1',
               credentialsSource: 'explicit',
-              modelId: 'us.amazon.nova-pro-v1:0',
-              modelType: 'nova',
-              apiUsed: 'Converse',
-              responseText: 'OK',
-              usage: {
-                inputTokens: 12,
-                outputTokens: 3,
-              },
+              usingApplicationProfile: true,
+              summary: { total: 5, up: 5, down: 0 },
+              profiles: [
+                {
+                  name: 'BEDROCK_MODEL',
+                  arn: 'arn:aws:bedrock:eu-west-1:400708341202:application-inference-profile/egt2tngo3h5y',
+                  status: 'up',
+                  latency: '1109ms',
+                  tokens: { input: 10, output: 5 },
+                },
+              ],
             },
           },
         },
@@ -361,6 +365,10 @@ This endpoint tests BOTH standalone and cluster Redis configurations to identify
   })
   @ApiResponse({ status: 503, description: 'Bedrock is unavailable' })
   checkBedrock() {
+    const usingApplicationProfile = process.env.USING_APPLICATION_PROFILE?.toLowerCase() === 'true';
+    if (usingApplicationProfile) {
+      return this.health.check([() => this.awsServices.checkBedrockApplicationProfiles('bedrock')]);
+    }
     return this.health.check([() => this.awsServices.checkBedrock('bedrock')]);
   }
 

@@ -274,6 +274,131 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   }
 
   /**
+   * Test Bedrock Application Inference Profiles for all configured models
+   * Tests each Application Inference Profile ARN independently
+   */
+  async checkBedrockApplicationProfiles(key: string): Promise<HealthIndicatorResult> {
+    const startTime = Date.now();
+
+    try {
+      if (!this.bedrockClient) {
+        throw new Error('Bedrock client not initialized');
+      }
+
+      const modelsToTest = this.getModelsToTest();
+      const profileResults: Array<{
+        name: string;
+        arn: string;
+        status: 'up' | 'down';
+        latency: string;
+        error?: string;
+        errorStack?: string;
+        tokens?: { input: number; output: number };
+      }> = [];
+
+      // Test each Application Inference Profile
+      for (const config of modelsToTest) {
+        const profileArn = this.configService.get<string>(config.envVar, config.defaultValue);
+        const profileStartTime = Date.now();
+
+        try {
+          this.logger.log(`Testing ${config.envVar}: ${profileArn}`);
+
+          // Use Converse command which works with application inference profiles
+          const command = new ConverseCommand({
+            modelId: profileArn,
+            messages: [{ role: 'user', content: [{ text: 'Respond with OK' }] }],
+            inferenceConfig: { maxTokens: 10, temperature: 0 },
+          });
+
+          const response = await this.bedrockClient!.send(command);
+          const profileLatency = Date.now() - profileStartTime;
+
+          profileResults.push({
+            name: config.envVar,
+            arn: profileArn,
+            status: 'up',
+            latency: `${profileLatency}ms`,
+            tokens: {
+              input: response.usage?.inputTokens || 0,
+              output: response.usage?.outputTokens || 0,
+            },
+          });
+
+          this.logger.log(`  ✓ ${config.envVar}: up (${profileLatency}ms)`);
+        } catch (error) {
+          const profileLatency = Date.now() - profileStartTime;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : undefined;
+
+          profileResults.push({
+            name: config.envVar,
+            arn: profileArn,
+            status: 'down',
+            latency: `${profileLatency}ms`,
+            error: errorMessage,
+            errorStack,
+          });
+
+          this.logger.warn(`  ✗ ${config.envVar}: down - ${errorMessage}`);
+          if (errorStack) {
+            this.logger.debug(`Stack trace: ${errorStack}`);
+          }
+        }
+      }
+
+      const latency = Date.now() - startTime;
+      const allUp = profileResults.every((r) => r.status === 'up');
+      const upCount = profileResults.filter((r) => r.status === 'up').length;
+      const downCount = profileResults.filter((r) => r.status === 'down').length;
+
+      const result: ServiceTestResult = {
+        status: allUp ? 'up' : 'down',
+        message: allUp
+          ? `All ${profileResults.length} Application Inference Profiles operational`
+          : `${downCount}/${profileResults.length} profiles down`,
+        latency: `${latency}ms`,
+        details: {
+          region: this.configService.get('AWS_REGION', 'eu-west-1'),
+          credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
+          usingApplicationProfile: true,
+          summary: { total: profileResults.length, up: upCount, down: downCount },
+          profiles: profileResults,
+        },
+      };
+
+      if (!allUp) {
+        this.logger.error(`Bedrock Application Profiles check failed: ${downCount} profiles down`);
+        throw new HealthCheckError('Bedrock Application Profiles check failed', this.getStatus(key, false, result));
+      }
+
+      this.logger.log(`Bedrock Application Profiles check passed (${latency}ms, ${upCount} profiles tested)`);
+      return this.getStatus(key, true, result);
+    } catch (error) {
+      if (error instanceof HealthCheckError) {
+        throw error;
+      }
+
+      const latency = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Bedrock Application Profiles check failed: ${errorMessage}`);
+
+      const result: ServiceTestResult = {
+        status: 'down',
+        message: 'Bedrock Application Profiles check failed',
+        latency: `${latency}ms`,
+        error: errorMessage,
+        details: {
+          errorType: error.constructor.name,
+          region: this.configService.get('AWS_REGION', 'eu-west-1'),
+        },
+      };
+
+      throw new HealthCheckError('Bedrock Application Profiles check failed', this.getStatus(key, false, result));
+    }
+  }
+
+  /**
    * Test AWS Bedrock connectivity and functionality for all configured models
    * Tests: BEDROCK_MODEL, CITATION_MODEL, BEDROCK_JUDGE_MODEL_1/2/3
    */
