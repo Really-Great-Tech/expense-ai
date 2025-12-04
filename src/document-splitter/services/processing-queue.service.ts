@@ -1,11 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ClientProxy } from '@nestjs/microservices';
 import { Receipt, ReceiptStatus } from '@/document/entities/receipt.entity';
 import { QUEUE_NAMES, JOB_TYPES, DocumentProcessingData } from '@/types';
 import { DocumentPersistenceService } from './document-persistence.service';
 import { ReceiptProcessingResultRepository } from '@/document/repositories/receipt-processing-result.repository';
 import { ProcessingStatus } from '@/document/entities/receipt-processing-result.entity';
+import { ReceiptEventPattern, ReceiptExtractedEvent } from '@/shared/events/receipt.events';
 
 @Injectable()
 export class ProcessingQueueService {
@@ -13,6 +15,7 @@ export class ProcessingQueueService {
 
   constructor(
     @InjectQueue(QUEUE_NAMES.EXPENSE_PROCESSING) private readonly expenseQueue: Queue,
+    @Inject('RABBITMQ_CLIENT') private rabbitClient: ClientProxy,
     private readonly persistenceService: DocumentPersistenceService,
     private readonly receiptProcessingResultRepo: ReceiptProcessingResultRepository,
   ) {}
@@ -53,6 +56,26 @@ export class ProcessingQueueService {
           status: ProcessingStatus.QUEUED,
         });
         this.logger.log(`✅ DB record created in ${Date.now() - dbStartTime}ms for receipt ${receipt.id}`);
+
+        // Publish receipt.extracted event to RabbitMQ
+        const receiptEvent: ReceiptExtractedEvent = {
+          receiptId: receipt.id,
+          documentId: receipt.sourceDocumentId,
+          storageKey: receipt.storageKey,
+          storageType: receipt.storageType,
+          storageBucket: receipt.storageBucket,
+          fileName: receipt.fileName,
+          userId: options.userId || 'anonymous',
+          country: options.country || 'Unknown',
+          icp: options.icp || 'DEFAULT',
+          documentReader: options.documentReader || 'textract',
+          uploadedAt: new Date(),
+          actualUserId: options.userId || 'anonymous',
+          sessionId: `session_${parentTimestamp}`,
+        };
+
+        this.rabbitClient.emit(ReceiptEventPattern.EXTRACTED, receiptEvent);
+        this.logger.log(`Published ${ReceiptEventPattern.EXTRACTED} event for receipt ${receipt.id}`);
 
         // Queue the job - THIS IS WHERE IT HANGS
         const queueStartTime = Date.now();

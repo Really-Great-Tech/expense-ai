@@ -4,6 +4,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ClientsModule } from '@nestjs/microservices';
+import { getRabbitMQClientConfig } from '../shared/config/rabbitmq.config';
 import { DocumentController } from './document.controller';
 import { DocumentService } from './document.service';
 import { ExpenseProcessor } from '../processing/processors/expense.processor';
@@ -40,6 +42,16 @@ import * as path from 'path';
   imports: [
     // Register TypeORM entities for this module
     TypeOrmModule.forFeature([ExpenseDocument, Receipt, FileHash, DocumentReference, ReceiptProcessingResult]),
+
+    // RabbitMQ Client for publishing events
+    ClientsModule.registerAsync([
+      {
+        name: 'RABBITMQ_CLIENT',
+        imports: [ConfigModule],
+        useFactory: getRabbitMQClientConfig,
+        inject: [ConfigService],
+      },
+    ]),
 
     // Import storage module for file operations
     StorageModule,

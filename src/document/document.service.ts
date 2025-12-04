@@ -1,12 +1,14 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
+import { ClientProxy } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { DocumentProcessingData, ProcessingStatus, ProcessingMetrics, QUEUE_NAMES, JOB_TYPES } from '../types';
 import { ExpenseProcessingService } from './processing.service';
 import { FileStorageService } from '../storage/interfaces/file-storage.interface';
+import { DocumentEventPattern, DocumentUploadedEvent } from '../shared/events/document.events';
 
 @Injectable()
 export class DocumentService {
@@ -15,6 +17,8 @@ export class DocumentService {
   constructor(
     @InjectQueue(QUEUE_NAMES.EXPENSE_PROCESSING)
     private expenseQueue: Queue,
+    @Inject('RABBITMQ_CLIENT')
+    private rabbitClient: ClientProxy,
     private configService: ConfigService,
     private expenseProcessingService: ExpenseProcessingService,
     @Inject('FILE_STORAGE_SERVICE')
@@ -107,7 +111,29 @@ export class DocumentService {
         filePath: uploadedKey, // Deprecated but kept for backward compatibility
       };
 
-      // Add job to expense processing queue
+      // Publish document.uploaded event to RabbitMQ
+      // Note: This assumes the document will be created by the document-splitter service
+      // For now, we publish with the storage information
+      const uploadEvent: DocumentUploadedEvent = {
+        documentId: jobId, // Temporary - will be replaced with actual document ID
+        storageKey: uploadedKey,
+        storageType,
+        storageBucket,
+        fileName: file.originalname,
+        userId: userId,
+        country,
+        icp,
+        documentReader: documentReader || 'textract',
+        uploadedAt: new Date(),
+        actualUserId: userId,
+        sessionId,
+      };
+
+      // Publish to RabbitMQ (async, fire-and-forget)
+      this.rabbitClient.emit(DocumentEventPattern.UPLOADED, uploadEvent);
+      this.logger.log(`Published ${DocumentEventPattern.UPLOADED} event for job ${jobId}`);
+
+      // Also add to BullMQ for job tracking (keep existing functionality)
       const job = await this.expenseQueue.add(JOB_TYPES.PROCESS_DOCUMENT, jobData, {
         jobId,
         delay: 0,

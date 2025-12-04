@@ -1,6 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { getRabbitMQClientConfig } from '../shared/config/rabbitmq.config';
 import { DocumentSplitterController } from './document-splitter.controller';
 import { SingleReceiptController } from './single-receipt.controller';
 import { CleanupController } from './cleanup.controller';
@@ -12,6 +15,7 @@ import { PdfSplittingService } from './services/pdf-splitting.service';
 import { DocumentStorageService } from './services/document-storage.service';
 import { DocumentPersistenceService } from './services/document-persistence.service';
 import { ProcessingQueueService } from './services/processing-queue.service';
+import { DocumentSplitterConsumer } from './services/document-splitter.consumer';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 import { StorageModule } from '../storage/storage.module';
 import { CountryPolicyModule } from '../country-policy/country-policy.module';
@@ -25,6 +29,15 @@ import { DocumentReference } from '../document/entities/document-reference.entit
 
 @Module({
   imports: [
+    // RabbitMQ Client for publishing events
+    ClientsModule.registerAsync([
+      {
+        name: 'RABBITMQ_CLIENT',
+        imports: [ConfigModule],
+        useFactory: getRabbitMQClientConfig,
+        inject: [ConfigService],
+      },
+    ]),
     StorageModule,
     CountryPolicyModule, // Import for country validation
     forwardRef(() => DocumentModule), // Import for ReceiptProcessingResultRepository (using forwardRef to avoid circular dependency)
@@ -36,6 +49,7 @@ import { DocumentReference } from '../document/entities/document-reference.entit
   controllers: [DocumentSplitterController, SingleReceiptController, CleanupController],
   providers: [
     DocumentSplitterService,
+    DocumentSplitterConsumer,
     FileValidationService,
     DuplicateDetectionService,
     DocumentParsingService,

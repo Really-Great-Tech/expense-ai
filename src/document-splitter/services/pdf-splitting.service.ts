@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PDFDocument } from 'pdf-lib';
+import * as pdfLib from 'pdf-lib';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PageAnalysisResult, SplitPdfInfo } from '../types/document-splitter.types';
+
+// pdf-lib exports PDFDocument, but TypeScript types may not reflect this correctly
+const PDFDocument = (pdfLib as any).PDFDocument;
 
 @Injectable()
 export class PdfSplittingService {

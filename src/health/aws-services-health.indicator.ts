@@ -56,30 +56,26 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
       const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
       const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
-      const textractCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
       // Initialize Textract client (same config as TextractApiService)
-      this.textractClient = new TextractClient({
+      const textractConfig: any = {
         region: textractRegion,
-        credentials: textractCredentials,
-      });
+      };
+      if (accessKeyId && secretAccessKey) {
+        textractConfig.credentials = { accessKeyId, secretAccessKey };
+      }
+      this.textractClient = new TextractClient(textractConfig);
 
       // Bedrock configuration (matches BedrockLlmService)
       const bedrockRegion = this.configService.get<string>('AWS_REGION', 'eu-west-1');
 
-      const bedrockCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
       // Initialize Bedrock client (same config as BedrockLlmService)
-      this.bedrockClient = new BedrockRuntimeClient({
+      const bedrockConfig: any = {
         region: "us-east-1",
-        credentials: bedrockCredentials,
-      });
+      };
+      if (accessKeyId && secretAccessKey) {
+        bedrockConfig.credentials = { accessKeyId, secretAccessKey };
+      }
+      this.bedrockClient = new BedrockRuntimeClient(bedrockConfig);
 
       this.logger.log(`AWS clients initialized (Textract: ${textractRegion}, Bedrock: ${bedrockRegion})`);
     } catch (error) {

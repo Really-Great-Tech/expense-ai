@@ -46,12 +46,20 @@ import { MigrationController } from './config/migration.controller';
 
     // BullMQ for job queues
     BullModule.forRootAsync({
+      imports: [ConfigModule],
       useClass: RedisConfigService,
     }),
 
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => configService.get('database'),
+      useFactory: (configService: ConfigService) => {
+        try {
+          return configService.get('database');
+        } catch (error) {
+          console.error('❌ Failed to load database configuration:', error);
+          throw error;
+        }
+      },
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
@@ -74,23 +82,32 @@ export class AppModule implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Validate database configuration on startup
-    // This prevents dangerous misconfigurations in production
-    DatabaseConfigValidator.validate(this.configService);
-
-    // Log migration status on startup (migrations run automatically via migrationsRun: true)
-    this.logger.log('Checking migration status after startup...');
+    console.log('📋 AppModule.onModuleInit called');
     try {
-      const hasPending = await this.migrationService.hasPendingMigrations();
-      const history = await this.migrationService.getMigrationHistory();
+      // Validate database configuration on startup
+      // This prevents dangerous misconfigurations in production
+      DatabaseConfigValidator.validate(this.configService);
+      console.log('✅ Database configuration validated');
 
-      if (hasPending) {
-        this.logger.warn('WARNING: There are still pending migrations after startup!');
-      } else {
-        this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
+      // Log migration status on startup (migrations run automatically via migrationsRun: true)
+      this.logger.log('Checking migration status after startup...');
+      try {
+        const hasPending = await this.migrationService.hasPendingMigrations();
+        const history = await this.migrationService.getMigrationHistory();
+
+        if (hasPending) {
+          this.logger.warn('WARNING: There are still pending migrations after startup!');
+        } else {
+          this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
+        }
+      } catch (error) {
+        console.error('❌ Failed to check migration status:', error);
+        this.logger.error('Failed to check migration status:', error);
       }
     } catch (error) {
-      this.logger.error('Failed to check migration status:', error);
+      console.error('❌ Error in AppModule.onModuleInit:', error);
+      this.logger.error('Error in AppModule.onModuleInit:', error);
+      // Don't throw - allow app to continue
     }
   }
 

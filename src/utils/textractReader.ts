@@ -27,19 +27,17 @@ export class TextractApiService implements DocumentReader {
     this.uploadPath = options.uploadPath || './uploads';
     this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
 
-    const credentials =
-      options.accessKeyId && options.secretAccessKey
-        ? {
-            accessKeyId: options.accessKeyId,
-            secretAccessKey: options.secretAccessKey,
-          }
-        : undefined; // Use default credential chain if not provided
-
     // Initialize Textract client
-    this.textractClient = new TextractClient({
+    const textractConfig: any = {
       region: awsRegion,
-      credentials,
-    });
+    };
+    if (options.accessKeyId && options.secretAccessKey) {
+      textractConfig.credentials = {
+        accessKeyId: options.accessKeyId,
+        secretAccessKey: options.secretAccessKey,
+      };
+    }
+    this.textractClient = new TextractClient(textractConfig);
   }
 
   /**
@@ -459,7 +457,9 @@ export class TextractApiService implements DocumentReader {
   private async splitPdfIntoPages(pdfBuffer: Buffer): Promise<Buffer[]> {
     try {
       // Import pdf-lib dynamically
-      const { PDFDocument } = await import('pdf-lib');
+      const pdfLibModule = await import('pdf-lib');
+      // pdf-lib exports PDFDocument, but TypeScript types may not reflect this correctly
+      const PDFDocument = (pdfLibModule as any).PDFDocument;
 
       this.logger.log(`    Loading PDF for splitting...`);
 

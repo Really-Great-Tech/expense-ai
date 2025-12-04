@@ -80,7 +80,7 @@ export class ExpenseProcessingService {
         agents.issueDetectionAgent,
       );
 
-      const citations={}
+      const citations = {};
       // const citations = await this.runCitationGeneration(
       //   extraction,
       //   markdownContent,

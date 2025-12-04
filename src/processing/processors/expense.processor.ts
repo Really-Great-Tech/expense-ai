@@ -1,5 +1,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
+import { EventPattern, Payload, Ctx, RmqContext } from '@nestjs/microservices';
+import { ClientProxy } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { DocumentReaderFactory } from '../../utils/documentReaderFactory';
@@ -12,6 +14,7 @@ import { ProcessingStatus } from '@/document/entities/receipt-processing-result.
 import { DocumentPersistenceService } from '@/document-splitter/services/document-persistence.service';
 import { ReceiptStatus } from '@/document/entities/receipt.entity';
 import { CountryPolicyService } from '@/country-policy/services/country-policy.service';
+import { ReceiptEventPattern, ReceiptExtractedEvent, ReceiptProcessingRequestedEvent, ReceiptProcessingCompletedEvent, ReceiptProcessingFailedEvent } from '@/shared/events/receipt.events';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -32,6 +35,8 @@ export class ExpenseProcessor extends WorkerHost {
     private readonly expenseProcessingService: ExpenseProcessingService,
     @Inject('FILE_STORAGE_SERVICE')
     private readonly storageService: FileStorageService,
+    @Inject('RABBITMQ_CLIENT')
+    private readonly rabbitClient: ClientProxy,
     private readonly storageResolver: StorageResolverService,
     private readonly configService: ConfigService,
     private readonly receiptProcessingResultRepo: ReceiptProcessingResultRepository,
@@ -39,6 +44,229 @@ export class ExpenseProcessor extends WorkerHost {
     private readonly countryPolicyService: CountryPolicyService,
   ) {
     super();
+  }
+
+  /**
+   * RabbitMQ Consumer: Handle receipt.processing.requested events
+   * This processes receipts when processing is explicitly requested
+   */
+  @EventPattern(ReceiptEventPattern.PROCESSING_REQUESTED)
+  async handleReceiptProcessingRequested(
+    @Payload() data: ReceiptProcessingRequestedEvent,
+    @Ctx() context: RmqContext,
+  ) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    
+    this.logger.log(`🎯 [RABBITMQ CONSUMER] Received ${ReceiptEventPattern.PROCESSING_REQUESTED} event for receipt ${data.receiptId}`);
+    this.logger.log(`📦 Event payload: ${JSON.stringify(data, null, 2)}`);
+    
+    try {
+      // Create a job data object similar to BullMQ job
+      const jobData: DocumentProcessingData = {
+        jobId: `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        storageKey: data.storageKey,
+        storageType: data.storageType,
+        storageBucket: data.storageBucket || 'local',
+        fileName: data.fileName,
+        userId: data.userId,
+        country: data.country,
+        icp: data.icp,
+        documentReader: data.documentReader,
+        uploadedAt: data.requestedAt,
+        receiptId: data.receiptId,
+        sourceDocumentId: data.documentId,
+      };
+
+      // Process the receipt using the same logic as BullMQ processor
+      const result = await this.processReceiptFromEvent(jobData);
+
+      // Publish processing completed event
+      const completedEvent: ReceiptProcessingCompletedEvent = {
+        receiptId: data.receiptId,
+        documentId: data.documentId,
+        result,
+        completedAt: new Date(),
+      };
+      
+      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
+      this.logger.log(`Published ${ReceiptEventPattern.PROCESSING_COMPLETED} for receipt ${data.receiptId}`);
+
+      // Acknowledge message
+      channel.ack(originalMsg);
+    } catch (error) {
+      this.logger.error(`Failed to process receipt.processing.requested event for ${data.receiptId}:`, error);
+      
+      // Publish failure event
+      const failedEvent: ReceiptProcessingFailedEvent = {
+        receiptId: data.receiptId,
+        documentId: data.documentId,
+        error: error instanceof Error ? error.message : String(error),
+        failedAt: new Date(),
+      };
+      
+      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
+      
+      // Reject message (will go to DLQ if configured)
+      channel.nack(originalMsg, false, false);
+    }
+  }
+
+  /**
+   * RabbitMQ Consumer: Handle receipt.extracted events
+   * This processes receipts that come from the document splitter service
+   */
+  @EventPattern(ReceiptEventPattern.EXTRACTED)
+  async handleReceiptExtracted(
+    @Payload() data: ReceiptExtractedEvent,
+    @Ctx() context: RmqContext,
+  ) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    
+    this.logger.log(`Received ${ReceiptEventPattern.EXTRACTED} event for receipt ${data.receiptId}`);
+    
+    try {
+      // Create a job data object similar to BullMQ job
+      const jobData: DocumentProcessingData = {
+        jobId: `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        storageKey: data.storageKey,
+        storageType: data.storageType,
+        storageBucket: data.storageBucket || 'local',
+        fileName: data.fileName,
+        userId: data.userId,
+        country: data.country,
+        icp: data.icp,
+        documentReader: data.documentReader,
+        uploadedAt: data.uploadedAt,
+        actualUserId: data.actualUserId,
+        sessionId: data.sessionId,
+        receiptId: data.receiptId,
+        sourceDocumentId: data.documentId,
+      };
+
+      // Process the receipt using the same logic as BullMQ processor
+      const result = await this.processReceiptFromEvent(jobData);
+
+      // Publish processing completed event
+      const completedEvent: ReceiptProcessingCompletedEvent = {
+        receiptId: data.receiptId,
+        documentId: data.documentId,
+        result,
+        completedAt: new Date(),
+      };
+      
+      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
+      this.logger.log(`Published ${ReceiptEventPattern.PROCESSING_COMPLETED} for receipt ${data.receiptId}`);
+
+      // Acknowledge message
+      channel.ack(originalMsg);
+    } catch (error) {
+      this.logger.error(`Failed to process receipt.extracted event for ${data.receiptId}:`, error);
+      
+      // Publish failure event
+      const failedEvent: ReceiptProcessingFailedEvent = {
+        receiptId: data.receiptId,
+        documentId: data.documentId,
+        error: error instanceof Error ? error.message : String(error),
+        failedAt: new Date(),
+      };
+      
+      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
+      
+      // Reject message (will go to DLQ if configured)
+      channel.nack(originalMsg, false, false);
+    }
+  }
+
+  /**
+   * Process receipt from RabbitMQ event (similar to BullMQ process method)
+   */
+  private async processReceiptFromEvent(jobData: DocumentProcessingData): Promise<any> {
+    const startTime = Date.now();
+    const { jobId, storageKey, storageType, fileName, country, icp, documentReader, receiptId } = jobData;
+
+    try {
+      this.logger.log(`Starting receipt processing for job: ${jobId}, receipt: ${receiptId}, file: ${fileName}, storage: ${storageType}`);
+
+      // Update status to PROCESSING in database
+      if (receiptId) {
+        await this.receiptProcessingResultRepo.updateStatus(receiptId, ProcessingStatus.PROCESSING, {
+          processingStartedAt: new Date(),
+        });
+      }
+
+      // Get physical file path (handles both local and S3 automatically)
+      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey);
+      this.logger.log(`Resolved physical path: ${filePath} (temp: ${isTemp})`);
+
+      try {
+        // Read the document content using the specified document reader
+        const markdownContent = await this.readDocumentContent(filePath, documentReader);
+
+        // Save markdown content locally
+        await this.saveMarkdownContent(fileName, markdownContent, documentReader || 'default');
+
+        // Load compliance data and expense schema
+        const complianceData = await this.loadComplianceData(country, icp);
+        const expenseSchema = await this.loadExpenseSchema();
+
+        // Process the document through all agents
+        const result = await this.expenseProcessingService.processExpenseDocument(
+          markdownContent,
+          fileName,
+          storageKey,
+          country,
+          icp,
+          complianceData,
+          expenseSchema,
+          async (stage: string, progress: number) => {
+            this.logger.log(`${stage}: ${progress}%`);
+          },
+        );
+
+        // Update receipt status to COMPLETED
+        if (receiptId) {
+          await this.receiptProcessingResultRepo.updateStatus(receiptId, ProcessingStatus.COMPLETED, {
+            processingCompletedAt: new Date(),
+            processingMetadata: {
+              processedAt: new Date().toISOString(),
+              processingTime: Date.now() - startTime,
+            },
+          });
+        }
+
+        const processingTime = Date.now() - startTime;
+        this.logger.log(`Receipt processing completed in ${processingTime}ms for receipt ${receiptId}`);
+
+        return {
+          success: true,
+          data: result,
+          processingTime,
+        };
+      } finally {
+        // Clean up temp file if needed
+        if (isTemp && fs.existsSync(filePath)) {
+          try {
+            fs.unlinkSync(filePath);
+          } catch (error) {
+            this.logger.warn(`Failed to cleanup temp file ${filePath}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to process receipt ${receiptId}:`, error);
+      
+      // Update receipt status to FAILED
+      if (receiptId) {
+        await this.receiptProcessingResultRepo.updateStatus(receiptId, ProcessingStatus.FAILED, {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async process(job: Job<DocumentProcessingData>): Promise<JobResult> {
