@@ -58,7 +58,7 @@ export class BedrockLlmService {
       const fallbackSecretAccessKey = BedrockLlmService.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
       const bedrockConfig = {
-        region: config?.region || fallbackRegion,
+        region: "us-east-1",
         credentials:
           config?.accessKeyId && config?.secretAccessKey
             ? {
