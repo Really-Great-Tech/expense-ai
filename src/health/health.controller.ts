@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiExcludeController } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
@@ -18,6 +18,7 @@ import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
  * - Enhanced checks: Meaningful operational tests with read/write operations
  * - Migration checks: Database schema validation
  */
+@ApiExcludeController()
 @ApiTags('health')
 @Controller('expenses-ai')
 export class HealthController {

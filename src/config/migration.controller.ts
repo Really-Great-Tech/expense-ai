@@ -1,5 +1,5 @@
 import { Controller, Post, Get, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiExcludeController } from '@nestjs/swagger';
 import { MigrationService } from './migration.service';
 
 /**
@@ -22,6 +22,7 @@ import { MigrationService } from './migration.service';
  * - GET  /migrations/status    - Check if migrations are pending
  * - GET  /migrations/history   - View migration history
  */
+@ApiExcludeController()
 @ApiTags('migrations')
 @Controller('migrations')
 export class MigrationController {
