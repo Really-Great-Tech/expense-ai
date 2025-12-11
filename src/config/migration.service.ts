@@ -79,7 +79,7 @@ export class MigrationService {
       const pendingMigrations = await this.dataSource.showMigrations();
 
       if (!pendingMigrations) {
-        this.logger.log('✓ Database schema is up to date. No migrations to run.');
+        this.logger.log(' Database schema is up to date. No migrations to run.');
         return {
           success: true,
           message: 'Database schema is up to date. No migrations to run.',
@@ -98,7 +98,7 @@ export class MigrationService {
       const migrationNames = executedMigrations.map((m) => m.name);
 
       if (executedMigrations.length === 0) {
-        this.logger.log('✓ No new migrations executed. Database is current.');
+        this.logger.log(' No new migrations executed. Database is current.');
         return {
           success: true,
           message: 'No new migrations executed. Database is current.',
@@ -106,7 +106,7 @@ export class MigrationService {
         };
       } else {
         this.logger.log(
-          `✓ Successfully executed ${executedMigrations.length} migration(s):`,
+          ` Successfully executed ${executedMigrations.length} migration(s):`,
         );
         executedMigrations.forEach((migration) => {
           this.logger.log(`  - ${migration.name}`);
@@ -139,7 +139,7 @@ export class MigrationService {
   private async verifyConnection(): Promise<void> {
     try {
       await this.dataSource.query('SELECT 1');
-      this.logger.log('✓ Database connection verified');
+      this.logger.log(' Database connection verified');
     } catch (error) {
       this.logger.error('Database connection check failed:', error);
       throw new Error('Cannot execute migrations: Database connection unavailable');

@@ -463,8 +463,11 @@ export class TextractApiService implements DocumentReader {
 
       this.logger.log(`    Loading PDF for splitting...`);
 
-      // Load the PDF document
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      // Load the PDF document with compatibility options
+      const pdfDoc = await PDFDocument.load(pdfBuffer, {
+        ignoreEncryption: true,
+        updateMetadata: false,
+      });
       const pageCount = pdfDoc.getPageCount();
 
       this.logger.log(`    Splitting PDF with ${pageCount} pages`);
@@ -479,8 +482,12 @@ export class TextractApiService implements DocumentReader {
         const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
         newPdf.addPage(copiedPage);
 
-        // Convert to buffer
-        const pdfBytes = await newPdf.save();
+        // Convert to buffer with Textract-compatible options
+        // useObjectStreams: false creates PDF 1.4 structure (better Textract compatibility)
+        const pdfBytes = await newPdf.save({
+          useObjectStreams: false,
+          addDefaultPage: false,
+        });
         pageBuffers.push(Buffer.from(pdfBytes));
       }
 

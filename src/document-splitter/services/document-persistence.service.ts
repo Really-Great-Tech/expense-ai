@@ -128,16 +128,29 @@ export class DocumentPersistenceService {
   }
 
   async updateReceiptStatus(receiptId: string, status: ReceiptStatus, metadata?: any): Promise<void> {
-    const updates: any = { status };
+    const updates: any = { status, updatedAt: new Date() };
     if (metadata) {
       updates.metadata = metadata;
     }
-    await this.receiptRepository.update(receiptId, updates);
+
+    const result = await this.receiptRepository.update(receiptId, updates);
+
+    if (result.affected === 0) {
+      this.logger.warn(`No receipt found to update status for receiptId: ${receiptId}`);
+    } else {
+      this.logger.log(`Updated receipt ${receiptId} status to ${status}`);
+    }
   }
 
   async getReceiptsByDocumentId(documentId: string): Promise<Receipt[]> {
     return await this.receiptRepository.find({
       where: { sourceDocumentId: documentId },
+    });
+  }
+
+  async getExpenseDocumentById(documentId: string): Promise<ExpenseDocument | null> {
+    return await this.expenseDocumentRepository.findOne({
+      where: { id: documentId },
     });
   }
 

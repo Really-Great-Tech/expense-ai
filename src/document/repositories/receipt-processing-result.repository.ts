@@ -36,12 +36,39 @@ export class ReceiptProcessingResultRepository {
     }
   }
 
+  // Status progression order for validation
+  private static readonly STATUS_ORDER: Record<ProcessingStatus, number> = {
+    [ProcessingStatus.QUEUED]: 0,
+    [ProcessingStatus.PROCESSING]: 1,
+    [ProcessingStatus.CLASSIFICATION]: 2,
+    [ProcessingStatus.EXTRACTION]: 3,
+    [ProcessingStatus.VALIDATION]: 4,
+    [ProcessingStatus.QUALITY_ASSESSMENT]: 5,
+    [ProcessingStatus.CITATION_GENERATION]: 6,
+    [ProcessingStatus.COMPLETED]: 7,
+    [ProcessingStatus.FAILED]: 8,
+    [ProcessingStatus.RETRYING]: 1, // Same as PROCESSING
+  };
+
   async updateStatus(
     receiptId: string,
     status: ProcessingStatus,
     additionalData?: Partial<ReceiptProcessingResult>,
   ): Promise<void> {
     try {
+      // COMPLETED status should only be set via saveResults() to ensure atomicity
+      if (status === ProcessingStatus.COMPLETED) {
+        this.logger.warn(`Skipping direct COMPLETED status update for receipt ${receiptId} - use saveResults() instead`);
+        return;
+      }
+
+      // Use conditional update to prevent out-of-order status changes
+      // Only update if the new status is higher in the progression order
+      const currentStatusOrder = ReceiptProcessingResultRepository.STATUS_ORDER[status];
+      const validPreviousStatuses = Object.entries(ReceiptProcessingResultRepository.STATUS_ORDER)
+        .filter(([_, order]) => order < currentStatusOrder)
+        .map(([s]) => s);
+
       const updateData: any = { status, ...additionalData };
 
       // Set processing start time if moving to PROCESSING
@@ -49,8 +76,20 @@ export class ReceiptProcessingResultRepository {
         updateData.processingStartedAt = new Date();
       }
 
-      await this.repository.update({ receiptId }, updateData);
-      this.logger.log(`Updated status for receipt ${receiptId} to ${status}`);
+      // Use query builder for conditional update
+      const result = await this.repository
+        .createQueryBuilder()
+        .update(ReceiptProcessingResult)
+        .set(updateData)
+        .where('receiptId = :receiptId', { receiptId })
+        .andWhere('status IN (:...validStatuses)', { validStatuses: validPreviousStatuses })
+        .execute();
+
+      if (result.affected === 0) {
+        this.logger.debug(`Status update skipped for receipt ${receiptId} to ${status} - already at same or higher status`);
+      } else {
+        this.logger.log(`Updated status for receipt ${receiptId} to ${status}`);
+      }
     } catch (error) {
       this.logger.error(`Failed to update status for receipt ${receiptId}:`, error);
       throw error;
@@ -70,15 +109,24 @@ export class ReceiptProcessingResultRepository {
     },
   ): Promise<void> {
     try {
-      await this.repository.update(
-        { receiptId },
-        {
-          ...results,
-          status: ProcessingStatus.COMPLETED,
-          processingCompletedAt: new Date(),
-        },
-      );
-      this.logger.log(`Saved complete processing results for receipt ${receiptId}`);
+      // Use transaction to ensure atomic update and prevent race conditions
+      await this.repository.manager.transaction(async (transactionalEntityManager) => {
+        const updateResult = await transactionalEntityManager.update(
+          ReceiptProcessingResult,
+          { receiptId },
+          {
+            ...results,
+            status: ProcessingStatus.COMPLETED,
+            processingCompletedAt: new Date(),
+          },
+        );
+
+        if (updateResult.affected === 0) {
+          throw new Error(`No processing result found for receipt ${receiptId}`);
+        }
+
+        this.logger.log(`Saved complete processing results for receipt ${receiptId} (affected: ${updateResult.affected})`);
+      });
     } catch (error) {
       this.logger.error(`Failed to save results for receipt ${receiptId}:`, error);
       throw error;

@@ -2,6 +2,7 @@ export interface PageMarkdown {
   pageNumber: number;
   content: string;
   filePath: string;
+  imageBase64?: string; // Optional base64 encoded page image for vision analysis
 }
 
 export interface PageGroup {
@@ -9,6 +10,11 @@ export interface PageGroup {
   pages: number[];
   confidence: number;
   reasoning: string;
+  // Expensify detection
+  isExpensifyExport?: boolean;
+  expensifyConfidence?: number;
+  expensifyReason?: string;
+  expensifyIndicators?: string[];
 }
 
 export interface PageAnalysisResult {
@@ -39,6 +45,11 @@ export interface InvoiceGroup {
   storagePath?: string | null;
   jobId?: string | null;
   receiptId?: string;
+  // Expensify detection
+  isExpensifyExport?: boolean;
+  expensifyConfidence?: number;
+  expensifyReason?: string;
+  expensifyIndicators?: string[];
 }
 
 export interface DuplicateChoice {
@@ -60,13 +71,13 @@ export interface SplitAnalysisResponse {
   success: boolean;
   data: {
     originalFileName: string;
-    totalPages: number;
-    hasMultipleInvoices: boolean;
-    totalInvoices: number;
-    invoices: InvoiceGroup[];
+    totalPages?: number;
+    hasMultipleInvoices?: boolean;
+    totalInvoices?: number;
+    invoices?: InvoiceGroup[];
     tempDirectory: string;
     expenseDocumentId: string;
-    receiptIds: string[];
+    receiptIds?: string[];
     // Duplicate detection fields
     isDuplicate?: boolean;
     duplicateAction?: 'REFERENCED' | 'REPROCESSED';

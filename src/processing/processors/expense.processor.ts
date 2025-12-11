@@ -20,10 +20,14 @@ import * as fs from 'fs';
  *
  * Processes expense documents through the BullMQ queue.
  * Concurrency is configured via WORKER_CONCURRENCY env var.
- * By default, processes 5 receipts concurrently.
+ * By default, processes 25 receipts concurrently.
  */
 @Processor(QUEUE_NAMES.EXPENSE_PROCESSING, {
-  concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
+  concurrency: parseInt(process.env.WORKER_CONCURRENCY || '25', 10),
+  lockDuration: 600000, // 10 minutes - long enough for expense processing (~4-5 min max)
+  lockRenewTime: 30000, // Renew lock every 30 seconds (more frequent than default lockDuration/2)
+  stalledInterval: 60000, // Check for stalled jobs every 60 seconds (default is 30s)
+  maxStalledCount: 3, // Allow 3 stall checks before marking job as stalled (default is 1)
 })
 export class ExpenseProcessor extends WorkerHost {
   private readonly logger = new Logger(ExpenseProcessor.name);
@@ -76,6 +80,9 @@ export class ExpenseProcessor extends WorkerHost {
         const expenseSchema = await this.loadExpenseSchema();
 
         // Process the document through all agents (always using parallel processing)
+        // Note: Status updates are done via progressCallback for intermediate stages only.
+        // The 'complete' stage is NOT updated here to avoid race conditions with saveResults().
+        // Final COMPLETED status is set atomically in saveResults() with a transaction.
         const result = await this.expenseProcessingService.processExpenseDocument(
           markdownContent,
           fileName,
@@ -88,14 +95,15 @@ export class ExpenseProcessor extends WorkerHost {
             await job.updateProgress(progress);
             this.logger.log(`${stage}: ${progress}%`);
 
-            // Update stage status in database
-            if (receiptId) {
+            // Update stage status in database for intermediate stages only
+            // Skip 'complete' stage - final status is set atomically in saveResults()
+            if (receiptId && stage !== 'complete') {
               const statusMap: Record<string, ProcessingStatus> = {
                 parallelPhase1: ProcessingStatus.CLASSIFICATION,
                 parallelPhase1Complete: ProcessingStatus.EXTRACTION,
                 parallelPhase2: ProcessingStatus.VALIDATION,
                 llmValidation: ProcessingStatus.QUALITY_ASSESSMENT,
-                complete: ProcessingStatus.COMPLETED,
+                // 'complete' is intentionally omitted - handled by saveResults()
               };
 
               if (statusMap[stage]) {
@@ -115,33 +123,39 @@ export class ExpenseProcessor extends WorkerHost {
         this.logger.log(`Receipt processing finished for job: ${jobId} in ${processingTime}ms (${totalProcessingTimeSeconds}s total)`);
 
         // Save complete results to database
+        // Important: saveResults() sets status to COMPLETED atomically within a transaction
+        // Only update Receipt entity status AFTER saveResults() succeeds to maintain consistency
         if (receiptId) {
-          const sourceDocumentId = job.data.receiptId ? undefined : job.data.sourceDocumentId;
+          try {
+            await this.receiptProcessingResultRepo.saveResults(receiptId, {
+              classificationResult: result.classification,
+              extractedData: result.extraction,
+              complianceValidation: result.compliance,
+              qualityAssessment: result.image_quality_assessment,
+              citationData: result.citations,
+              processingMetadata: {
+                processedAt: new Date().toISOString(),
+                processingTime,
+                timing: result.timing,
+                agentVersions: this.getAgentVersions(),
+                modelVersions: this.getModelVersions(),
+              },
+              fileReferences: {
+                originalReceipt: storageKey,
+              },
+            });
 
-          await this.receiptProcessingResultRepo.saveResults(receiptId, {
-            classificationResult: result.classification,
-            extractedData: result.extraction,
-            complianceValidation: result.compliance,
-            qualityAssessment: result.image_quality_assessment,
-            citationData: result.citations,
-            processingMetadata: {
-              processedAt: new Date().toISOString(),
-              processingTime,
-              timing: result.timing,
-              agentVersions: this.getAgentVersions(),
-              modelVersions: this.getModelVersions(),
-            },
-            fileReferences: {
-              originalReceipt: storageKey,
-            },
-          });
+            // Update Receipt entity status only after processing results are saved successfully
+            await this.documentPersistenceService.updateReceiptStatus(receiptId, ReceiptStatus.COMPLETED, {
+              parsedData: result.extraction,
+            } as any);
 
-          // Update Receipt entity status
-          await this.documentPersistenceService.updateReceiptStatus(receiptId, ReceiptStatus.COMPLETED, {
-            parsedData: result.extraction,
-          } as any);
-
-          this.logger.log(`Saved processing results to database for receipt ${receiptId}`);
+            this.logger.log(`Saved processing results to database for receipt ${receiptId}`);
+          } catch (saveError) {
+            // Log the error but don't update Receipt status to COMPLETED if saveResults failed
+            this.logger.error(`Failed to save processing results for receipt ${receiptId}:`, saveError);
+            throw saveError; // Re-throw to trigger the outer catch block for proper failure handling
+          }
         }
 
         return {

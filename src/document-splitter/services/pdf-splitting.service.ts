@@ -12,7 +12,11 @@ export class PdfSplittingService {
     this.logger.log(`Creating ${analysis.totalInvoices} split PDF files`);
 
     const pdfBuffer = await fs.readFile(originalPdfPath);
-    const originalPdf = await PDFDocument.load(pdfBuffer);
+    // Load with ignoreEncryption to handle more PDF types
+    const originalPdf = await PDFDocument.load(pdfBuffer, {
+      ignoreEncryption: true,
+      updateMetadata: false,
+    });
 
     const splitPdfs: SplitPdfInfo[] = [];
 
@@ -27,7 +31,13 @@ export class PdfSplittingService {
 
         const outputFileName = `invoice_${group.invoiceNumber}.pdf`;
         const outputPath = path.join(outputDir, outputFileName);
-        const pdfBytes = await newPdf.save();
+        // Save with compatibility options for AWS Textract
+        // - useObjectStreams: false - Creates PDF 1.4 compatible structure (better Textract support)
+        // - addDefaultPage: false - Don't add empty pages
+        const pdfBytes = await newPdf.save({
+          useObjectStreams: false,
+          addDefaultPage: false,
+        });
         await fs.writeFile(outputPath, pdfBytes);
 
         splitPdfs.push({

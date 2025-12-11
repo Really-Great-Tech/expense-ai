@@ -21,6 +21,9 @@ export const MODEL_CONFIG = {
 
   // Document splitting model
   DOCUMENT_SPLITTER: 'eu.amazon.nova-pro-v1:0',
+
+  // Vision model for image analysis (Claude - Nova doesn't support images)
+  VISION_MODEL: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
 } as const;
 
 /**
