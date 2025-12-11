@@ -178,7 +178,7 @@ const baseDBConfig: DataSourceOptions = {
   // Automatically run migrations on application startup
   // Migrations run in transactions (migrationsTransactionMode: 'each') for safety
   // This ensures database schema is always up-to-date with the application code
-  migrationsRun: true,
+  migrationsRun: false,
 
   // Enable transaction per migration for rollback safety
   migrationsTransactionMode: 'each' as const,

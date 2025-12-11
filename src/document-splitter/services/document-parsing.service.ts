@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import { pdfToPng } from 'pdf-to-png-converter';
 import { DocumentReaderFactory } from '@/utils/documentReaderFactory';
 import { PageMarkdown } from '../types/document-splitter.types';
 
@@ -88,5 +90,60 @@ export class DocumentParsingService {
       })
       .filter((content) => content.length > 0)
       .join('\n\n---\n\n');
+  }
+
+  /**
+   * Convert PDF pages to base64 encoded images
+   * @param pdfPath Path to the PDF file
+   * @returns Array of base64 encoded PNG images (one per page)
+   */
+  async convertPdfToImages(pdfPath: string): Promise<string[]> {
+    this.logger.log(`Converting PDF to images: ${pdfPath}`);
+
+    try {
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      const arrayBuffer = pdfBuffer.buffer.slice(
+        pdfBuffer.byteOffset,
+        pdfBuffer.byteOffset + pdfBuffer.byteLength,
+      );
+
+      const pages = await pdfToPng(arrayBuffer as ArrayBuffer, {
+        disableFontFace: false,
+        useSystemFonts: true,
+        viewportScale: 1.5, // Balance quality and size
+      });
+
+      const images = pages.map((page) => {
+        if (page.content) {
+          return page.content.toString('base64');
+        }
+        return '';
+      });
+
+      this.logger.log(`Converted ${images.length} pages to images`);
+      return images;
+    } catch (error) {
+      this.logger.error(`Failed to convert PDF to images: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Parse markdown and add images to page structures
+   * @param fullMarkdown Full markdown content
+   * @param images Optional array of base64 images (one per page)
+   */
+  parseMarkdownPagesWithImages(fullMarkdown: string, images: string[] = []): PageMarkdown[] {
+    const pages = this.parseMarkdownPages(fullMarkdown);
+
+    // Add images to pages if available
+    for (let i = 0; i < pages.length; i++) {
+      if (images[i]) {
+        pages[i].imageBase64 = images[i];
+      }
+    }
+
+    this.logger.log(`Parsed ${pages.length} pages with ${images.filter(Boolean).length} images`);
+    return pages;
   }
 }

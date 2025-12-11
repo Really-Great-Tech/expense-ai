@@ -13,6 +13,7 @@ import { DocumentStorageService } from './services/document-storage.service';
 import { DocumentPersistenceService } from './services/document-persistence.service';
 import { ProcessingQueueService } from './services/processing-queue.service';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
+import { DocumentSplitterProcessor } from './processors/document-splitter.processor';
 import { StorageModule } from '../storage/storage.module';
 import { CountryPolicyModule } from '../country-policy/country-policy.module';
 import { DocumentModule } from '../document/document.module';
@@ -29,9 +30,7 @@ import { DocumentReference } from '../document/entities/document-reference.entit
     CountryPolicyModule, // Import for country validation
     forwardRef(() => DocumentModule), // Import for ReceiptProcessingResultRepository (using forwardRef to avoid circular dependency)
     TypeOrmModule.forFeature([ExpenseDocument, Receipt, Country, FileHash, DocumentReference]),
-    BullModule.registerQueue({
-      name: QUEUE_NAMES.EXPENSE_PROCESSING,
-    }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.EXPENSE_PROCESSING }, { name: QUEUE_NAMES.DOCUMENT_SPLITTING }),
   ],
   controllers: [DocumentSplitterController, SingleReceiptController, CleanupController],
   providers: [
@@ -43,11 +42,11 @@ import { DocumentReference } from '../document/entities/document-reference.entit
     DocumentStorageService,
     DocumentPersistenceService,
     ProcessingQueueService,
+    DocumentSplitterProcessor,
     {
       provide: DocumentSplitterAgent,
       useFactory: () => {
-        const provider: 'bedrock' | 'anthropic' = 'bedrock';
-        return new DocumentSplitterAgent(provider);
+        return new DocumentSplitterAgent();
       },
     },
   ],

@@ -1,29 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PageMarkdown, PageAnalysisResult, SplitPdfInfo, InvoiceGroup, SplitAnalysisResponse } from './types/document-splitter.types';
-import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { SplitAnalysisResponse } from './types/document-splitter.types';
 import { ExpenseDocument, DocumentStatus } from '@/document/entities/expense-document.entity';
 import { Receipt } from '@/document/entities/receipt.entity';
 import { DuplicateDetectionService, DuplicateCheckResult } from './services/duplicate-detection.service';
-import { DocumentParsingService } from './services/document-parsing.service';
-import { PdfSplittingService } from './services/pdf-splitting.service';
 import { DocumentStorageService } from './services/document-storage.service';
-import { DocumentPersistenceService, ReceiptCreationData } from './services/document-persistence.service';
+import { DocumentPersistenceService } from './services/document-persistence.service';
 import { ProcessingQueueService } from './services/processing-queue.service';
+import { QUEUE_NAMES, JOB_TYPES, DocumentSplittingJobData } from '../types';
 
 @Injectable()
 export class DocumentSplitterService {
   private readonly logger = new Logger(DocumentSplitterService.name);
 
   constructor(
-    private readonly documentSplitterAgent: DocumentSplitterAgent,
     private readonly duplicateDetectionService: DuplicateDetectionService,
-    private readonly parsingService: DocumentParsingService,
-    private readonly splittingService: PdfSplittingService,
     private readonly storageService: DocumentStorageService,
     private readonly persistenceService: DocumentPersistenceService,
     private readonly queueService: ProcessingQueueService,
+    @InjectQueue(QUEUE_NAMES.DOCUMENT_SPLITTING)
+    private readonly splitterQueue: Queue<DocumentSplittingJobData>,
   ) {}
 
+  /**
+   * Analyze and split a multi-receipt document
+   * Steps B-C run synchronously, Steps D-I run in background queue
+   */
   async analyzeAndSplitDocument(
     file: Express.Multer.File,
     options: {
@@ -45,28 +48,28 @@ export class DocumentSplitterService {
         fileSize: file.size,
       });
 
-      // STEP A: Check for duplicates first
-      duplicateResult = await this.duplicateDetectionService.checkForDuplicates({
-        fileBuffer: file.buffer,
-        filename: file.originalname,
-        mimeType: file.mimetype,
-        userId: options.userId,
-      });
+      // // STEP A: Check for duplicates first
+      // duplicateResult = await this.duplicateDetectionService.checkForDuplicates({
+      //   fileBuffer: file.buffer,
+      //   filename: file.originalname,
+      //   mimeType: file.mimetype,
+      //   userId: options.userId,
+      // });
 
-      if (duplicateResult.isDuplicate && !options.forceResplit) {
-        this.logger.log(`Duplicate detected: ${duplicateResult.duplicateType}`, {
-          existingDocumentId: duplicateResult.existingDocument?.id,
-          confidence: duplicateResult.confidence,
-        });
+      // if (duplicateResult.isDuplicate && !options.forceResplit) {
+      //   this.logger.log(`Duplicate detected: ${duplicateResult.duplicateType}`, {
+      //     existingDocumentId: duplicateResult.existingDocument?.id,
+      //     confidence: duplicateResult.confidence,
+      //   });
 
-        if (options.duplicateChoice === 'REFERENCE_EXISTING') {
-          return await this.handleDuplicateReference(duplicateResult);
-        } else if (options.duplicateChoice === 'FORCE_REPROCESS') {
-          this.logger.log('User chose to force reprocess duplicate');
-        } else {
-          return this.buildDuplicateChoiceResponse(duplicateResult);
-        }
-      }
+      //   if (options.duplicateChoice === 'REFERENCE_EXISTING') {
+      //     return await this.handleDuplicateReference(duplicateResult);
+      //   } else if (options.duplicateChoice === 'FORCE_REPROCESS') {
+      //     this.logger.log('User chose to force reprocess duplicate');
+      //   } else {
+      //     return this.buildDuplicateChoiceResponse(duplicateResult);
+      //   }
+      // }
 
       // STEP B: Create or get ExpenseDocument
       expenseDocument = await this.persistenceService.createOrGetExpenseDocument(file, options);
@@ -76,52 +79,39 @@ export class DocumentSplitterService {
         return this.buildResponseFromExisting(expenseDocument, existingReceipts);
       }
 
-      // STEP C: Set PROCESSING status and create temp directory
+      // STEP C: Set PROCESSING status and create temp directory, save file
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.PROCESSING);
       tempDir = this.storageService.getTempDirectory();
       const originalFilePath = await this.storageService.saveFileTemporarily(file, tempDir);
 
-      // STEP D: Extract full document markdown
-      const fullMarkdown = await this.parsingService.extractFullDocumentMarkdown(originalFilePath, 'textract');
-      const pageMarkdowns = this.parsingService.parseMarkdownPages(fullMarkdown);
-
-      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.TEXTRACT_COMPLETE, {
-        totalPages: pageMarkdowns.length,
-        processingMetadata: {
-          ...expenseDocument.processingMetadata,
-          textractCompleted: new Date().toISOString(),
-          totalPages: pageMarkdowns.length,
-        },
-      });
-
-      // STEP E: LLM boundary detection
+      // Set status to BOUNDARY_DETECTION to indicate processing has started
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.BOUNDARY_DETECTION);
-      const pageAnalysis = await this.documentSplitterAgent.analyzePages(pageMarkdowns);
-      this.splittingService.validatePageAnalysis(pageAnalysis, pageMarkdowns.length);
 
-      // STEP F: PDF splitting
-      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.SPLITTING);
-      const splitPdfs = await this.splittingService.createSplitPdfFiles(originalFilePath, pageAnalysis, tempDir);
-      const invoiceGroups = this.combineResultsWithPdfPaths(pageMarkdowns, pageAnalysis, splitPdfs);
+      // ENQUEUE: Steps D-I run in background queue
+      const jobData: DocumentSplittingJobData = {
+        documentId: expenseDocument.id,
+        originalFilePath,
+        tempDirectory: tempDir,
+        originalFileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        userId: options.userId || 'anonymous',
+        country: options.country || 'Unknown',
+        icp: options.icp || 'DEFAULT',
+        documentReader: options.documentReader,
+      };
 
-      // STEP G: Upload splits and persist receipts
-      const { receipts, uploadedGroups } = await this.uploadAndPersistReceipts(expenseDocument, invoiceGroups);
-
-      // STEP H: Update document completion
-      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.COMPLETED, {
-        totalReceipts: receipts.length,
-        processingMetadata: {
-          ...expenseDocument.processingMetadata,
-          completedAt: new Date().toISOString(),
-          totalReceipts: receipts.length,
-          successfulUploads: receipts.length,
-        },
+      await this.splitterQueue.add(JOB_TYPES.SPLIT_DOCUMENT, jobData, {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000 },
       });
 
-      // STEP I: Enqueue receipt processing
-      await this.queueService.enqueueReceiptProcessing(receipts, options);
+      this.logger.log(`Document splitting job enqueued`, {
+        expenseDocumentId: expenseDocument.id,
+        tempDirectory: tempDir,
+      });
 
-      // STEP J: Store file hash for future duplicate detection
+      // Store file hash for future duplicate detection
       if (duplicateResult) {
         await this.duplicateDetectionService.storeFileHash({
           hash: duplicateResult.contentHash,
@@ -132,22 +122,13 @@ export class DocumentSplitterService {
         });
       }
 
-      this.logger.log(`Document splitting completed: ${receipts.length} receipts created`, {
-        expenseDocumentId: expenseDocument.id,
-        receiptIds: receipts.map((r) => r.id),
-      });
-
+      // Return immediately with documentId
       return {
         success: true,
         data: {
           originalFileName: file.originalname,
-          totalPages: pageMarkdowns.length,
-          hasMultipleInvoices: pageAnalysis.totalInvoices > 1,
-          totalInvoices: pageAnalysis.totalInvoices,
-          invoices: uploadedGroups,
           tempDirectory: tempDir,
           expenseDocumentId: expenseDocument.id,
-          receiptIds: receipts.map((r) => r.id),
         },
       };
     } catch (error) {
@@ -232,68 +213,6 @@ export class DocumentSplitterService {
     };
   }
 
-  private combineResultsWithPdfPaths(pageMarkdowns: PageMarkdown[], analysis: PageAnalysisResult, splitPdfs: SplitPdfInfo[]): InvoiceGroup[] {
-    return analysis.pageGroups.map((group) => {
-      const splitPdf = splitPdfs.find((pdf) => pdf.invoiceNumber === group.invoiceNumber);
-      const combinedMarkdown = this.parsingService.combinePageMarkdown(pageMarkdowns, group.pages);
-
-      return {
-        invoiceNumber: group.invoiceNumber,
-        pages: group.pages,
-        content: combinedMarkdown,
-        confidence: group.confidence,
-        reasoning: group.reasoning,
-        totalPages: group.pages.length,
-        pdfPath: splitPdf?.pdfPath || null,
-        fileName: splitPdf?.fileName || null,
-        fileSize: splitPdf?.fileSize || null,
-      };
-    });
-  }
-
-  private async uploadAndPersistReceipts(
-    expenseDocument: ExpenseDocument,
-    invoiceGroups: InvoiceGroup[],
-  ): Promise<{ receipts: Receipt[]; uploadedGroups: InvoiceGroup[] }> {
-    const receiptsData: ReceiptCreationData[] = [];
-    const uploadedGroups: InvoiceGroup[] = [];
-
-    for (const group of invoiceGroups) {
-      try {
-        if (group.pdfPath) {
-          const { storagePath, storageDetails } = await this.storageService.uploadSplitPdf(
-            group.pdfPath,
-            group.fileName || `invoice_${group.invoiceNumber}.pdf`,
-            expenseDocument.id,
-            expenseDocument.uploadedBy,
-            group.invoiceNumber,
-          );
-
-          receiptsData.push({
-            group,
-            storageDetails,
-            sourceDocumentId: expenseDocument.id,
-          });
-
-          uploadedGroups.push({
-            ...group,
-            storagePath,
-          });
-        }
-      } catch (error) {
-        this.logger.warn(`Upload failed for invoice ${group.invoiceNumber}:`, error);
-      }
-    }
-
-    const receipts = await this.persistenceService.createReceiptsInTransaction(receiptsData);
-
-    for (let i = 0; i < receipts.length; i++) {
-      uploadedGroups[i].receiptId = receipts[i].id;
-    }
-
-    return { receipts, uploadedGroups };
-  }
-
   private buildResponseFromExisting(document: ExpenseDocument, receipts: Receipt[]): SplitAnalysisResponse {
     const invoiceGroups = receipts.map((receipt) => ({
       invoiceNumber: receipt.metadata?.receiptNumber || 0,
@@ -327,9 +246,6 @@ export class DocumentSplitterService {
   /**
    * Process a single receipt without splitting
    * Fast-path that skips Textract OCR, LLM boundary detection, and PDF splitting
-   * @param file Uploaded file
-   * @param options Processing options
-   * @returns Processing response with single receipt
    */
   async processSingleReceipt(
     file: Express.Multer.File,

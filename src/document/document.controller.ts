@@ -8,10 +8,11 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiExcludeController } from '@nestjs/swagger';
 import { DocumentService } from './document.service';
 import { ProcessingStatusResponseDto, ErrorResponseDto } from './dto';
 
+@ApiExcludeController()
 @ApiTags('Processing Jobs')
 @Controller('jobs')
 export class DocumentController {

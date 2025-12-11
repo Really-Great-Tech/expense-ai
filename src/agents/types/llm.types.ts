@@ -22,6 +22,17 @@ export interface ChatOptions {
   messages: ChatMessage[];
 }
 
+export interface ImageInput {
+  data: string; // base64 encoded image
+  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+}
+
+export interface ChatWithVisionOptions {
+  prompt: string;
+  images: ImageInput[];
+  systemPrompt?: string;
+}
+
 /**
  * Interface for LLM service implementations (Bedrock, Anthropic, etc.)
  */
@@ -32,6 +43,13 @@ export interface ILLMService {
    * @returns Promise resolving to chat response
    */
   chat(options: ChatOptions): Promise<ChatResponse>;
+
+  /**
+   * Send a chat request with vision (images + text)
+   * @param options Vision chat options including prompt, images, and optional system prompt
+   * @returns Promise resolving to chat response
+   */
+  chatWithVision?(options: ChatWithVisionOptions): Promise<ChatResponse>;
 
   /**
    * Get the current provider name

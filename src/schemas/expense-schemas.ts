@@ -21,6 +21,10 @@ export const FileClassificationResultSchema = z.object({
   classification_confidence: z.number(),
   reasoning: z.string(),
   schema_field_analysis: SchemaFieldAnalysisSchema,
+  // Enhanced metadata for improved classification accuracy
+  date_period: z.string().nullable().optional(), // e.g., "1/2/2024", "Jan 2024", transaction date
+  header_info: z.string().nullable().optional(), // Vendor/company header information
+  footer_info: z.string().nullable().optional(), // Footer info like issuer, license, authorization
 });
 
 // Citation Schemas

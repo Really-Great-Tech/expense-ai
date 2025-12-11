@@ -40,7 +40,7 @@ export class DatabaseConfigValidator {
       this.validateDevelopmentSettings(configService);
     }
 
-    this.logger.log('✅ Database configuration validation passed');
+    this.logger.log(' Database configuration validation passed');
   }
 
   /**
@@ -54,7 +54,7 @@ export class DatabaseConfigValidator {
     const synchronize = configService.get<string>('TYPEORM_SYNCHRONIZE');
     // if (synchronize === 'true') {
     //   throw new Error(
-    //     `❌ CRITICAL: TYPEORM_SYNCHRONIZE=true is NOT allowed in ${env}. ` +
+    //     ` CRITICAL: TYPEORM_SYNCHRONIZE=true is NOT allowed in ${env}. ` +
     //       'This will automatically alter your database schema and can cause DATA LOSS. ' +
     //       'Use migrations instead: npm run migration:generate && npm run migration:run',
     //   );
@@ -64,13 +64,13 @@ export class DatabaseConfigValidator {
     const migrationsRun = configService.get<string>('TYPEORM_MIGRATIONS_RUN');
     // if (migrationsRun === 'true') {
     //   throw new Error(
-    //     `❌ CRITICAL: TYPEORM_MIGRATIONS_RUN=true is NOT allowed in ${env}. ` +
+    //     ` CRITICAL: TYPEORM_MIGRATIONS_RUN=true is NOT allowed in ${env}. ` +
     //       'Migrations must be run manually via CLI for safety and control. ' +
     //       'Use: npm run migration:run',
     //   );
     // }
 
-    this.logger.log('✅ Production safeguards validated');
+    this.logger.log(' Production safeguards validated');
   }
 
   /**
@@ -82,17 +82,17 @@ export class DatabaseConfigValidator {
 
     // IAM auth requires SSL - it will be auto-enabled
     if (useIAMAuth) {
-      this.logger.log('✅ SSL automatically enabled for IAM authentication');
+      this.logger.log(' SSL automatically enabled for IAM authentication');
       return;
     }
 
     if (ssl !== 'true') {
       this.logger.warn(
-        '⚠️  WARNING: MYSQL_SSL is not enabled. ' +
+        '️  WARNING: MYSQL_SSL is not enabled. ' +
           'SSL is strongly recommended for production databases to encrypt data in transit.',
       );
     } else {
-      this.logger.log('✅ SSL configuration validated');
+      this.logger.log(' SSL configuration validated');
     }
   }
 
@@ -132,20 +132,20 @@ export class DatabaseConfigValidator {
     if (missingVars.length > 0) {
       const authType = useIAMAuth ? 'IAM authentication' : 'traditional authentication';
       throw new Error(
-        `❌ CRITICAL: Missing required database environment variables for ${authType}: ${missingVars.join(', ')}. ` +
+        ` CRITICAL: Missing required database environment variables for ${authType}: ${missingVars.join(', ')}. ` +
           'Please set these variables in your environment or .env file.',
       );
     }
 
     if (invalidVars.length > 0) {
       throw new Error(
-        `❌ CRITICAL: Invalid placeholder values detected in: ${invalidVars.join(', ')}. ` +
+        ` CRITICAL: Invalid placeholder values detected in: ${invalidVars.join(', ')}. ` +
           'Please set valid database credentials in environment variables.',
       );
     }
 
     const authType = useIAMAuth ? 'IAM' : 'traditional';
-    this.logger.log(`✅ Database credentials validated (${authType} authentication)`);
+    this.logger.log(` Database credentials validated (${authType} authentication)`);
   }
 
   /**
@@ -164,7 +164,7 @@ export class DatabaseConfigValidator {
     const region = configService.get<string>('AWS_REGION');
     if (!region) {
       throw new Error(
-        '❌ CRITICAL: AWS_REGION must be set when MYSQL_IAM_AUTH_ENABLED=true. ' +
+        ' CRITICAL: AWS_REGION must be set when MYSQL_IAM_AUTH_ENABLED=true. ' +
           'This is required for generating IAM authentication tokens.',
       );
     }
@@ -173,7 +173,7 @@ export class DatabaseConfigValidator {
     const username = configService.get<string>('MYSQL_USER');
     if (username && username.includes(':')) {
       this.logger.warn(
-        '⚠️  WARNING: Database username contains ":" which may cause issues with IAM authentication. ' +
+        '️  WARNING: Database username contains ":" which may cause issues with IAM authentication. ' +
           'Consider using a simpler username format (e.g., "iam_db_user").',
       );
     }
@@ -182,7 +182,7 @@ export class DatabaseConfigValidator {
     const password = configService.get<string>('MYSQL_PASSWORD');
     if (password) {
       this.logger.warn(
-        '⚠️  WARNING: MYSQL_PASSWORD is set but MYSQL_IAM_AUTH_ENABLED=true. ' +
+        '️  WARNING: MYSQL_PASSWORD is set but MYSQL_IAM_AUTH_ENABLED=true. ' +
           'The password will be ignored. IAM tokens will be used for authentication.',
       );
     }
@@ -194,13 +194,13 @@ export class DatabaseConfigValidator {
 
     if (!fs.existsSync(certPath)) {
       this.logger.warn(
-        '⚠️  WARNING: RDS CA certificate bundle not found at certs/global-bundle.pem. ' +
+        '️  WARNING: RDS CA certificate bundle not found at certs/global-bundle.pem. ' +
           'While not strictly required, it is recommended for secure SSL connections. ' +
           'Download from: https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
       );
     }
 
-    this.logger.log('✅ IAM authentication configuration validated');
+    this.logger.log(' IAM authentication configuration validated');
     this.logger.log(
       'ℹ️  Ensure the following are configured in AWS:\n' +
         '   1. IAM authentication enabled on Aurora cluster\n' +
@@ -219,7 +219,7 @@ export class DatabaseConfigValidator {
     const synchronize = configService.get<string>('TYPEORM_SYNCHRONIZE');
     if (synchronize === 'true') {
       this.logger.warn(
-        '⚠️  DEVELOPMENT MODE: synchronize=true is enabled. ' +
+        '️  DEVELOPMENT MODE: synchronize=true is enabled. ' +
           'This is OK for development but remember to use migrations for production.',
       );
     }
@@ -227,7 +227,7 @@ export class DatabaseConfigValidator {
     const migrationsRun = configService.get<string>('TYPEORM_MIGRATIONS_RUN');
     if (migrationsRun === 'true') {
       this.logger.warn(
-        '⚠️  DEVELOPMENT MODE: migrationsRun=true is enabled. ' +
+        '️  DEVELOPMENT MODE: migrationsRun=true is enabled. ' +
           'Migrations will run automatically on startup.',
       );
     }
@@ -248,11 +248,11 @@ export class DatabaseConfigValidator {
       // Simple connectivity test
       await dataSource.query('SELECT 1 as health_check');
 
-      this.logger.log('✅ Database connection test passed');
+      this.logger.log(' Database connection test passed');
       return true;
     } catch (error) {
       this.logger.error(
-        `❌ Database connection test failed: ${error instanceof Error ? error.message : error}`,
+        ` Database connection test failed: ${error instanceof Error ? error.message : error}`,
       );
       return false;
     }
