@@ -1,0 +1,29 @@
+name: Build and Deploy Expenses AI (Papaya)
+
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:    
+
+permissions:
+  packages: write
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  ECR_REPO: ${{ vars.ECR_REPO }}
+
+jobs:
+  build-and-package:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
+      
+      
+    
