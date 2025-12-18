@@ -114,7 +114,7 @@ const getSslConfig = () => {
   // For IAM auth, always use SSL even if cert file is missing
   // (will rely on system CA certificates)
   return {
-    rejectUnauthorized: isProduction && useIAMAuth, // Strict verification for IAM auth in production
+    rejectUnauthorized: isProduction, // Always enforce SSL validation in production
     ca: ca, // CA certificate bundle (optional but recommended)
   };
 };

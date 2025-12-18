@@ -70,6 +70,8 @@ export class BedrockLlmService {
     try {
       this.bedrockClient = new BedrockRuntimeClient({
         region: 'us-east-1', // Bedrock is available in us-east-1
+        maxAttempts: 4,
+        retryMode: 'adaptive',
       });
 
       // Check if using application inference profiles globally

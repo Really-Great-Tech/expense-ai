@@ -32,6 +32,8 @@ export class TextractApiService implements DocumentReader {
     // 4. EC2 Instance metadata (Instance Profile)
     this.textractClient = new TextractClient({
       region: awsRegion,
+      maxAttempts: 4,
+      retryMode: 'adaptive',
     });
   }
 
