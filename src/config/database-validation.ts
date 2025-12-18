@@ -178,12 +178,12 @@ export class DatabaseConfigValidator {
       );
     }
 
-    // Warn if MYSQL_PASSWORD is set when using IAM auth
+    // Block password when using IAM auth - this is a security requirement
     const password = configService.get<string>('MYSQL_PASSWORD');
     if (password) {
-      this.logger.warn(
-        '⚠️  WARNING: MYSQL_PASSWORD is set but MYSQL_IAM_AUTH_ENABLED=true. ' +
-          'The password will be ignored. IAM tokens will be used for authentication.',
+      throw new Error(
+        '❌ CRITICAL: MYSQL_PASSWORD must not be set when MYSQL_IAM_AUTH_ENABLED=true. ' +
+          'Remove MYSQL_PASSWORD from environment to use IAM authentication.',
       );
     }
 
