@@ -4,7 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LoggerService } from './logger/logger.service';
+import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
 
 async function bootstrap() {

@@ -1,9 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { DocumentReaderFactory } from './documentReaderFactory';
 import { DocumentReaderType } from './types';
-import { TextractApiService } from './textractReader';
+import { TextractApiService } from '../services/textract/textract-reader';
 
-jest.mock('./textractReader');
+jest.mock('../services/textract/textract-reader');
 
 describe('DocumentReaderFactory', () => {
   let mockConfigService: jest.Mocked<ConfigService>;

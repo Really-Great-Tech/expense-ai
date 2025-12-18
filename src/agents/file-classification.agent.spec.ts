@@ -1,8 +1,8 @@
 import { FileClassificationAgent } from './file-classification.agent';
-import { BedrockLlmService } from '../utils/bedrockLlm';
-import { FileClassificationResultSchema } from '../schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { FileClassificationResultSchema } from '../common/schemas/expense-schemas';
 
-jest.mock('../utils/bedrockLlm');
+jest.mock('../services/bedrock/bedrock-llm');
 
 describe('FileClassificationAgent', () => {
   let agent: FileClassificationAgent;

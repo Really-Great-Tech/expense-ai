@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { Logger } from '@nestjs/common';
-import { MigrationHelper } from '../country-policy/utils/migration-helper';
+import { MigrationHelper } from '../utils/migration-helper';
 
 export class SeedCountryPolicies1736504407000 implements MigrationInterface {
   name = 'SeedCountryPolicies1736504407000';

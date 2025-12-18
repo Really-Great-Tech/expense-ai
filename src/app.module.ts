@@ -5,15 +5,15 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config';
-import { DocumentModule } from './document/document.module';
-import { ProcessingModule } from './processing/processing.module';
+import { ExpenseDocumentModule } from './expense-document/expense-document.module';
+import { WorkersModule } from './workers/workers.module';
+import { ExpenseResultModule } from './expense-result/expense-result.module';
 import { CountryPolicyModule } from './country-policy/country-policy.module';
 import { RedisConfigService } from './config/redis.config';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityMiddleware } from './middleware/security.middleware';
-import { DocumentSplitterModule } from './document-splitter/document-splitter.module';
-import { LoggerModule } from './logger/logger.module';
+import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseConfigValidator } from './config/database-validation';
 
@@ -53,9 +53,9 @@ import { DatabaseConfigValidator } from './config/database-validation';
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
-    DocumentModule,
-    DocumentSplitterModule,
-    ProcessingModule,
+    ExpenseDocumentModule,
+    WorkersModule,
+    ExpenseResultModule,
     CountryPolicyModule,
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring

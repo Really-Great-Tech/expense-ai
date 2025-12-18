@@ -13,8 +13,8 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { BedrockLlmService } from '../utils/bedrockLlm';
-import { PageMarkdown } from '../document-splitter/types/document-splitter.types';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { PageMarkdown } from '../expense-document/types/upload.types';
 import {
   DocumentSplitterEvalAgent,
   SplitResult,

@@ -39,13 +39,6 @@ const srcMigrations = join(cwd, 'src', 'migrations');
 // Check multiple possible locations for compiled migrations
 const distMigrationsExist = existsSync(distSrcMigrations) || existsSync(distMigrations);
 
-// Log the detected paths for debugging
-log('Working directory:', cwd);
-log('Checking migration paths:');
-log('  - dist/src/migrations:', existsSync(distSrcMigrations));
-log('  - dist/migrations:', existsSync(distMigrations));
-log('  - src/migrations:', existsSync(srcMigrations));
-log('Using compiled migrations:', distMigrationsExist);
 
 // Use dist if it exists and has migrations, otherwise use src
 // Include both possible dist locations for maximum compatibility

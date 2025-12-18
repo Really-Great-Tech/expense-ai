@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { StorageModule } from './storage.module';
 import { LocalStorageService } from './services/local-storage.service';
-import { S3StorageService } from './services/s3-storage.service';
+import { S3StorageService } from '../services/s3/s3-storage.service';
 import { FileStorageService } from './interfaces/file-storage.interface';
 
 // Skip S3 tests in CI environment (SDK uses default credential chain in production)
