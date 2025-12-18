@@ -93,8 +93,8 @@ EXPOSE 3000
 EXPOSE 9229
 
 
-# Migrations run automatically via TypeORM's migrationsRun: true config
-# No need for entrypoint script - TypeORM handles migrations on app startup
-# Clear any inherited ENTRYPOINT from base image
-ENTRYPOINT []
+# Migrations controlled via TYPEORM_MIGRATIONS_RUN env var (true/false)
+# Set TYPEORM_MIGRATIONS_RUN=true to run migrations before app starts
+# migrationsRun is disabled in app to prevent race conditions in multi-instance deployments
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]
