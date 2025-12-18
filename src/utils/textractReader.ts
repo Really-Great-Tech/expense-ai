@@ -5,8 +5,6 @@ import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Bloc
 import { DocumentReader, TextractConfig, ApiResponse } from './types';
 
 export interface TextractApiServiceOptions {
-  accessKeyId?: string;
-  secretAccessKey?: string;
   region?: string;
   uploadPath?: string;
 }
@@ -27,18 +25,13 @@ export class TextractApiService implements DocumentReader {
     this.uploadPath = options.uploadPath || './uploads';
     this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
 
-    const credentials =
-      options.accessKeyId && options.secretAccessKey
-        ? {
-            accessKeyId: options.accessKeyId,
-            secretAccessKey: options.secretAccessKey,
-          }
-        : undefined; // Use default credential chain if not provided
-
-    // Initialize Textract client
+    // Initialize Textract client - uses AWS SDK default credential chain:
+    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    // 2. Shared credentials file (~/.aws/credentials)
+    // 3. ECS Container credentials (Task Role)
+    // 4. EC2 Instance metadata (Instance Profile)
     this.textractClient = new TextractClient({
       region: awsRegion,
-      credentials,
     });
   }
 
@@ -463,8 +456,11 @@ export class TextractApiService implements DocumentReader {
 
       this.logger.log(`    Loading PDF for splitting...`);
 
-      // Load the PDF document
-      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      // Load the PDF document with compatibility options
+      const pdfDoc = await PDFDocument.load(pdfBuffer, {
+        ignoreEncryption: true,
+        updateMetadata: false,
+      });
       const pageCount = pdfDoc.getPageCount();
 
       this.logger.log(`    Splitting PDF with ${pageCount} pages`);
@@ -479,8 +475,12 @@ export class TextractApiService implements DocumentReader {
         const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
         newPdf.addPage(copiedPage);
 
-        // Convert to buffer
-        const pdfBytes = await newPdf.save();
+        // Convert to buffer with Textract-compatible options
+        // useObjectStreams: false creates PDF 1.4 structure (better Textract compatibility)
+        const pdfBytes = await newPdf.save({
+          useObjectStreams: false,
+          addDefaultPage: false,
+        });
         pageBuffers.push(Buffer.from(pdfBytes));
       }
 
@@ -624,6 +624,7 @@ export class TextractApiService implements DocumentReader {
 }
 
 // Factory function for easy instantiation
-export function createTextractService(accessKeyId?: string, secretAccessKey?: string, region?: string, uploadPath?: string): TextractApiService {
-  return new TextractApiService({ accessKeyId, secretAccessKey, region, uploadPath });
+// Uses AWS SDK default credential chain (env vars, shared credentials, IAM roles)
+export function createTextractService(region?: string, uploadPath?: string): TextractApiService {
+  return new TextractApiService({ region, uploadPath });
 }

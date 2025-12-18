@@ -5,8 +5,8 @@ import { LocalStorageService } from './services/local-storage.service';
 import { S3StorageService } from './services/s3-storage.service';
 import { FileStorageService } from './interfaces/file-storage.interface';
 
-// Skip S3 tests in CI environment or when AWS credentials are not available
-const shouldSkipS3Tests = process.env.CI === 'true' || !process.env.AWS_ACCESS_KEY_ID;
+// Skip S3 tests in CI environment (SDK uses default credential chain in production)
+const shouldSkipS3Tests = process.env.CI === 'true';
 const describeS3 = shouldSkipS3Tests ? describe.skip : describe;
 
 describe('StorageModule', () => {
@@ -72,13 +72,12 @@ describe('StorageModule', () => {
       configValues.STORAGE_TYPE = 's3';
       configValues.S3_BUCKET_NAME = 'test-bucket';
       configValues.AWS_REGION = 'us-east-1';
-      configValues.AWS_ACCESS_KEY_ID = 'test-key';
-      configValues.AWS_SECRET_ACCESS_KEY = 'test-secret';
+      // No credentials needed - SDK uses default credential chain
 
       const module: TestingModule = await buildModule();
 
       const storageService = module.get<FileStorageService>('FILE_STORAGE_SERVICE');
-      
+
       expect(storageService).toBeDefined();
       expect(storageService).toBeInstanceOf(S3StorageService);
     });
@@ -87,9 +86,7 @@ describe('StorageModule', () => {
       configValues.STORAGE_TYPE = 's3';
       // Don't set S3_BUCKET_NAME
 
-      await expect(
-        buildModule()
-      ).rejects.toThrow('S3_BUCKET_NAME is required for S3StorageService');
+      await expect(buildModule()).rejects.toThrow('S3_BUCKET_NAME is required for S3StorageService');
     });
   });
 
@@ -184,11 +181,10 @@ describe('StorageModule', () => {
         configValues.STORAGE_TYPE = 'S3';
         configValues.S3_BUCKET_NAME = 'test-bucket';
         configValues.AWS_REGION = 'us-east-1';
-        configValues.AWS_ACCESS_KEY_ID = 'test-key';
-        configValues.AWS_SECRET_ACCESS_KEY = 'test-secret';
-  
+        // No credentials needed - SDK uses default credential chain
+
         const module: TestingModule = await buildModule();
-  
+
         const storageService = module.get<FileStorageService>('FILE_STORAGE_SERVICE');
         expect(storageService).toBeInstanceOf(S3StorageService);
       });

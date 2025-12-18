@@ -4,20 +4,23 @@ import { TextractApiService } from './textractReader';
 
 /**
  * Factory class for creating document readers
+ * Uses AWS SDK default credential chain for authentication:
+ * 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+ * 2. Shared credentials file (~/.aws/credentials)
+ * 3. ECS Container credentials (Task Role)
+ * 4. EC2 Instance metadata (Instance Profile)
  */
 export class DocumentReaderFactory {
   /**
    * Create a document reader based on the specified type
    * @param type The type of document reader to create
-   * @param apiKey The API key for the document reader
+   * @param configService ConfigService instance for reading configuration
    * @returns A document reader instance
    */
-  static createReader(type: string, apiKey: string, configService: ConfigService = new ConfigService()): DocumentReader {
+  static createReader(type: string, configService: ConfigService = new ConfigService()): DocumentReader {
     switch (type.toLowerCase()) {
       case DocumentReaderType.TEXTRACT:
         return new TextractApiService({
-          accessKeyId: apiKey,
-          secretAccessKey: configService.get<string>('AWS_SECRET_ACCESS_KEY'),
           region: configService.get<string>('AWS_REGION'),
           uploadPath: configService.get<string>('UPLOAD_PATH', './uploads'),
         });
@@ -28,6 +31,7 @@ export class DocumentReaderFactory {
 
   /**
    * Get the default document reader based on environment configuration
+   * @param configService ConfigService instance for reading configuration
    * @param overrideType Optional reader type to override environment configuration
    * @returns A document reader instance
    */
@@ -36,19 +40,8 @@ export class DocumentReaderFactory {
 
     switch (readerType) {
       case DocumentReaderType.TEXTRACT:
-        // For Textract, we use service-specific AWS credentials from environment variables
-        const textractAccessKeyId = configService.get<string>('AWS_ACCESS_KEY_ID');
-        const textractSecretAccessKey = configService.get<string>('AWS_SECRET_ACCESS_KEY');
-        const textractRegion = configService.get<string>('AWS_REGION');
-
-        if (!textractAccessKeyId || !textractSecretAccessKey || !textractRegion) {
-          throw new Error('Textract AWS credentials not configured');
-        }
-
         return new TextractApiService({
-          accessKeyId: textractAccessKeyId,
-          secretAccessKey: textractSecretAccessKey,
-          region: textractRegion,
+          region: configService.get<string>('AWS_REGION'),
           uploadPath: configService.get<string>('UPLOAD_PATH', './uploads'),
         });
 

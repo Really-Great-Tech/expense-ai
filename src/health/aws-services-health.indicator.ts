@@ -47,41 +47,27 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
 
   /**
    * Initialize AWS SDK clients
-   * Uses same configuration pattern as TextractApiService and BedrockLlmService
+   * Uses AWS SDK default credential chain for authentication:
+   * 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+   * 2. Shared credentials file (~/.aws/credentials)
+   * 3. ECS Container credentials (Task Role)
+   * 4. EC2 Instance metadata (Instance Profile)
    */
   private initializeClients(): void {
     try {
-      // Textract configuration (matches TextractApiService)
       const textractRegion = this.configService.get<string>('AWS_REGION', 'us-east-1');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
-      const textractCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
-      // Initialize Textract client (same config as TextractApiService)
+      // Initialize Textract client - uses default credential chain
       this.textractClient = new TextractClient({
         region: textractRegion,
-        credentials: textractCredentials,
       });
 
-      // Bedrock configuration (matches BedrockLlmService)
-      const bedrockRegion = this.configService.get<string>('AWS_REGION', 'eu-west-1');
-
-      const bedrockCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
-      // Initialize Bedrock client (same config as BedrockLlmService)
+      // Initialize Bedrock client - uses default credential chain
       this.bedrockClient = new BedrockRuntimeClient({
-        region: "us-east-1",
-        credentials: bedrockCredentials,
+        region: 'us-east-1',
       });
 
-      this.logger.log(`AWS clients initialized (Textract: ${textractRegion}, Bedrock: ${bedrockRegion})`);
+      this.logger.log(`AWS clients initialized (Textract: ${textractRegion}, Bedrock: us-east-1)`);
     } catch (error) {
       this.logger.error(`Failed to initialize AWS clients: ${error.message}`);
     }
@@ -120,7 +106,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         latency: `${latency}ms`,
         details: {
           region: this.configService.get('AWS_REGION', 'us-east-1'),
-          credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
+          credentialsSource: 'default-chain',
           blocksDetected: response.Blocks?.length || 0,
           documentMetadata: response.DocumentMetadata,
         },
@@ -306,8 +292,8 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         message: allUp ? 'All Bedrock models operational' : `${downCount}/${modelResults.length} models down`,
         latency: `${latency}ms`,
         details: {
-          region: this.configService.get('AWS_REGION', 'eu-west-1'),
-          credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
+          region: 'us-east-1',
+          credentialsSource: 'default-chain',
           usingApplicationProfile: this.configService.get<string>('USING_APPLICATION_PROFILE', 'false'),
           summary: { total: modelResults.length, up: upCount, down: downCount },
           models: modelResults,
@@ -337,7 +323,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         error: errorMessage,
         details: {
           errorType: error.constructor.name,
-          region: this.configService.get('AWS_REGION', 'eu-west-1'),
+          region: 'us-east-1',
         },
       };
 

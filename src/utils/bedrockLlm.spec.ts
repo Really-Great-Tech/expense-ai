@@ -8,9 +8,8 @@ jest.mock('@nestjs/config', () => {
       get: jest.fn((key: string, defaultValue?: any) => {
         const values: Record<string, string> = {
           AWS_REGION: 'us-east-1',
-          AWS_ACCESS_KEY_ID: 'AKIA_ENV_TEST',
-          AWS_SECRET_ACCESS_KEY: 'SECRET_ENV_TEST',
           USING_APPLICATION_PROFILE: 'false',
+          // No credentials needed - SDK uses default credential chain
         };
         return values[key] ?? defaultValue;
       }),
@@ -60,11 +59,8 @@ describe('BedrockLlmService', () => {
     mockState.throwOnConstruct = false;
   });
 
-  it('should initialize with provided config and report provider/model', () => {
+  it('should initialize with default credential chain and report provider/model', () => {
     const svc = new BedrockLlmService({
-      accessKeyId: 'AKIA_TEST',
-      secretAccessKey: 'SECRET_TEST',
-      region: 'us-east-1',
       modelId: 'eu.amazon.nova-pro-v1:0',
       temperature: 0.5,
     });
@@ -73,13 +69,10 @@ describe('BedrockLlmService', () => {
     expect(svc.getCurrentProvider()).toBe('bedrock');
     expect(svc.getCurrentModelName()).toBe('eu.amazon.nova-pro-v1:0');
 
-    // Ensure Bedrock client was constructed with passed region and credentials
+    // Ensure Bedrock client was constructed with region (credentials handled by SDK)
     expect(mockState.lastConfig).toBeTruthy();
     expect(mockState.lastConfig!.region).toBe('us-east-1');
-    expect(mockState.lastConfig!.credentials).toEqual({
-      accessKeyId: 'AKIA_TEST',
-      secretAccessKey: 'SECRET_TEST',
-    });
+    // No explicit credentials - SDK uses default credential chain
   });
 
   it('should chat using Nova (Converse) API when modelId contains amazon.nova', async () => {
@@ -163,9 +156,7 @@ describe('BedrockLlmService', () => {
     const parsedBody = JSON.parse(callArg.input.body);
     expect(parsedBody.temperature).toBe(0.2);
     expect(parsedBody.system).toBe('Be concise.');
-    expect(parsedBody.messages).toEqual([
-      { role: 'user', content: 'Summarize this text.' },
-    ]);
+    expect(parsedBody.messages).toEqual([{ role: 'user', content: 'Summarize this text.' }]);
   });
 
   it('should throw if bedrock client failed to initialize', async () => {
@@ -174,9 +165,7 @@ describe('BedrockLlmService', () => {
       modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
     });
 
-    await expect(svc.chat({ messages: [{ role: 'user', content: 'Hi' }] })).rejects.toThrow(
-      'Bedrock client not initialized'
-    );
+    await expect(svc.chat({ messages: [{ role: 'user', content: 'Hi' }] })).rejects.toThrow('Bedrock client not initialized');
     // Provider should be none
     expect(svc.getCurrentProvider()).toBe('none');
     expect(svc.getCurrentModelName()).toBe('unknown');

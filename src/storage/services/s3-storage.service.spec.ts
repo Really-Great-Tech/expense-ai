@@ -21,8 +21,8 @@ jest.mock('@aws-sdk/client-s3', () => {
 // Import after mocking
 import { PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-// Skip S3 tests in CI environment or when AWS credentials are not available
-const shouldSkipS3Tests = process.env.CI === 'true' || !process.env.AWS_ACCESS_KEY_ID;
+// Skip S3 tests in CI environment (SDK uses default credential chain in production)
+const shouldSkipS3Tests = process.env.CI === 'true';
 const describeS3 = shouldSkipS3Tests ? describe.skip : describe;
 
 describeS3('S3StorageService', () => {
@@ -36,8 +36,7 @@ describeS3('S3StorageService', () => {
     configValues = {
       S3_BUCKET_NAME: 'test-bucket',
       AWS_REGION: 'us-east-1',
-      AWS_ACCESS_KEY_ID: 'test-key',
-      AWS_SECRET_ACCESS_KEY: 'test-secret',
+      // No credentials needed - SDK uses default credential chain
     };
 
     const mockConfigService = {
@@ -422,8 +421,7 @@ describeS3('S3StorageService', () => {
           if (key === 'S3_BUCKET_NAME') return undefined;
           const values: Record<string, string> = {
             AWS_REGION: 'us-east-1',
-            AWS_ACCESS_KEY_ID: 'test-key',
-            AWS_SECRET_ACCESS_KEY: 'test-secret',
+            // No credentials needed - SDK uses default credential chain
           };
           return values[key] ?? defaultValue;
         }),
@@ -438,7 +436,7 @@ describeS3('S3StorageService', () => {
               useValue: mockConfigServiceNoBucket,
             },
           ],
-        }).compile()
+        }).compile(),
       ).rejects.toThrow('S3_BUCKET_NAME is required for S3StorageService');
     });
   });

@@ -10,13 +10,13 @@ export class S3StorageService implements FileStorageService {
   private readonly bucketName: string;
 
   constructor(private configService: ConfigService) {
-    // Initialize S3 client
+    // Initialize S3 client - uses AWS SDK default credential chain:
+    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    // 2. Shared credentials file (~/.aws/credentials)
+    // 3. ECS Container credentials (Task Role)
+    // 4. EC2 Instance metadata (Instance Profile)
     this.s3Client = new S3Client({
       region: this.configService.get('AWS_REGION', 'us-east-1'),
-      credentials: {
-        accessKeyId: this.configService.get('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY'),
-      },
     });
     
     this.bucketName = this.configService.get('S3_BUCKET_NAME');

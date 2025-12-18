@@ -34,6 +34,17 @@ export interface ChatResponse {
   modelUsed?: string;
 }
 
+export interface ImageInput {
+  data: string; // base64 encoded image
+  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+}
+
+export interface ChatWithVisionOptions {
+  prompt: string;
+  images: ImageInput[];
+  systemPrompt?: string;
+}
+
 /**
  * AWS Bedrock LLM Service
  * Provides a unified interface for Nova and Claude models via Bedrock
@@ -51,29 +62,15 @@ export class BedrockLlmService {
   private static readonly configService = new ConfigService();
 
   constructor(config?: BedrockConfig) {
-    // Initialize Bedrock client with service-specific credentials
+    // Initialize Bedrock client - uses AWS SDK default credential chain:
+    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    // 2. Shared credentials file (~/.aws/credentials)
+    // 3. ECS Container credentials (Task Role)
+    // 4. EC2 Instance metadata (Instance Profile)
     try {
-      const fallbackRegion = BedrockLlmService.configService.get<string>('AWS_REGION', 'eu-west-1');
-      const fallbackAccessKeyId = BedrockLlmService.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const fallbackSecretAccessKey = BedrockLlmService.configService.get<string>('AWS_SECRET_ACCESS_KEY');
-
-      const bedrockConfig = {
-        region: config?.region || fallbackRegion,
-        credentials:
-          config?.accessKeyId && config?.secretAccessKey
-            ? {
-                accessKeyId: config.accessKeyId,
-                secretAccessKey: config.secretAccessKey,
-              }
-            : fallbackAccessKeyId && fallbackSecretAccessKey
-            ? {
-                accessKeyId: fallbackAccessKeyId,
-                secretAccessKey: fallbackSecretAccessKey,
-              }
-            : undefined,
-      };
-
-      this.bedrockClient = new BedrockRuntimeClient(bedrockConfig);
+      this.bedrockClient = new BedrockRuntimeClient({
+        region: 'us-east-1', // Bedrock is available in us-east-1
+      });
 
       // Check if using application inference profiles globally
       this.usingApplicationProfile = BedrockLlmService.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
@@ -211,6 +208,83 @@ export class BedrockLlmService {
     };
   }
 
+  /**
+   * Chat with vision support (images + text)
+   * Uses Claude for vision as Nova doesn't support images
+   */
+  async chatWithVision(options: ChatWithVisionOptions): Promise<ChatResponse> {
+    if (!this.bedrockClient) {
+      throw new Error('Bedrock client not initialized');
+    }
+
+    // Vision requires Claude - Nova doesn't support images
+    if (this.isNovaModel()) {
+      this.logger.warn('Vision not supported on Nova, falling back to text-only');
+      return this.chat({
+        messages: [
+          ...(options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : []),
+          { role: 'user' as const, content: options.prompt },
+        ],
+      });
+    }
+
+    // Build content array with images and text
+    const content: any[] = [];
+
+    // Add images first
+    for (const img of options.images) {
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.mediaType,
+          data: img.data,
+        },
+      });
+    }
+
+    // Add text prompt
+    content.push({
+      type: 'text',
+      text: options.prompt,
+    });
+
+    const requestBody = {
+      anthropic_version: 'bedrock-2023-05-31',
+      max_tokens: 4000,
+      temperature: this.temperature,
+      system: options.systemPrompt || '',
+      messages: [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+    };
+
+    const command = new InvokeModelCommand({
+      modelId: this.modelId,
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: JSON.stringify(requestBody),
+    });
+
+    const response = await this.bedrockClient.send(command);
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+    this.logger.log(`✅ Vision chat completed using model: ${this.modelId}`);
+
+    return {
+      message: {
+        content: responseBody.content[0].text,
+      },
+      usage: {
+        input_tokens: responseBody.usage?.input_tokens || 0,
+        output_tokens: responseBody.usage?.output_tokens || 0,
+      },
+      modelUsed: this.modelId,
+    };
+  }
 
   /**
    * Get the current provider being used
