@@ -4,11 +4,11 @@ import { ConfigService } from '@nestjs/config';
 
 export type ModelType = 'nova' | 'claude';
 
+/**
+ * Bedrock configuration options
+ * Note: AWS credentials are handled by the SDK default credential chain
+ */
 export interface BedrockConfig {
-  accessKeyId?: string;
-  secretAccessKey?: string;
-  sessionToken?: string;
-  region?: string;
   modelId?: string;
   temperature?: number;
   /**
