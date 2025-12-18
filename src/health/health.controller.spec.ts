@@ -34,7 +34,6 @@ describe('HealthController', () => {
 
     mockDatabaseHealthIndicator = {
       isHealthy: jest.fn().mockResolvedValue({ database: { status: 'up' } }),
-      checkMigrationStatus: jest.fn().mockResolvedValue({ migrations: { status: 'up' } }),
     } as any;
 
     mockRedisHealthEnhancedIndicator = {
@@ -119,15 +118,6 @@ describe('HealthController', () => {
 
       expect(result).toBeDefined();
       expect(mockDatabaseHealthIndicator.isHealthy).toHaveBeenCalledWith('database');
-    });
-  });
-
-  describe('checkMigrations', () => {
-    it('should check migration status', async () => {
-      const result = await controller.checkMigrations();
-
-      expect(result).toBeDefined();
-      expect(mockDatabaseHealthIndicator.checkMigrationStatus).toHaveBeenCalled();
     });
   });
 

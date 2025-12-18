@@ -190,7 +190,7 @@ This endpoint is designed for single-receipt documents and provides a fast-path 
     const requestStartTime = Date.now();
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    this.logger.log(`🚀 [${requestId}] Single receipt upload started`, {
+    this.logger.log(`[${requestId}] Single receipt upload started`, {
       fileName: file?.originalname,
       fileSize: file?.size,
       userId: body?.userId,
@@ -198,16 +198,16 @@ This endpoint is designed for single-receipt documents and provides a fast-path 
     });
 
     if (!file) {
-      this.logger.error(`❌ [${requestId}] No file uploaded`);
+      this.logger.error(`[${requestId}] No file uploaded`);
       throw new HttpException('No file uploaded', HttpStatus.BAD_REQUEST);
     }
 
     try {
       // Step 1: File validation
       const validationStartTime = Date.now();
-      this.logger.log(`🔍 [${requestId}] Starting file validation for single receipt: ${file.originalname}`);
+      this.logger.log(`[${requestId}] Starting file validation for single receipt: ${file.originalname}`);
       const validationResult = await this.fileValidationService.validateFile(file);
-      this.logger.log(`✅ [${requestId}] File validation completed in ${Date.now() - validationStartTime}ms`);
+      this.logger.log(`[${requestId}] File validation completed in ${Date.now() - validationStartTime}ms`);
 
       // Step 2: Handle validation failures
       if (!validationResult.isValid) {

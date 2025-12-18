@@ -125,53 +125,6 @@ export class HealthController {
   }
 
   /**
-   * Database migration status check
-   * Verifies that all migrations have been applied
-   */
-  @Get('health/database/migrations')
-  @HealthCheck()
-  @ApiOperation({
-    summary: 'Check database migration status',
-    description: 'Verifies that all database migrations have been applied.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'All migrations applied',
-    schema: {
-      example: {
-        status: 'ok',
-        info: {
-          migrations: {
-            status: 'up',
-            message: 'All migrations applied',
-            hasPendingMigrations: false,
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 503,
-    description: 'Pending migrations detected',
-    schema: {
-      example: {
-        status: 'error',
-        error: {
-          migrations: {
-            status: 'down',
-            message: 'Pending migrations detected',
-            hasPendingMigrations: true,
-            recommendation: 'Run migrations via CLI or POST /migrations/run endpoint',
-          },
-        },
-      },
-    },
-  })
-  checkMigrations() {
-    return this.health.check([() => this.dbEnhanced.checkMigrationStatus()]);
-  }
-
-  /**
    * AWS Textract health check
    * Tests connectivity and functionality of AWS Textract service
    */

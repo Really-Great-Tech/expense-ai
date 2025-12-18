@@ -175,10 +175,10 @@ const baseDBConfig: DataSourceOptions = {
   // CRITICAL: Production safeguards - NEVER enable synchronize in production
   synchronize: false,
 
-  // Automatically run migrations on application startup
-  // Migrations run in transactions (migrationsTransactionMode: 'each') for safety
-  // This ensures database schema is always up-to-date with the application code
-  migrationsRun: true,
+  // DISABLED: Auto-migration causes race conditions in multi-instance deployments
+  // Migrations are run via Docker entrypoint script (TYPEORM_MIGRATIONS_RUN=true)
+  // or manually via: npx typeorm migration:run -d dist/src/config/database.js
+  migrationsRun: false,
 
   // Enable transaction per migration for rollback safety
   migrationsTransactionMode: 'each' as const,

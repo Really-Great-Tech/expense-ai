@@ -17,7 +17,6 @@ describe('DatabaseHealthIndicator', () => {
         maxConnections: '151',
         currentConnections: '5',
       }]),
-      showMigrations: jest.fn().mockResolvedValue(false),
       ...dataSourceOptions,
     } as any;
 
@@ -118,49 +117,6 @@ describe('DatabaseHealthIndicator', () => {
       const duration = Date.now() - startTime;
 
       expect(duration).toBeLessThan(10000);
-    });
-  });
-
-  describe('checkMigrationStatus', () => {
-    it('should return healthy when no pending migrations', async () => {
-      moduleRef = await buildModule({
-        showMigrations: jest.fn().mockResolvedValue(false),
-      });
-      indicator = moduleRef.get(DatabaseHealthIndicator);
-
-      const result = await indicator.checkMigrationStatus();
-
-      expect(result).toBeDefined();
-      expect(result.migrations).toBeDefined();
-      expect(result.migrations.status).toBe('up');
-      expect(result.migrations.message).toBe('All migrations applied');
-      expect(result.migrations.hasPendingMigrations).toBe(false);
-    });
-
-    it('should return unhealthy when pending migrations exist', async () => {
-      moduleRef = await buildModule({
-        showMigrations: jest.fn().mockResolvedValue(true),
-      });
-      indicator = moduleRef.get(DatabaseHealthIndicator);
-
-      const result = await indicator.checkMigrationStatus();
-
-      expect(result.migrations.status).toBe('down');
-      expect(result.migrations.message).toBe('Pending migrations detected');
-      expect(result.migrations.hasPendingMigrations).toBe(true);
-      expect(result.migrations.recommendation).toBeDefined();
-    });
-
-    it('should handle migration check errors gracefully', async () => {
-      moduleRef = await buildModule({
-        showMigrations: jest.fn().mockRejectedValue(new Error('Migration check failed')),
-      });
-      indicator = moduleRef.get(DatabaseHealthIndicator);
-
-      const result = await indicator.checkMigrationStatus();
-
-      expect(result.migrations.status).toBe('down');
-      expect(result.migrations.message).toContain('Failed to check migration status');
     });
   });
 

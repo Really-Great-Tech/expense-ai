@@ -276,7 +276,7 @@ export class TextractApiService implements DocumentReader {
         this.logger.log(`   Estimated pages: ${estimatedPages}`);
 
         if (estimatedPages > 100) {
-          this.logger.log(`   ️ High page count detected (${estimatedPages} pages)`);
+          this.logger.log(`   High page count detected (${estimatedPages} pages)`);
         }
       } else {
         // Images are always single page
@@ -403,7 +403,7 @@ export class TextractApiService implements DocumentReader {
 
       // Step 1: Split PDF into individual pages
       const pageBuffers = await this.splitPdfIntoPages(fileBuffer);
-      this.logger.log(`   ️ PDF split into ${pageBuffers.length} pages`);
+      this.logger.log(`   PDF split into ${pageBuffers.length} pages`);
 
       // Step 2: Process each page individually
       const pageResults: string[] = [];
@@ -419,7 +419,7 @@ export class TextractApiService implements DocumentReader {
             this.logger.log(`    Page ${i + 1} processed successfully (${pageResult.data.length} chars)`);
           } else {
             const errorMsg = 'error' in pageResult ? pageResult.error : 'Unknown error';
-            this.logger.log(`   ️ Page ${i + 1} failed: ${errorMsg}`);
+            this.logger.log(`   Page ${i + 1} failed: ${errorMsg}`);
             pageResults.push(`\n## Page ${i + 1}\n\n*[Page processing failed: ${errorMsg}]*`);
           }
         } catch (pageError) {
@@ -468,7 +468,7 @@ export class TextractApiService implements DocumentReader {
       const pageBuffers: Buffer[] = [];
 
       for (let i = 0; i < pageCount; i++) {
-        this.logger.log(`   ️ Extracting page ${i + 1}/${pageCount}...`);
+        this.logger.log(`   Extracting page ${i + 1}/${pageCount}...`);
 
         // Create new PDF with single page
         const newPdf = await PDFDocument.create();
@@ -484,7 +484,7 @@ export class TextractApiService implements DocumentReader {
         pageBuffers.push(Buffer.from(pdfBytes));
       }
 
-      this.logger.log(`   ️ Successfully split into ${pageBuffers.length} individual pages`);
+      this.logger.log(`   Successfully split into ${pageBuffers.length} individual pages`);
       return pageBuffers;
     } catch (error) {
       this.logger.error(

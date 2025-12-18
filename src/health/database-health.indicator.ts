@@ -119,35 +119,4 @@ export class DatabaseHealthIndicator extends HealthIndicator {
       }, ms);
     });
   }
-
-  /**
-   * Check migration status
-   * Useful for ensuring database schema is up-to-date
-   */
-  async checkMigrationStatus(): Promise<HealthIndicatorResult> {
-    try {
-      const hasPending = await this.dataSource.showMigrations();
-
-      if (hasPending) {
-        this.logger.warn('Database has pending migrations');
-        return this.getStatus('migrations', false, {
-          message: 'Pending migrations detected',
-          hasPendingMigrations: true,
-          recommendation: 'Run migrations via CLI or POST /migrations/run endpoint',
-        });
-      }
-
-      return this.getStatus('migrations', true, {
-        message: 'All migrations applied',
-        hasPendingMigrations: false,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Migration status check failed: ${errorMessage}`);
-
-      return this.getStatus('migrations', false, {
-        message: `Failed to check migration status: ${errorMessage}`,
-      });
-    }
-  }
 }

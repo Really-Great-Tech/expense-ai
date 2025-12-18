@@ -52,7 +52,7 @@ export class ExpenseComplianceUQLMValidator {
       }),
     );
     
-    this.logger.log('✅ ExpenseComplianceUQLMValidator initialized with 3 judge models and custom temperatures');
+    this.logger.log('ExpenseComplianceUQLMValidator initialized with 3 judge models and custom temperatures');
     judgeConfigs.forEach((config, index) => {
       this.logger.log(`   Judge ${index + 1}: ${config.modelId} (temp: ${config.temperature})`);
     });
@@ -71,7 +71,7 @@ export class ExpenseComplianceUQLMValidator {
   ): Promise<ValidationSummary> {
     const startTime = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
-    this.logger.log(`🔍 Starting compliance validation for ${country} ${receiptType}`);
+    this.logger.log(`Starting compliance validation for ${country} ${receiptType}`);
 
     try {
       // Parse AI response if it's a JSON string
@@ -95,7 +95,7 @@ export class ExpenseComplianceUQLMValidator {
         const dimensionStartTimeISO = new Date(dimensionStartTime).toISOString();
         
         try {
-          this.logger.log(`📊 Validating dimension: ${ValidationUtils.dimensionToString(dimension)}`);
+          this.logger.log(`Validating dimension: ${ValidationUtils.dimensionToString(dimension)}`);
           
           const validationPrompt = this._createValidationPrompt(
             aiResponse,
@@ -123,7 +123,7 @@ export class ExpenseComplianceUQLMValidator {
           };
           
         } catch (error) {
-          this.logger.error(`❌ Error validating ${dimension}: ${error.message}`);
+          this.logger.error(`Error validating ${dimension}: ${error.message}`);
           validationResults.push(this._createErrorResult(dimension, error.message));
           
           const dimensionEndTime = Date.now();
@@ -155,12 +155,12 @@ export class ExpenseComplianceUQLMValidator {
       );
       
       const processingTime = endTime - startTime;
-      this.logger.log(`✅ Validation completed in ${processingTime}ms`);
+      this.logger.log(`Validation completed in ${processingTime}ms`);
 
       return overallAssessment;
 
     } catch (error) {
-      this.logger.error(`❌ Validation failed: ${error.message}`);
+      this.logger.error(`Validation failed: ${error.message}`);
       throw new ValidationError(
         ValidationErrorType.VALIDATION_TIMEOUT,
         `Validation process failed: ${error.message}`,
@@ -459,7 +459,7 @@ SUMMARY: [Brief assessment]`;
           });
           
         } catch (error) {
-          this.logger.warn(`⚠️ Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
+          this.logger.warn(`Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
           const errorResponse = `Error: ${error.message}`;
           judgeResponses.push(errorResponse);
           confidenceScores.push(0.0);
@@ -507,7 +507,7 @@ SUMMARY: [Brief assessment]`;
       );
 
     } catch (error) {
-      this.logger.error(`❌ Panel validation failed for ${dimension}: ${error.message}`);
+      this.logger.error(`Panel validation failed for ${dimension}: ${error.message}`);
       return this._createErrorResult(dimension, error.message);
     }
   }
