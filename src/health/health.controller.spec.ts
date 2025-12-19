@@ -84,13 +84,14 @@ describe('HealthController', () => {
   });
 
   describe('ready', () => {
-    it('should return ready status immediately', async () => {
+    it('should check database and redis for readiness', async () => {
       const result = await controller.ready();
 
       expect(result).toBeDefined();
       expect(result.status).toBe('ok');
-      expect(result.message).toBe('Application is ready to accept requests');
-      expect(result.timestamp).toBeDefined();
+      expect(mockHealthCheckService.check).toHaveBeenCalled();
+      expect(mockTypeOrmHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
+      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis-queue', 5000, false);
     });
   });
 

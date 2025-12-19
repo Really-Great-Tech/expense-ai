@@ -6,6 +6,9 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
+import { HealthCheckService } from '@nestjs/terminus';
+import { DatabaseHealthIndicator } from './health/database-health.indicator';
+import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -93,6 +96,29 @@ async function bootstrap() {
 
     const port = configService.get('PORT', 3000);
     app.enableShutdownHooks();
+
+    // Perform startup health checks before accepting traffic
+    // This ensures critical dependencies (database, Redis) are available
+    const healthCheckService = app.get(HealthCheckService);
+    const dbHealth = app.get(DatabaseHealthIndicator);
+    const redisHealth = app.get(RedisHealthEnhancedIndicator);
+
+    logger.log('Performing startup health checks...');
+
+    try {
+      await healthCheckService.check([
+        () => dbHealth.isHealthy('database', 10000),
+        () => redisHealth.isHealthy('redis-queue', 10000, false), // Skip BullMQ for startup
+      ]);
+      logger.log('Startup health checks passed');
+    } catch (healthError) {
+      logger.error(
+        'Startup health checks failed - dependencies not ready',
+        healthError instanceof Error ? healthError.stack : undefined,
+      );
+      throw healthError;
+    }
+
     await app.listen(port);
     logger.log(`Application is running on: http://localhost:${port}`);
   } catch (error) {
