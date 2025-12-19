@@ -49,9 +49,19 @@ export class DatabaseHealthIndicator extends HealthIndicator {
       // Parse result
       const { version, maxConnections, currentConnections } = result as any;
 
+      const utilizationPercent = Math.round((currentConnections / maxConnections) * 100);
+
+      // Warn if pool utilization is high (>80%)
+      if (utilizationPercent > 80) {
+        this.logger.warn(
+          `Database connection pool utilization high: ${utilizationPercent}% ` +
+            `(${currentConnections}/${maxConnections} connections)`,
+        );
+      }
+
       this.logger.debug(
         `Database health check passed: MySQL ${version}, ` +
-          `${currentConnections}/${maxConnections} connections, ` +
+          `${currentConnections}/${maxConnections} connections (${utilizationPercent}%), ` +
           `${responseTime}ms response time`,
       );
 
@@ -62,8 +72,9 @@ export class DatabaseHealthIndicator extends HealthIndicator {
         currentConnections,
         responseTime: `${responseTime}ms`,
         connectionPool: {
-          status: 'healthy',
-          utilizationPercent: Math.round((currentConnections / maxConnections) * 100),
+          status: utilizationPercent > 80 ? 'warning' : 'healthy',
+          utilizationPercent,
+          warning: utilizationPercent > 80 ? 'Pool utilization exceeds 80%' : undefined,
         },
       });
     } catch (error) {

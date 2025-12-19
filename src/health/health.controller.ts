@@ -25,7 +25,8 @@ export class HealthController {
   ) {}
 
   /**
-   * Complete health check - checks all dependencies
+   * Complete health check - checks all dependencies with full details
+   * Returns connection pool utilization, Redis stats, and BullMQ queue info
    */
   @Get('health')
   @HealthCheck()
@@ -34,8 +35,8 @@ export class HealthController {
   @ApiResponse({ status: 503, description: 'System is unhealthy' })
   check() {
     return this.health.check([
-      // Check database connection
-      () => this.db.pingCheck('database'),
+      // Check database connection with pool utilization metrics
+      () => this.dbEnhanced.isHealthy('database'),
 
       // Check Redis connection (BullMQ job queue) - uses enhanced indicator with proper TLS
       () => this.redisEnhanced.isHealthy('redis-queue'),

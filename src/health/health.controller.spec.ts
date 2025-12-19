@@ -75,10 +75,10 @@ describe('HealthController', () => {
       expect(mockHealthCheckService.check).toHaveBeenCalled();
     });
 
-    it('should check both database and redis', async () => {
+    it('should check both database (enhanced) and redis', async () => {
       await controller.check();
 
-      expect(mockTypeOrmHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
+      expect(mockDatabaseHealthIndicator.isHealthy).toHaveBeenCalledWith('database');
       expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis-queue');
     });
   });
