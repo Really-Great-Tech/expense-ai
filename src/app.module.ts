@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config';
+import appConfig, { AppConfigType } from './config/app.config';
 import { ExpenseDocumentModule } from './expense-document/expense-document.module';
 import { WorkersModule } from './workers/workers.module';
 import { ExpenseResultModule } from './expense-result/expense-result.module';
@@ -22,21 +23,20 @@ import { DataSource } from 'typeorm';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [configuration],
+      load: [configuration, appConfig],
     }),
-    // Throttling
+    // Throttling - uses centralized app config
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const ttl = parseInt(configService.get<string>('THROTTLE_TTL', '60'), 10);
-        const limit = parseInt(configService.get<string>('THROTTLE_LIMIT', '100'), 10);
+        const config = configService.get<AppConfigType>('app')!;
 
         return {
           throttlers: [
             {
-              ttl,
-              limit,
+              ttl: config.throttle.ttl,
+              limit: config.throttle.limit,
             },
           ],
         };

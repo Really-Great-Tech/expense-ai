@@ -1,6 +1,6 @@
 import { BedrockRuntimeClient, InvokeModelCommand, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { getAppConfig, AppConfigType } from '../../config/app.config';
 
 export type ModelType = 'nova' | 'claude';
 
@@ -59,7 +59,14 @@ export class BedrockLlmService {
   private modelType?: ModelType;
   private usingApplicationProfile: boolean;
 
-  private static readonly configService = new ConfigService();
+  private static appConfig: AppConfigType | null = null;
+
+  private static getConfig(): AppConfigType {
+    if (!BedrockLlmService.appConfig) {
+      BedrockLlmService.appConfig = getAppConfig();
+    }
+    return BedrockLlmService.appConfig;
+  }
 
   constructor(config?: BedrockConfig) {
     // Initialize Bedrock client - uses AWS SDK default credential chain:
@@ -68,17 +75,19 @@ export class BedrockLlmService {
     // 3. ECS Container credentials (Task Role)
     // 4. EC2 Instance metadata (Instance Profile)
     try {
+      const appConfig = BedrockLlmService.getConfig();
+
       this.bedrockClient = new BedrockRuntimeClient({
-        region: 'us-east-1', // Bedrock is available in us-east-1
+        region: appConfig.aws.region,
         maxAttempts: 4,
         retryMode: 'adaptive',
       });
 
       // Check if using application inference profiles globally
-      this.usingApplicationProfile = BedrockLlmService.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
+      this.usingApplicationProfile = appConfig.bedrock.usingApplicationProfile;
 
-      // Prefer env var over config, use config as fallback, then hardcoded default
-      this.modelId = BedrockLlmService.configService.get<string>('BEDROCK_MODEL') || config?.modelId || 'us.amazon.nova-pro-v1:0';
+      // Prefer centralized config over constructor config, then hardcoded default
+      this.modelId = appConfig.bedrock.model || config?.modelId || 'us.amazon.nova-pro-v1:0';
 
       // Store model type from config (agents pass this based on their known model type)
       this.modelType = config?.modelType;
