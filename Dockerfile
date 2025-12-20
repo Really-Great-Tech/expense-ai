@@ -63,9 +63,12 @@ COPY .docker-template/markdown_extractions ./markdown_extractions
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Copy SSL certificates for RDS IAM authentication
-# This includes the global-bundle.pem for secure Aurora connections
-COPY certs ./certs
+# Download AWS RDS CA certificate bundle at build time
+# This ensures we always have the latest certificates
+# Source: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
+RUN mkdir -p certs && \
+    curl -o certs/global-bundle.pem \
+    https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
 # Add non-root user with configurable UID/GID for Linux compatibility
 # Build arg allows matching host user: docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)

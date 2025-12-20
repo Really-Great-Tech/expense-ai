@@ -25,7 +25,8 @@ export class HealthController {
   ) {}
 
   /**
-   * Complete health check - checks all dependencies
+   * Complete health check - checks all dependencies with full details
+   * Returns connection pool utilization, Redis stats, and BullMQ queue info
    */
   @Get('health')
   @HealthCheck()
@@ -34,8 +35,8 @@ export class HealthController {
   @ApiResponse({ status: 503, description: 'System is unhealthy' })
   check() {
     return this.health.check([
-      // Check database connection
-      () => this.db.pingCheck('database'),
+      // Check database connection with pool utilization metrics
+      () => this.dbEnhanced.isHealthy('database'),
 
       // Check Redis connection (BullMQ job queue) - uses enhanced indicator with proper TLS
       () => this.redisEnhanced.isHealthy('redis-queue'),
@@ -44,17 +45,19 @@ export class HealthController {
 
   /**
    * Readiness check endpoint - indicates pod is ready to accept traffic
-   * Returns 200 immediately without checking dependencies
+   * Checks critical dependencies (database, Redis) before returning healthy
+   * Used by Kubernetes readiness probes to control traffic routing
    */
   @Get('ready')
+  @HealthCheck()
   @ApiOperation({ summary: 'Check if application is ready to accept requests' })
   @ApiResponse({ status: 200, description: 'Application is ready' })
+  @ApiResponse({ status: 503, description: 'Application is not ready' })
   ready() {
-    return {
-      status: 'ok',
-      message: 'Application is ready to accept requests',
-      timestamp: new Date().toISOString(),
-    };
+    return this.health.check([
+      () => this.db.pingCheck('database'),
+      () => this.redisEnhanced.isHealthy('redis-queue', 5000, false), // Skip BullMQ for faster readiness
+    ]);
   }
 
   /**

@@ -100,15 +100,25 @@ const getSslConfig = () => {
   // Try to load certificate if it exists
   if (existsSync(certPath)) {
     ca = readFileSync(certPath, 'utf8');
+    log('Loaded RDS CA certificate from:', certPath);
   } else if (existsSync(certPathAlt)) {
     ca = readFileSync(certPathAlt, 'utf8');
+    log('Loaded RDS CA certificate from:', certPathAlt);
+  } else {
+    // Certificate not found - will fall back to system CA certificates
+    log(
+      'RDS CA certificate not found at expected paths. ' +
+        'Falling back to system CA certificates. ' +
+        'For local development, download from: ' +
+        'https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
+    );
   }
 
   // For IAM auth, always use SSL even if cert file is missing
   // (will rely on system CA certificates)
   return {
     rejectUnauthorized: isProduction, // Always enforce SSL validation in production
-    ca: ca, // CA certificate bundle (optional but recommended)
+    ca, // CA certificate bundle (optional - falls back to system CA if not provided)
   };
 };
 
@@ -190,7 +200,7 @@ const baseDBConfig: DataSourceOptions = {
   // Connection pool settings optimized for Aurora
   extra: {
     connectionLimit: parseInt(configService.get<string>('DB_CONNECTION_LIMIT', '20'), 10),
-    queueLimit: parseInt(configService.get<string>('DB_QUEUE_LIMIT', '0'), 10),
+    queueLimit: parseInt(configService.get<string>('DB_QUEUE_LIMIT', '100'), 10),
 
     // Add IAM auth plugin if enabled
     ...getIAMAuthConfig(),

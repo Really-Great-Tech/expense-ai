@@ -6,6 +6,9 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
+import { HealthCheckService } from '@nestjs/terminus';
+import { DatabaseHealthIndicator } from './health/database-health.indicator';
+import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -93,8 +96,39 @@ async function bootstrap() {
 
     const port = configService.get('PORT', 3000);
     app.enableShutdownHooks();
+
+    // Perform startup health checks before accepting traffic
+    // This ensures critical dependencies (database, Redis) are available
+    const healthCheckService = app.get(HealthCheckService);
+    const dbHealth = app.get(DatabaseHealthIndicator);
+    const redisHealth = app.get(RedisHealthEnhancedIndicator);
+
+    logger.log('Performing startup health checks...');
+
+    try {
+      await healthCheckService.check([
+        () => dbHealth.isHealthy('database', 10000),
+        () => redisHealth.isHealthy('redis-queue', 10000, false), // Skip BullMQ for startup
+      ]);
+      logger.log('Startup health checks passed');
+    } catch (healthError) {
+      logger.error(
+        'Startup health checks failed - dependencies not ready',
+        healthError instanceof Error ? healthError.stack : undefined,
+      );
+      throw healthError;
+    }
+
     await app.listen(port);
+
+    // Configure HTTP server timeouts
+    const server = app.getHttpServer();
+    server.setTimeout(300000); // 5 minutes - overall request timeout
+    server.keepAliveTimeout = 65000; // 65 seconds - slightly higher than ALB's 60s default
+    server.headersTimeout = 66000; // 66 seconds - must be > keepAliveTimeout
+
     logger.log(`Application is running on: http://localhost:${port}`);
+    logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s');
   } catch (error) {
     logger.error(
       `Error during application bootstrap: ${error instanceof Error ? error.message : error}`,
