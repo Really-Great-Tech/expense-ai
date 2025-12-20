@@ -1,5 +1,5 @@
 import { IssueDetectionAgent } from './issue-detection.agent';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import * as fs from 'fs';
 
 // Mock AWS SDK before any imports
@@ -9,7 +9,7 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
   ConverseCommand: jest.fn(),
 }));
 
-jest.mock('../utils/bedrockLlm');
+jest.mock('../services/bedrock/bedrock-llm');
 jest.mock('fs');
 
 describe('IssueDetectionAgent', () => {

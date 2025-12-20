@@ -1,7 +1,7 @@
 import { DataExtractionAgent } from './data-extraction.agent';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 
-jest.mock('../utils/bedrockLlm');
+jest.mock('../services/bedrock/bedrock-llm');
 
 describe('DataExtractionAgent', () => {
   let agent: DataExtractionAgent;

@@ -1,5 +1,5 @@
-import { FileClassificationResultSchema, type FileClassificationResult } from '../schemas/expense-schemas';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { FileClassificationResultSchema, type FileClassificationResult } from '../common/schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { MODEL_CONFIG } from './config/models.config';

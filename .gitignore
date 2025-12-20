@@ -53,3 +53,9 @@ src/document-splitter/README-FILE-VALIDATION.md
 scripts/test-aws-services.ts
 sample_receipt
 /uploads
+
+/deepwiki
+/expense_files
+/playground_results
+/markdown_extractions
+/temp

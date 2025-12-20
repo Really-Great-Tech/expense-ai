@@ -18,18 +18,29 @@ Downloaded from: https://truststore.pki.rds.amazonaws.com/global/global-bundle.p
 - Valid until approximately 2061
 - File size: ~162KB
 
-### Security Note
-This is a **public certificate bundle** (not a secret):
-- Safe to commit to version control
-- No sensitive information contained
-- Does not grant any access permissions
-- Only used to verify AWS RDS server identity
+### How It's Obtained
 
-### Updates
-AWS occasionally updates these certificates. Check for updates:
-- Annually as part of security review
-- When AWS announces certificate rotation
-- Re-download using: `curl -o certs/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`
+**Docker builds:** The certificate is automatically downloaded at build time via the Dockerfile:
+```dockerfile
+RUN mkdir -p certs && \
+    curl -o certs/global-bundle.pem \
+    https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+**Local development:** Download manually if needed:
+```bash
+mkdir -p certs
+curl -o certs/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+### Note on Git Tracking
+The certificate file is NOT tracked in git (ignored via .gitignore). This ensures:
+- Always using the latest certificate bundle at build time
+- No stale certificates in the repository
+- Following best practices for certificate management
+
+### Fallback Behavior
+If the certificate file is not present, the application will fall back to system CA certificates. This works in most production environments but may fail for some RDS endpoints.
 
 ### Usage in Application
 The certificate is automatically loaded by the database configuration when:

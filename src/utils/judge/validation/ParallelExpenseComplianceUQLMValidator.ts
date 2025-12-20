@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator';
-import { BedrockLlmService } from '../../bedrockLlm';
+import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -14,7 +14,7 @@ import {
   ValidationErrorType,
   IssueValidationScore,
 } from './types';
-import pLimit from '../../p-limit';
+import pLimit from '../../../tools/p-limit/limit';
 
 /**
  * Configuration interface for parallel validation

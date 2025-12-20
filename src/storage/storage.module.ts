@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LocalStorageService } from './services/local-storage.service';
-import { S3StorageService } from './services/s3-storage.service';
+import { S3StorageService } from '../services/s3/s3-storage.service';
 import { StorageResolverService } from './services/storage-resolver.service';
 import { FileStorageService } from './interfaces/file-storage.interface';
 

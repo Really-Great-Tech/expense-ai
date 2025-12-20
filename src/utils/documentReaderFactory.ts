@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { DocumentReader, DocumentReaderType } from './types';
-import { TextractApiService } from './textractReader';
+import { TextractApiService } from '../services/textract/textract-reader';
 
 /**
  * Factory class for creating document readers

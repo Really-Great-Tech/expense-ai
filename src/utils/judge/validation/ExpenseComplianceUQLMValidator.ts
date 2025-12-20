@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BedrockLlmService } from '../../bedrockLlm';
+import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import {
   ValidationDimension,
   ComplianceValidationResult,

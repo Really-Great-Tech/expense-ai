@@ -1,6 +1,6 @@
 import { BaseAgent } from '@/agents/base.agent';
-import { BedrockLlmService } from '@/utils/bedrockLlm';
-import { PageMarkdown, PageAnalysisResult } from '@/document-splitter/types/document-splitter.types';
+import { BedrockLlmService } from '@/services/bedrock/bedrock-llm';
+import { PageMarkdown, PageAnalysisResult } from '@/expense-document/types/upload.types';
 import type { ILLMService } from './types/llm.types';
 import { MODEL_CONFIG } from './config/models.config';
 

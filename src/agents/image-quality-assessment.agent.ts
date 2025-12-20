@@ -1,7 +1,7 @@
-import { ImageQualityAssessmentSchema, type ImageQualityAssessment } from '../schemas/expense-schemas';
+import { ImageQualityAssessmentSchema, type ImageQualityAssessment } from '../common/schemas/expense-schemas';
 import * as fs from 'fs';
 import * as path from 'path';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { MODEL_CONFIG } from './config/models.config';
