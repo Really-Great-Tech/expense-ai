@@ -24,6 +24,7 @@ export interface AppConfigType {
 
   // Database
   database: {
+    auroraMySQL: boolean;
     host: string;
     port: number;
     user: string;
@@ -121,8 +122,12 @@ export default registerAs('app', (): AppConfigType => {
 
     // ==========================================================================
     // DATABASE (MySQL/Aurora)
+    // Supported modes:
+    // - Local MySQL (AURORA_MYSQL !== 'true'): localhost only, password auth
+    // - Aurora MySQL (AURORA_MYSQL === 'true'): IAM auth required, no password
     // ==========================================================================
     database: {
+      auroraMySQL: process.env.AURORA_MYSQL === 'true',
       host: process.env.MYSQL_HOST || 'localhost',
       port: parseInt(process.env.MYSQL_PORT || '3306', 10),
       user: process.env.MYSQL_USER || 'root',

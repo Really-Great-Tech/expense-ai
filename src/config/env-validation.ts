@@ -23,12 +23,26 @@ const REQUIRED_IN_PRODUCTION: EnvRequirement[] = [
 
 /**
  * Conditional requirements based on other configuration
+ *
+ * Database modes:
+ * - Local MySQL (AURORA_MYSQL !== 'true'): Requires MYSQL_PASSWORD
+ * - Aurora MySQL (AURORA_MYSQL === 'true'): Requires IAM auth, no password
  */
 const CONDITIONAL_REQUIREMENTS: EnvRequirement[] = [
   {
     name: 'MYSQL_PASSWORD',
-    description: 'Database password (required when IAM auth disabled)',
-    condition: () => process.env.MYSQL_IAM_AUTH_ENABLED !== 'true',
+    description: 'Database password (required for local MySQL only)',
+    condition: () => process.env.AURORA_MYSQL !== 'true' && process.env.MYSQL_IAM_AUTH_ENABLED !== 'true',
+  },
+  {
+    name: 'MYSQL_IAM_AUTH_ENABLED',
+    description: 'IAM authentication (required for Aurora MySQL)',
+    condition: () => process.env.AURORA_MYSQL === 'true' && process.env.MYSQL_IAM_AUTH_ENABLED !== 'true',
+  },
+  {
+    name: 'AWS_REGION',
+    description: 'AWS region (required for Aurora MySQL IAM auth)',
+    condition: () => process.env.AURORA_MYSQL === 'true',
   },
   {
     name: 'REDIS_HOST',
@@ -137,6 +151,7 @@ export function getConfigSummary(redactSecrets = true): Record<string, string | 
     'NODE_ENV',
     'PORT',
     // Database
+    'AURORA_MYSQL',
     'MYSQL_HOST',
     'MYSQL_PORT',
     'MYSQL_USER',
