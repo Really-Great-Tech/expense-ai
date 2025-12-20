@@ -9,6 +9,8 @@ import { useContainer } from 'class-validator';
 import { HealthCheckService } from '@nestjs/terminus';
 import { DatabaseHealthIndicator } from './health/database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
+import * as express from 'express';
+import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -20,6 +22,31 @@ async function bootstrap() {
 
     // Enable class-validator to use NestJS's DI container for custom validators
     useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
+    // Request body size limits - prevent large payload attacks
+    const bodyLimit = configService.get('REQUEST_BODY_LIMIT', '1mb');
+    const urlEncodedLimit = configService.get('URL_ENCODED_LIMIT', '1mb');
+
+    app.use(express.json({ limit: bodyLimit }));
+    app.use(express.urlencoded({ limit: urlEncodedLimit, extended: true }));
+    app.use(express.raw({ limit: bodyLimit, type: 'application/octet-stream' }));
+
+    logger.log(`Request body size limits configured: JSON=${bodyLimit}, URL-encoded=${urlEncodedLimit}`);
+
+    // Request size monitoring middleware
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const contentLength = req.headers['content-length'];
+      if (contentLength) {
+        const sizeInBytes = parseInt(contentLength, 10);
+        const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+
+        // Log large requests for monitoring (> 100KB)
+        if (sizeInBytes > 100 * 1024) {
+          logger.warn(`Large request detected: ${sizeInMB}MB on ${req.method} ${req.path}`);
+        }
+      }
+      next();
+    });
 
     // Comprehensive security middleware
     app.use(helmet({
