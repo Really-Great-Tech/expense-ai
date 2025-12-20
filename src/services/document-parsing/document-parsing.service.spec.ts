@@ -12,7 +12,7 @@ describe('DocumentParsingService', () => {
 
   beforeEach(async () => {
     mockReader = {
-      parseDocument: jest.fn(),
+      parseDocumentFromBuffer: jest.fn(),
     };
 
     (DocumentReaderFactory.getDefaultReader as jest.Mock) = jest.fn().mockReturnValue(mockReader);
@@ -43,21 +43,22 @@ describe('DocumentParsingService', () => {
     });
   });
 
-  describe('extractFullDocumentMarkdown', () => {
-    const mockPdfPath = '/path/to/document.pdf';
+  describe('extractMarkdownFromBuffer', () => {
+    const mockBuffer = Buffer.from('test content');
+    const mockFileName = 'document.pdf';
     const mockDocumentReader = 'textract';
     const mockMarkdownContent = '# Document\n\nContent here';
 
-    it('should extract markdown successfully', async () => {
-      mockReader.parseDocument.mockResolvedValue({
+    it('should extract markdown from buffer successfully', async () => {
+      mockReader.parseDocumentFromBuffer.mockResolvedValue({
         success: true,
         data: mockMarkdownContent,
       });
 
-      const result = await service.extractFullDocumentMarkdown(mockPdfPath, mockDocumentReader);
+      const result = await service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader);
 
       expect(DocumentReaderFactory.getDefaultReader).toHaveBeenCalledWith(configService, mockDocumentReader);
-      expect(mockReader.parseDocument).toHaveBeenCalledWith(mockPdfPath, {
+      expect(mockReader.parseDocumentFromBuffer).toHaveBeenCalledWith(mockBuffer, mockFileName, {
         featureTypes: ['TABLES', 'FORMS'],
         outputFormat: 'markdown',
         timeout: 120000,
@@ -66,40 +67,48 @@ describe('DocumentParsingService', () => {
     });
 
     it('should handle parsing failure', async () => {
-      mockReader.parseDocument.mockResolvedValue({
+      mockReader.parseDocumentFromBuffer.mockResolvedValue({
         success: false,
         error: 'Parse error occurred',
       });
 
-      await expect(service.extractFullDocumentMarkdown(mockPdfPath, mockDocumentReader)).rejects.toThrow(
+      await expect(service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader)).rejects.toThrow(
         'Document parsing failed: Parse error occurred',
       );
     });
 
     it('should handle parsing exception', async () => {
-      mockReader.parseDocument.mockRejectedValue(new Error('Network error'));
+      mockReader.parseDocumentFromBuffer.mockRejectedValue(new Error('Network error'));
 
-      await expect(service.extractFullDocumentMarkdown(mockPdfPath, mockDocumentReader)).rejects.toThrow('Network error');
+      await expect(service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader)).rejects.toThrow('Network error');
+    });
+
+    it('should throw if reader does not support buffer parsing', async () => {
+      mockReader.parseDocumentFromBuffer = undefined;
+
+      await expect(service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader)).rejects.toThrow(
+        'does not support buffer-based parsing',
+      );
     });
 
     it('should log extraction progress', async () => {
       const logSpy = jest.spyOn(service['logger'], 'log');
-      mockReader.parseDocument.mockResolvedValue({
+      mockReader.parseDocumentFromBuffer.mockResolvedValue({
         success: true,
         data: mockMarkdownContent,
       });
 
-      await service.extractFullDocumentMarkdown(mockPdfPath, mockDocumentReader);
+      await service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader);
 
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Extracting full document'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Extracting markdown from buffer'));
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully extracted'));
     });
 
     it('should log errors on failure', async () => {
       const errorSpy = jest.spyOn(service['logger'], 'error');
-      mockReader.parseDocument.mockRejectedValue(new Error('Test error'));
+      mockReader.parseDocumentFromBuffer.mockRejectedValue(new Error('Test error'));
 
-      await expect(service.extractFullDocumentMarkdown(mockPdfPath, mockDocumentReader)).rejects.toThrow();
+      await expect(service.extractMarkdownFromBuffer(mockBuffer, mockFileName, mockDocumentReader)).rejects.toThrow();
 
       expect(errorSpy).toHaveBeenCalled();
     });
@@ -291,12 +300,12 @@ Content with trailing spaces   `;
   describe('edge cases', () => {
     it('should handle very large markdown documents', async () => {
       const largeContent = 'x'.repeat(1000000); // 1MB of content
-      mockReader.parseDocument.mockResolvedValue({
+      mockReader.parseDocumentFromBuffer.mockResolvedValue({
         success: true,
         data: largeContent,
       });
 
-      const result = await service.extractFullDocumentMarkdown('/test.pdf', 'textract');
+      const result = await service.extractMarkdownFromBuffer(Buffer.from('test'), 'test.pdf', 'textract');
 
       expect(result).toBe(largeContent);
       expect(result.length).toBe(1000000);

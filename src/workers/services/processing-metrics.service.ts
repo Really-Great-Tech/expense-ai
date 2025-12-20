@@ -28,7 +28,7 @@ export interface ProcessingTiming {
 export class ProcessingMetricsService {
   private readonly logger = new Logger(ProcessingMetricsService.name);
 
-  createTimingObject(markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string }): {
+  createTimingObject(markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string; markdownSource?: 'stored' | 'extracted' }): {
     timing: ProcessingTiming;
     trueStartTime: number;
   } {

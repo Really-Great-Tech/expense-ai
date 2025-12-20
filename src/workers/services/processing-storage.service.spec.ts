@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProcessingStorageService } from './processing-storage.service';
-import { FileStorageService } from '../../storage/interfaces/file-storage.interface';
+import { S3StorageService } from '@/storage/s3-storage.service';
 
 describe('ProcessingStorageService', () => {
   let service: ProcessingStorageService;
-  let mockStorageService: jest.Mocked<Partial<FileStorageService>>;
+  let mockStorageService: jest.Mocked<Partial<S3StorageService>>;
 
   beforeEach(async () => {
     mockStorageService = {
@@ -16,7 +16,7 @@ describe('ProcessingStorageService', () => {
       providers: [
         ProcessingStorageService,
         {
-          provide: 'FILE_STORAGE_SERVICE',
+          provide: S3StorageService,
           useValue: mockStorageService,
         },
       ],

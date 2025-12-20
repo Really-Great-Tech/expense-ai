@@ -3,8 +3,7 @@ import { DocumentSplitterService } from './document-splitter.service';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 import { DuplicateDetectionService } from '@/utils/duplicate-detection.service';
 import { DocumentParsingService } from '@/services/document-parsing/document-parsing.service';
-import { PdfSplittingService } from '@/tools/pdf-splitting/pdf-splitting.service';
-import { DocumentStorageService } from '@/services/document-storage/document-storage.service';
+import { S3StorageService } from '@/storage/s3-storage.service';
 import { DocumentPersistenceService } from './document-persistence.service';
 import { ProcessingQueueService } from './processing-queue.service';
 
@@ -13,8 +12,7 @@ describe('DocumentSplitterService', () => {
   let mockAgent: jest.Mocked<DocumentSplitterAgent>;
   let mockDuplicateDetection: jest.Mocked<DuplicateDetectionService>;
   let mockParsing: jest.Mocked<DocumentParsingService>;
-  let mockSplitting: jest.Mocked<PdfSplittingService>;
-  let mockStorage: jest.Mocked<DocumentStorageService>;
+  let mockStorage: jest.Mocked<S3StorageService>;
   let mockPersistence: jest.Mocked<DocumentPersistenceService>;
   let mockQueue: jest.Mocked<ProcessingQueueService>;
 
@@ -29,21 +27,14 @@ describe('DocumentSplitterService', () => {
     };
 
     const mockParsingImplementation = {
-      extractFullDocumentMarkdown: jest.fn(),
+      extractMarkdownFromBuffer: jest.fn(),
       parseMarkdownPages: jest.fn(),
       combinePageMarkdown: jest.fn(),
     };
 
-    const mockSplittingImplementation = {
-      validatePageAnalysis: jest.fn(),
-      createSplitPdfFiles: jest.fn(),
-    };
-
     const mockStorageImplementation = {
-      getTempDirectory: jest.fn().mockReturnValue('/tmp/test'),
-      saveFileTemporarily: jest.fn(),
-      uploadSplitPdf: jest.fn(),
-      cleanupTempDirectory: jest.fn(),
+      uploadOriginalDocument: jest.fn(),
+      uploadOriginalFile: jest.fn(),
     };
 
     const mockPersistenceImplementation = {
@@ -73,11 +64,7 @@ describe('DocumentSplitterService', () => {
           useValue: mockParsingImplementation,
         },
         {
-          provide: PdfSplittingService,
-          useValue: mockSplittingImplementation,
-        },
-        {
-          provide: DocumentStorageService,
+          provide: S3StorageService,
           useValue: mockStorageImplementation,
         },
         {
@@ -95,8 +82,7 @@ describe('DocumentSplitterService', () => {
     mockAgent = module.get(DocumentSplitterAgent);
     mockDuplicateDetection = module.get(DuplicateDetectionService);
     mockParsing = module.get(DocumentParsingService);
-    mockSplitting = module.get(PdfSplittingService);
-    mockStorage = module.get(DocumentStorageService);
+    mockStorage = module.get(S3StorageService);
     mockPersistence = module.get(DocumentPersistenceService);
     mockQueue = module.get(ProcessingQueueService);
   });
@@ -105,15 +91,15 @@ describe('DocumentSplitterService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should have cleanup method', () => {
+  it('should have cleanup method (deprecated no-op)', () => {
     expect(service.cleanupTempFiles).toBeDefined();
     expect(typeof service.cleanupTempFiles).toBe('function');
   });
 
-  it('should call cleanupTempDirectory when cleanupTempFiles is called', async () => {
+  it('cleanupTempFiles should be a no-op (no temp files in new architecture)', async () => {
     const tempDir = '/tmp/test-dir';
-    await service.cleanupTempFiles(tempDir);
-    expect(mockStorage.cleanupTempDirectory).toHaveBeenCalledWith(tempDir);
+    // Should complete without errors (no-op)
+    await expect(service.cleanupTempFiles(tempDir)).resolves.not.toThrow();
   });
 
   // Note: Full integration tests would require actual PDF files and LLM API access

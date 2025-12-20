@@ -121,7 +121,93 @@ export class TextractApiService implements DocumentReader {
   }
 
   /**
-   * Parse document using AWS Textract
+   * Parse document from buffer using AWS Textract
+   * This is the preferred method - avoids writing to disk
+   */
+  async parseDocumentFromBuffer(buffer: Buffer, fileName: string, config: TextractConfig = {}): Promise<ApiResponse<string>> {
+    try {
+      const fileExtension = path.extname(fileName).toLowerCase();
+      this.logger.log(`Parsing document from buffer: ${fileName} (${buffer.length} bytes)`);
+
+      // Check file size limits (Textract limit is 10MB for synchronous)
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      if (buffer.length > maxSizeBytes) {
+        return {
+          success: false,
+          error: `File too large for Textract: ${(buffer.length / 1024 / 1024).toFixed(2)}MB (max: 10MB)`,
+        };
+      }
+
+      // Detect file type and validate format
+      const fileHeader = buffer.slice(0, 8);
+      const headerString = fileHeader.toString('binary');
+
+      let fileType = 'unknown';
+      let isValidFormat = false;
+      let isMultiPage = false;
+      let estimatedPages = 1;
+
+      // Check for PDF
+      if (headerString.startsWith('%PDF')) {
+        fileType = 'pdf';
+        isValidFormat = true;
+        const content = buffer.toString('binary');
+        const pageMatches = content.match(/\/Type\s*\/Page[^s]/g);
+        estimatedPages = pageMatches ? pageMatches.length : 1;
+        isMultiPage = estimatedPages > 1;
+        this.logger.log(`   File type: PDF (${estimatedPages} pages)`);
+      }
+      // Check for PNG
+      else if (fileHeader[0] === 0x89 && fileHeader[1] === 0x50 && fileHeader[2] === 0x4e && fileHeader[3] === 0x47) {
+        fileType = 'png';
+        isValidFormat = true;
+        this.logger.log(`   File type: PNG image`);
+      }
+      // Check for JPEG
+      else if (fileHeader[0] === 0xff && fileHeader[1] === 0xd8 && fileHeader[2] === 0xff) {
+        fileType = 'jpeg';
+        isValidFormat = true;
+        this.logger.log(`   File type: JPEG image`);
+      }
+      // Check for TIFF
+      else if (
+        (fileHeader[0] === 0x49 && fileHeader[1] === 0x49 && fileHeader[2] === 0x2a && fileHeader[3] === 0x00) ||
+        (fileHeader[0] === 0x4d && fileHeader[1] === 0x4d && fileHeader[2] === 0x00 && fileHeader[3] === 0x2a)
+      ) {
+        fileType = 'tiff';
+        isValidFormat = true;
+        this.logger.log(`   File type: TIFF image`);
+      }
+
+      if (!isValidFormat) {
+        return {
+          success: false,
+          error: `Unsupported file format: Expected PDF, PNG, JPEG, or TIFF. Detected: ${fileType}`,
+        };
+      }
+
+      // Route to appropriate processing method
+      if (isMultiPage) {
+        return await this.processMultiPageDocumentBySplitting(buffer, fileName, config, estimatedPages);
+      } else {
+        return await this.processSinglePageDocument(buffer, config);
+      }
+    } catch (error) {
+      this.logger.error(
+        ` Error parsing document from buffer: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      return {
+        success: false,
+        error: `Buffer parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  /**
+   * Parse document using AWS Textract (file path version - legacy)
+   * @deprecated Use parseDocumentFromBuffer instead
    */
   async parseDocument(filePath: string, config: TextractConfig = {}): Promise<ApiResponse<string>> {
     // Validate file path for security

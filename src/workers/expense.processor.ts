@@ -1,12 +1,11 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger, Inject } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { DocumentReaderFactory } from '../utils/documentReaderFactory';
 import { DocumentProcessingData, QUEUE_NAMES, JOB_TYPES, JobResult } from '../common/types';
 import { ExpenseProcessingService } from './services/expense-processing.service';
-import { FileStorageService } from '../storage/interfaces/file-storage.interface';
-import { StorageResolverService } from '../storage/services/storage-resolver.service';
+import { S3StorageService } from '../storage/s3-storage.service';
 import { ReceiptProcessingResultRepository } from '@/expense-result/repositories/receipt-processing-result.repository';
 import { ProcessingStatus } from '@/expense-result/entities/receipt-processing-result.entity';
 import { DocumentPersistenceService } from '@/expense-document/services/document-persistence.service';
@@ -30,9 +29,7 @@ export class ExpenseProcessor extends WorkerHost {
 
   constructor(
     private readonly expenseProcessingService: ExpenseProcessingService,
-    @Inject('FILE_STORAGE_SERVICE')
-    private readonly storageService: FileStorageService,
-    private readonly storageResolver: StorageResolverService,
+    private readonly s3Storage: S3StorageService,
     private readonly configService: ConfigService,
     private readonly receiptProcessingResultRepo: ReceiptProcessingResultRepository,
     private readonly documentPersistenceService: DocumentPersistenceService,
@@ -55,106 +52,112 @@ export class ExpenseProcessor extends WorkerHost {
         });
       }
 
-      // Get physical file path (handles both local and S3 automatically)
-      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey);
-      this.logger.log(`Resolved physical path: ${filePath} (temp: ${isTemp})`);
+      // Get markdown content - prefer stored extractedText, fall back to extraction
+      const markdownExtractionStart = Date.now();
+      let markdownContent: string;
+      let markdownSource: 'stored' | 'extracted' = 'stored';
 
-      try {
-        // Read the document content using the specified document reader with timing
-        const markdownExtractionStart = Date.now();
-        const markdownContent = await this.readDocumentContent(filePath, documentReader);
-        const markdownExtractionEnd = Date.now();
-
-        const markdownExtractionTime = markdownExtractionEnd - markdownExtractionStart;
-        this.logger.log(`Markdown extraction completed in ${markdownExtractionTime}ms using ${documentReader || 'default'} reader`);
-
-        // Save markdown content locally
-        await this.saveMarkdownContent(fileName, markdownContent, documentReader || 'default');
-
-        // Load compliance data and expense schema (placeholder - should be loaded from config/database)
-        const complianceData = await this.loadComplianceData(country, icp);
-        const expenseSchema = await this.loadExpenseSchema();
-
-        // Process the document through all agents (always using parallel processing)
-        const result = await this.expenseProcessingService.processExpenseDocument(
-          markdownContent,
-          fileName,
-          storageKey,
-          country,
-          icp,
-          complianceData,
-          expenseSchema,
-          async (stage: string, progress: number) => {
-            await job.updateProgress(progress);
-            this.logger.log(`${stage}: ${progress}%`);
-
-            // Update stage status in database
-            if (receiptId) {
-              const statusMap: Record<string, ProcessingStatus> = {
-                parallelPhase1: ProcessingStatus.CLASSIFICATION,
-                parallelPhase1Complete: ProcessingStatus.EXTRACTION,
-                parallelPhase2: ProcessingStatus.VALIDATION,
-                llmValidation: ProcessingStatus.QUALITY_ASSESSMENT,
-                complete: ProcessingStatus.COMPLETED,
-              };
-
-              if (statusMap[stage]) {
-                await this.receiptProcessingResultRepo.updateStatus(receiptId, statusMap[stage]);
-              }
-            }
-          },
-          {
-            markdownExtractionTime,
-            documentReader: documentReader || 'default',
-          },
-          userId, // Pass the userId from the API to Langfuse tracking
-        );
-
-        const processingTime = Date.now() - startTime;
-        const totalProcessingTimeSeconds = result.timing?.total_processing_time_seconds || 'N/A';
-        this.logger.log(`Receipt processing finished for job: ${jobId} in ${processingTime}ms (${totalProcessingTimeSeconds}s total)`);
-
-        // Save complete results to database
-        if (receiptId) {
-          const sourceDocumentId = job.data.receiptId ? undefined : job.data.sourceDocumentId;
-
-          await this.receiptProcessingResultRepo.saveResults(receiptId, {
-            classificationResult: result.classification,
-            extractedData: result.extraction,
-            complianceValidation: result.compliance,
-            qualityAssessment: result.image_quality_assessment,
-            citationData: result.citations,
-            processingMetadata: {
-              processedAt: new Date().toISOString(),
-              processingTime,
-              timing: result.timing,
-              agentVersions: this.getAgentVersions(),
-              modelVersions: this.getModelVersions(),
-            },
-            fileReferences: {
-              originalReceipt: storageKey,
-            },
-          });
-
-          // Update Receipt entity status
-          await this.documentPersistenceService.updateReceiptStatus(receiptId, ReceiptStatus.COMPLETED, {
-            parsedData: result.extraction,
-          } as any);
-
-          this.logger.log(`Saved processing results to database for receipt ${receiptId}`);
-        }
-
-        return {
-          success: true,
-          data: result,
-          processingTime,
-        };
-      } finally {
-        // Cleanup temp file if it was downloaded from S3
-        if (isTemp) {
-          this.storageResolver.cleanupTempFile(filePath);
+      // Try to get markdown from Receipt.extractedText (already extracted in HTTP layer)
+      if (receiptId) {
+        const receipt = await this.documentPersistenceService.getReceiptById(receiptId);
+        if (receipt?.extractedText && receipt.extractedText.trim().length > 0) {
+          markdownContent = receipt.extractedText;
+          this.logger.log(`Using stored extractedText from Receipt (${markdownContent.length} chars) - no Textract call needed`);
         }
       }
+
+      // Fallback: Extract markdown if not available (legacy receipts or single-receipt uploads)
+      if (!markdownContent) {
+        markdownSource = 'extracted';
+        this.logger.log(`No stored extractedText found, falling back to Textract extraction`);
+        const fileBuffer = await this.s3Storage.getFile(storageKey);
+        markdownContent = await this.readDocumentContentFromBuffer(fileBuffer, fileName, documentReader);
+      }
+
+      const markdownExtractionEnd = Date.now();
+      const markdownExtractionTime = markdownExtractionEnd - markdownExtractionStart;
+      this.logger.log(`Markdown ${markdownSource === 'stored' ? 'loaded' : 'extracted'} in ${markdownExtractionTime}ms`);
+
+      // Save markdown content locally
+      await this.saveMarkdownContent(fileName, markdownContent, documentReader || 'default');
+
+      // Load compliance data and expense schema (placeholder - should be loaded from config/database)
+      const complianceData = await this.loadComplianceData(country, icp);
+      const expenseSchema = await this.loadExpenseSchema();
+
+      // Process the document through all agents (always using parallel processing)
+      const result = await this.expenseProcessingService.processExpenseDocument(
+        markdownContent,
+        fileName,
+        storageKey,
+        country,
+        icp,
+        complianceData,
+        expenseSchema,
+        async (stage: string, progress: number) => {
+          await job.updateProgress(progress);
+          this.logger.log(`${stage}: ${progress}%`);
+
+          // Update stage status in database
+          if (receiptId) {
+            const statusMap: Record<string, ProcessingStatus> = {
+              parallelPhase1: ProcessingStatus.CLASSIFICATION,
+              parallelPhase1Complete: ProcessingStatus.EXTRACTION,
+              parallelPhase2: ProcessingStatus.VALIDATION,
+              llmValidation: ProcessingStatus.QUALITY_ASSESSMENT,
+              complete: ProcessingStatus.COMPLETED,
+            };
+
+            if (statusMap[stage]) {
+              await this.receiptProcessingResultRepo.updateStatus(receiptId, statusMap[stage]);
+            }
+          }
+        },
+        {
+          markdownExtractionTime,
+          documentReader: documentReader || 'default',
+          markdownSource, // Track whether we used stored or extracted markdown
+        },
+        userId, // Pass the userId from the API to Langfuse tracking
+      );
+
+      const processingTime = Date.now() - startTime;
+      const totalProcessingTimeSeconds = result.timing?.total_processing_time_seconds || 'N/A';
+      this.logger.log(`Receipt processing finished for job: ${jobId} in ${processingTime}ms (${totalProcessingTimeSeconds}s total)`);
+
+      // Save complete results to database
+      if (receiptId) {
+        await this.receiptProcessingResultRepo.saveResults(receiptId, {
+          classificationResult: result.classification,
+          extractedData: result.extraction,
+          complianceValidation: result.compliance,
+          qualityAssessment: result.image_quality_assessment,
+          citationData: result.citations,
+          processingMetadata: {
+            processedAt: new Date().toISOString(),
+            processingTime,
+            timing: result.timing,
+            agentVersions: this.getAgentVersions(),
+            modelVersions: this.getModelVersions(),
+          },
+          fileReferences: {
+            originalReceipt: storageKey,
+          },
+        });
+
+        // Update Receipt entity status
+        await this.documentPersistenceService.updateReceiptStatus(receiptId, ReceiptStatus.COMPLETED, {
+          parsedData: result.extraction,
+        } as any);
+
+        this.logger.log(`Saved processing results to database for receipt ${receiptId}`);
+      }
+
+      return {
+        success: true,
+        data: result,
+        processingTime,
+      };
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.logger.error(`Receipt processing failed for job: ${jobId}:`, error);
@@ -191,51 +194,40 @@ export class ExpenseProcessor extends WorkerHost {
     };
   }
 
-  private async readDocumentContent(filePath: string, documentReader?: string): Promise<string> {
+  /**
+   * Read document content from a buffer (fallback when extractedText not available)
+   * Used for legacy receipts or single-receipt uploads that don't have stored markdown
+   */
+  private async readDocumentContentFromBuffer(buffer: Buffer, fileName: string, documentReader?: string): Promise<string> {
     try {
-      const fs = require('fs');
-      const path = require('path');
+      const fileExtension = path.extname(fileName).toLowerCase();
 
-      // Check if file exists
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found: ${filePath}`);
-      }
+      this.logger.log(`Reading document from buffer: ${fileName} (${fileExtension}, ${buffer.length} bytes)`);
 
-      const fileExtension = path.extname(filePath).toLowerCase();
-      const fileName = path.basename(filePath);
+      const readerType = documentReader || this.configService.get<string>('DOCUMENT_READER', 'textract');
+      const reader = DocumentReaderFactory.getDefaultReader(this.configService, readerType);
 
-      this.logger.log(`Reading document: ${fileName} (${fileExtension})`);
+      this.logger.log(`Extracting content from ${fileName} using ${readerType}...`);
 
-      // Use document reader factory to get the appropriate reader
-      try {
-        const readerType = documentReader || this.configService.get<string>('DOCUMENT_READER', 'textract');
-        const reader = DocumentReaderFactory.getDefaultReader(this.configService, readerType);
+      // Configure document reader for expense document processing
+      const parseConfig = {
+        featureTypes: ['TABLES', 'FORMS'],
+        outputFormat: 'markdown' as const,
+      };
 
-        this.logger.log(`Extracting content from ${fileName} using ${readerType}...`);
+      // Use buffer-based parsing if available, otherwise fall back to temp file
+      const parseResult = await reader.parseDocumentFromBuffer(buffer, fileName, parseConfig);
 
-        // Configure document reader for expense document processing
-        const parseConfig = {
-          // Textract specific config
-          featureTypes: ['TABLES', 'FORMS'],
-          outputFormat: 'markdown' as const,
-        };
-
-        const parseResult = await reader.parseDocument(filePath, parseConfig);
-
-        if (parseResult.success && parseResult.data) {
-          this.logger.log(`Successfully extracted ${parseResult.data.length} characters from ${fileName} using ${readerType}`);
-          return parseResult.data;
-        } else {
-          const errorMsg = 'error' in parseResult ? parseResult.error : 'Unknown error';
-          this.logger.error(`Document reader failed for ${fileName}: ${errorMsg}`);
-          throw new Error(`Document reader failed for ${fileName}: ${errorMsg}`);
-        }
-      } catch (readerError) {
-        this.logger.error(`Document reader error for ${fileName}: ${readerError.message}`);
-        throw new Error(`Document reader error for ${fileName}: ${readerError.message}`);
+      if (parseResult.success && parseResult.data) {
+        this.logger.log(`Successfully extracted ${parseResult.data.length} characters from ${fileName} using ${readerType}`);
+        return parseResult.data;
+      } else {
+        const errorMsg = 'error' in parseResult ? parseResult.error : 'Unknown error';
+        this.logger.error(`Document reader failed for ${fileName}: ${errorMsg}`);
+        throw new Error(`Document reader failed for ${fileName}: ${errorMsg}`);
       }
     } catch (error) {
-      this.logger.error(`Failed to read document content: ${error.message}`);
+      this.logger.error(`Failed to read document content from buffer: ${error.message}`);
       throw error;
     }
   }
@@ -291,7 +283,7 @@ export class ExpenseProcessor extends WorkerHost {
   private async loadExpenseSchema(): Promise<any> {
     try {
       const schemaFile = 'expense_file_schema.json';
-      const schemaData = await this.storageService.readLocalConfigFile(schemaFile);
+      const schemaData = await this.s3Storage.readLocalConfigFile(schemaFile);
       
       if (schemaData && typeof schemaData === 'object') {
         this.logger.log(`Loaded expense schema with ${Object.keys(schemaData.properties || {}).length} fields`);
@@ -325,7 +317,7 @@ export class ExpenseProcessor extends WorkerHost {
 ${markdownContent}`;
 
       // Save markdown content using storage service
-      await this.storageService.saveMarkdownExtraction(
+      await this.s3Storage.saveMarkdownExtraction(
         `markdown_extractions/${markdownFilename}`,
         markdownWithMetadata
       );

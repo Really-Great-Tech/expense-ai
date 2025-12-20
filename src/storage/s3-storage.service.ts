@@ -1,34 +1,51 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { FileStorageService, FileMetadata } from '../../storage/interfaces/file-storage.interface';
 
+/**
+ * Storage metadata returned when uploading documents
+ */
+export interface StorageMetadata {
+  storageKey: string;
+  storageBucket: string;
+  storageType: 's3';
+  storageUrl: string;
+}
+
+/**
+ * S3StorageService - Unified S3 storage operations
+ *
+ * Provides all S3 storage functionality:
+ * - Core S3 operations (upload, download, delete, exists)
+ * - Document upload helpers (uploadOriginalDocument, uploadOriginalFile)
+ * - Result storage (saveResult, saveValidationResult, saveMarkdownExtraction)
+ * - Storage metadata helpers (buildStorageMetadata, getStorageBucket)
+ */
 @Injectable()
-export class S3StorageService implements FileStorageService {
+export class S3StorageService {
   private readonly logger = new Logger(S3StorageService.name);
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
 
   constructor(private configService: ConfigService) {
-    // Initialize S3 client - uses AWS SDK default credential chain:
-    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-    // 2. Shared credentials file (~/.aws/credentials)
-    // 3. ECS Container credentials (Task Role)
-    // 4. EC2 Instance metadata (Instance Profile)
     this.s3Client = new S3Client({
       region: this.configService.get('AWS_REGION', 'us-east-1'),
       maxAttempts: 4,
       retryMode: 'adaptive',
     });
-    
+
     this.bucketName = this.configService.get('S3_BUCKET_NAME');
-    
+
     if (!this.bucketName) {
       throw new Error('S3_BUCKET_NAME is required for S3StorageService');
     }
-    
+
     this.logger.log(`S3StorageService initialized with bucket: ${this.bucketName}`);
   }
+
+  // ============================================
+  // Core S3 Operations
+  // ============================================
 
   async uploadFile(buffer: Buffer, key: string, metadata?: Record<string, string>): Promise<string> {
     try {
@@ -41,11 +58,7 @@ export class S3StorageService implements FileStorageService {
       });
 
       await this.s3Client.send(command);
-
-      const s3Url = `s3://${this.bucketName}/${key}`;
-      this.logger.log(`File uploaded to S3: ${s3Url}`);
-
-      // Return logical key, not full S3 URL - this enables storage-agnostic code
+      this.logger.log(`File uploaded to S3: s3://${this.bucketName}/${key}`);
       return key;
     } catch (error) {
       this.logger.error(`Failed to upload file ${key} to S3:`, error);
@@ -61,21 +74,20 @@ export class S3StorageService implements FileStorageService {
       });
 
       const response = await this.s3Client.send(command);
-      
+
       if (!response.Body) {
         throw new Error(`No body returned for file ${key}`);
       }
 
-      // Convert stream to buffer
       const chunks: Buffer[] = [];
       const stream = response.Body as any;
-      
+
       for await (const chunk of stream) {
         chunks.push(chunk);
       }
-      
+
       const buffer = Buffer.concat(chunks);
-      this.logger.log(`File downloaded from S3: ${key} (${buffer.length} bytes)`);
+      this.logger.debug(`File downloaded from S3: ${key} (${buffer.length} bytes)`);
       return buffer;
     } catch (error) {
       this.logger.error(`Failed to download file ${key} from S3:`, error);
@@ -83,27 +95,11 @@ export class S3StorageService implements FileStorageService {
     }
   }
 
-  async getFileInfo(key: string): Promise<{size: number, exists: boolean}> {
-    try {
-      const command = new HeadObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
-
-      const response = await this.s3Client.send(command);
-      
-      return {
-        size: response.ContentLength || 0,
-        exists: true
-      };
-    } catch (error) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
-        return { size: 0, exists: false };
-      }
-      
-      this.logger.error(`Failed to get file info for ${key}:`, error);
-      return { size: 0, exists: false };
-    }
+  /**
+   * Alias for downloadFile - preferred method name
+   */
+  async getFile(storageKey: string): Promise<Buffer> {
+    return this.downloadFile(storageKey);
   }
 
   async fileExists(key: string): Promise<boolean> {
@@ -113,6 +109,29 @@ export class S3StorageService implements FileStorageService {
     } catch (error) {
       this.logger.error(`Failed to check file existence for ${key}:`, error);
       return false;
+    }
+  }
+
+  async getFileInfo(key: string): Promise<{ size: number; exists: boolean }> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+
+      return {
+        size: response.ContentLength || 0,
+        exists: true,
+      };
+    } catch (error) {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        return { size: 0, exists: false };
+      }
+
+      this.logger.error(`Failed to get file info for ${key}:`, error);
+      return { size: 0, exists: false };
     }
   }
 
@@ -131,6 +150,62 @@ export class S3StorageService implements FileStorageService {
     }
   }
 
+  // ============================================
+  // Document Upload Helpers
+  // ============================================
+
+  /**
+   * Upload original document buffer to S3
+   * Used by multi-receipt splitting flow
+   */
+  async uploadOriginalDocument(
+    buffer: Buffer,
+    fileName: string,
+    expenseDocumentId: string,
+    uploadedBy: string,
+  ): Promise<{ storageKey: string; storageDetails: StorageMetadata }> {
+    const key = `documents/${uploadedBy}/${expenseDocumentId}/${fileName}`;
+
+    const storageKey = await this.uploadFile(buffer, key, {
+      originalName: fileName,
+      source: 'document-upload',
+      documentId: expenseDocumentId,
+    });
+
+    const storageDetails = this.buildStorageMetadata(storageKey);
+    this.logger.log(`Uploaded original document: ${storageKey}`);
+
+    return { storageKey, storageDetails };
+  }
+
+  /**
+   * Upload original file directly without splitting
+   * Used by single-receipt fast-path
+   */
+  async uploadOriginalFile(
+    file: Express.Multer.File,
+    expenseDocumentId: string,
+    uploadedBy: string,
+  ): Promise<{ storagePath: string; storageDetails: StorageMetadata }> {
+    const safeFileName = file.originalname;
+    const key = `receipts/${uploadedBy}/${expenseDocumentId}/${safeFileName}`;
+
+    const storageKey = await this.uploadFile(file.buffer, key, {
+      originalName: safeFileName,
+      source: 'single-receipt',
+      parentDocument: expenseDocumentId,
+    });
+
+    const storageDetails = this.buildStorageMetadata(storageKey);
+    this.logger.log(`Uploaded original file: ${storageKey}`);
+
+    return { storagePath: storageKey, storageDetails };
+  }
+
+  // ============================================
+  // Result Storage
+  // ============================================
+
   async saveResult(key: string, data: any): Promise<void> {
     try {
       const resultKey = `results/${key}`;
@@ -139,9 +214,9 @@ export class S3StorageService implements FileStorageService {
 
       await this.uploadFile(buffer, resultKey, {
         'content-type': 'application/json',
-        'result-type': 'processing-result'
+        'result-type': 'processing-result',
       });
-      
+
       this.logger.log(`Result saved to S3: ${resultKey}`);
     } catch (error) {
       this.logger.error(`Failed to save result ${key} to S3:`, error);
@@ -154,7 +229,7 @@ export class S3StorageService implements FileStorageService {
       const resultKey = `results/${key}`;
       const buffer = await this.downloadFile(resultKey);
       const content = buffer.toString('utf8');
-      
+
       return JSON.parse(content);
     } catch (error) {
       this.logger.error(`Failed to load result ${key} from S3:`, error);
@@ -162,46 +237,6 @@ export class S3StorageService implements FileStorageService {
     }
   }
 
-  async ensureDirectory(path: string): Promise<void> {
-    // S3 doesn't have directories, so this is a no-op
-    // But we keep the interface for compatibility
-    this.logger.debug(`Directory operation not needed for S3: ${path}`);
-  }
-
-  async moveFile(sourcePath: string, destPath: string): Promise<void> {
-    try {
-      // For S3, we copy the object and then delete the source
-      // First, download the source file
-      const buffer = await this.downloadFile(sourcePath);
-      
-      // Upload to destination
-      await this.uploadFile(buffer, destPath);
-      
-      // Delete source
-      await this.deleteFile(sourcePath);
-      
-      this.logger.log(`File moved in S3 from ${sourcePath} to ${destPath}`);
-    } catch (error) {
-      this.logger.error(`Failed to move file in S3 from ${sourcePath} to ${destPath}:`, error);
-      throw error;
-    }
-  }
-
-  async readFile(key: string): Promise<Buffer> {
-    return this.downloadFile(key);
-  }
-
-  async readFileAsString(key: string): Promise<string> {
-    try {
-      const buffer = await this.readFile(key);
-      return buffer.toString('utf8');
-    } catch (error) {
-      this.logger.error(`Failed to read file as string ${key}:`, error);
-      throw error;
-    }
-  }
-
-  // Additional methods for validation results and markdown extractions
   async saveValidationResult(key: string, data: any): Promise<void> {
     try {
       const validationKey = `validation_results/${key}`;
@@ -210,9 +245,9 @@ export class S3StorageService implements FileStorageService {
 
       await this.uploadFile(buffer, validationKey, {
         'content-type': 'application/json',
-        'result-type': 'validation-result'
+        'result-type': 'validation-result',
       });
-      
+
       this.logger.log(`Validation result saved to S3: ${validationKey}`);
     } catch (error) {
       this.logger.error(`Failed to save validation result ${key} to S3:`, error);
@@ -227,9 +262,9 @@ export class S3StorageService implements FileStorageService {
 
       await this.uploadFile(buffer, markdownKey, {
         'content-type': 'text/markdown',
-        'result-type': 'markdown-extraction'
+        'result-type': 'markdown-extraction',
       });
-      
+
       this.logger.log(`Markdown content saved to S3: ${markdownKey}`);
     } catch (error) {
       this.logger.error(`Failed to save markdown extraction ${key} to S3:`, error);
@@ -237,18 +272,41 @@ export class S3StorageService implements FileStorageService {
     }
   }
 
-  // Helper method for reading config files - S3 version would load from S3
+  // ============================================
+  // File Reading Helpers
+  // ============================================
+
+  /**
+   * Alias for downloadFile
+   */
+  async readFile(key: string): Promise<Buffer> {
+    return this.downloadFile(key);
+  }
+
+  /**
+   * Read file and return as UTF-8 string
+   */
+  async readFileAsString(key: string): Promise<string> {
+    try {
+      const buffer = await this.readFile(key);
+      return buffer.toString('utf8');
+    } catch (error) {
+      this.logger.error(`Failed to read file as string ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Read config file from S3 configs/ prefix
+   */
   async readLocalConfigFile(relativePath: string): Promise<any> {
     try {
-      // For S3 implementation, we might load config from S3 or keep it local
-      // For now, we'll attempt to load from S3 configs/ prefix
       const configKey = `configs/${relativePath}`;
-      
+
       try {
         const content = await this.readFileAsString(configKey);
         return JSON.parse(content);
       } catch (s3Error) {
-        // Fallback to reading from local filesystem for configs
         this.logger.warn(`Config not found in S3 (${configKey}), this might be expected for schemas/compliance data`);
         throw new Error(`Config file not found in S3: ${configKey}`);
       }
@@ -258,21 +316,54 @@ export class S3StorageService implements FileStorageService {
     }
   }
 
-  // Helper method for file validation
-  async validateLocalFile(filePath: string): Promise<boolean> {
-    try {
-      // For S3, we interpret filePath as an S3 key
-      return await this.fileExists(filePath);
-    } catch (error) {
-      this.logger.error(`Failed to validate S3 file ${filePath}:`, error);
-      return false;
-    }
+  // ============================================
+  // Storage Metadata
+  // ============================================
+
+  /**
+   * Build storage metadata for a given key
+   */
+  buildStorageMetadata(storageKey: string): StorageMetadata {
+    return {
+      storageKey,
+      storageBucket: this.bucketName,
+      storageType: 's3',
+      storageUrl: `s3://${this.bucketName}/${storageKey}`,
+    };
   }
 
-  // Helper method to determine content type based on file extension
+  /**
+   * Get S3 bucket name
+   */
+  getStorageBucket(): string {
+    return this.bucketName;
+  }
+
+  /**
+   * Get S3 URL for a key
+   */
+  getS3Url(key: string): string {
+    return `s3://${this.bucketName}/${key}`;
+  }
+
+  /**
+   * Extract key from S3 URL
+   */
+  extractKeyFromUrl(s3Url: string): string {
+    if (s3Url.startsWith('s3://')) {
+      const parts = s3Url.replace('s3://', '').split('/');
+      return parts.slice(1).join('/');
+    }
+    return s3Url;
+  }
+
+  // ============================================
+  // Private Helpers
+  // ============================================
+
   private getContentType(key: string): string {
     const extension = key.split('.').pop()?.toLowerCase();
-    
+
     switch (extension) {
       case 'pdf':
         return 'application/pdf';
@@ -293,19 +384,5 @@ export class S3StorageService implements FileStorageService {
       default:
         return 'application/octet-stream';
     }
-  }
-
-  // Utility method to get S3 URL for external access
-  getS3Url(key: string): string {
-    return `s3://${this.bucketName}/${key}`;
-  }
-
-  // Utility method to extract key from S3 URL
-  extractKeyFromUrl(s3Url: string): string {
-    if (s3Url.startsWith('s3://')) {
-      const parts = s3Url.replace('s3://', '').split('/');
-      return parts.slice(1).join('/'); // Remove bucket name, keep the rest as key
-    }
-    return s3Url; // Assume it's already a key
   }
 }
