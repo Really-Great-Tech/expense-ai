@@ -143,6 +143,110 @@ export class ImageQualityAssessmentAgent extends BaseAgent {
   }
 
   /**
+   * Get image information from buffer for logging purposes
+   * @param buffer Image file buffer
+   * @param filename Original filename
+   * @returns String with image metadata
+   * @private
+   */
+  private getImageInfoFromBuffer(buffer: Buffer, filename: string): string {
+    const sizeKB = Math.round(buffer.length / 1024);
+    return `Filename: ${filename}, Size: ${sizeKB}KB, Format: ${path.extname(filename)}`;
+  }
+
+  /**
+   * Assess the quality of an expense document image from buffer
+   * @param buffer Image file buffer
+   * @param filename Original filename
+   * @returns Quality assessment with scores and recommendations
+   * @throws Error if assessment fails critically
+   */
+  async assessImageQualityFromBuffer(buffer: Buffer, filename: string): Promise<ImageQualityAssessment> {
+    const startTime = new Date();
+
+    this.logger.log(`Starting LLM-based quality assessment for: ${filename}`);
+
+    try {
+      // Get image info for context from buffer
+      const imageInfo = this.getImageInfoFromBuffer(buffer, filename);
+
+      // Get the assessment prompt from local prompts
+      const assessmentPrompt = await this.getPromptTemplate('image-quality-assessment-prompt');
+
+      this.logger.debug(`Using prompt: ${this.lastPromptInfo?.name} (version: ${this.lastPromptInfo?.version || 'unknown'})`);
+
+      // Create the full user prompt that will be sent to the LLM
+      const userPrompt = `Simulate a quality assessment for an expense document image. ${imageInfo}\n\n${assessmentPrompt}`;
+
+      const response = await this.llm.chat({
+        messages: [
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+      });
+
+      // Extract and parse response using BaseAgent utilities
+      const rawContent = this.extractContentFromResponse(response);
+      this.logger.debug(`Extracted content: ${rawContent.substring(0, 200)}...`);
+
+      const parsedResult = this.parseJsonResponse(rawContent);
+      const result = ImageQualityAssessmentSchema.parse(parsedResult);
+
+      const endTime = new Date();
+      const duration = endTime.getTime() - startTime.getTime();
+
+      this.logger.log(
+        `Image quality assessment completed: Score ${result.overall_quality_score}/10, ` +
+          `Suitable: ${result.suitable_for_extraction} in ${duration}ms`,
+      );
+      this.logger.debug(`Model used: ${this.getActualModelUsed()}`);
+      this.logger.debug(`Prompt metadata: ${JSON.stringify(this.getPromptMetadata())}`);
+
+      return result;
+    } catch (error) {
+      const endTime = new Date();
+      const duration = endTime.getTime() - startTime.getTime();
+
+      this.logger.error(`Image quality assessment failed after ${duration}ms: ${error.message}`);
+
+      // Return fallback result
+      return {
+        blur_detection: this.createFallbackIssue('Blur assessment failed'),
+        contrast_assessment: this.createFallbackIssue('Contrast assessment failed'),
+        glare_identification: this.createFallbackIssue('Glare assessment failed'),
+        water_stains: this.createFallbackIssue('Water stain assessment failed'),
+        tears_or_folds: this.createFallbackIssue('Tear/fold assessment failed'),
+        cut_off_detection: this.createFallbackIssue('Cut-off assessment failed'),
+        missing_sections: this.createFallbackIssue('Missing section assessment failed'),
+        obstructions: this.createFallbackIssue('Obstruction assessment failed'),
+        overall_quality_score: 5,
+        suitable_for_extraction: true, // Default to true to not block processing
+      };
+    }
+  }
+
+  /**
+   * Format assessment results for workflow processing (buffer version)
+   * @param assessment The quality assessment result
+   * @param filename Original filename
+   * @returns Formatted assessment object
+   */
+  formatAssessmentForWorkflowFromBuffer(assessment: ImageQualityAssessment, filename: string) {
+    return {
+      image_path: filename,
+      assessment_method: 'LLM',
+      model_used: this.getActualModelUsed(),
+      timestamp: new Date().toISOString(),
+      quality_score: assessment.overall_quality_score * 10, // Convert to 0-100 scale
+      quality_level: this.getQualityLevel(assessment.overall_quality_score),
+      suitable_for_extraction: assessment.suitable_for_extraction,
+      ...assessment,
+    };
+  }
+
+  /**
    * Format assessment results for workflow processing
    * @param assessment The quality assessment result
    * @param imagePath Path to the assessed image

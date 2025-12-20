@@ -1,22 +1,19 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { FileStorageService } from '../../storage/interfaces/file-storage.interface';
+import { Injectable, Logger } from '@nestjs/common';
+import { S3StorageService } from '@/storage/s3-storage.service';
 import * as path from 'path';
 
 @Injectable()
 export class ProcessingStorageService {
   private readonly logger = new Logger(ProcessingStorageService.name);
 
-  constructor(
-    @Inject('FILE_STORAGE_SERVICE')
-    private storageService: FileStorageService,
-  ) {}
+  constructor(private readonly s3Storage: S3StorageService) {}
 
   async saveResults(filename: string, result: any): Promise<void> {
     try {
       const baseName = path.parse(filename).name;
       const outputFilename = `${baseName}_result.json`;
 
-      await this.storageService.saveResult(outputFilename, result);
+      await this.s3Storage.saveResult(outputFilename, result);
 
       this.logger.log(`Results saved using storage service: ${outputFilename}`);
     } catch (error) {
@@ -30,7 +27,7 @@ export class ProcessingStorageService {
       const baseName = path.parse(filename).name;
       const outputFilename = `${baseName}_llm_validation.json`;
 
-      await this.storageService.saveValidationResult(outputFilename, validationResult);
+      await this.s3Storage.saveValidationResult(outputFilename, validationResult);
 
       this.logger.log(`LLM validation results saved using storage service: ${outputFilename}`);
     } catch (error) {

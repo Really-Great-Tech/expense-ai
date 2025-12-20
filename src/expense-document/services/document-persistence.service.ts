@@ -6,16 +6,16 @@ import { ExpenseDocument, DocumentStatus } from '@/expense-document/entities/exp
 import { Receipt, ReceiptStatus } from '@/expense-document/entities/receipt.entity';
 import { Country } from '@/country-policy/entities/country.entity';
 import { InvoiceGroup } from '../types/upload.types';
-import { StorageDetails } from '@/services/document-storage/document-storage.service';
+import { StorageMetadata } from '@/storage/s3-storage.service';
 
 export interface ReceiptCreationData {
   group: InvoiceGroup;
-  storageDetails: StorageDetails;
+  storageDetails: StorageMetadata;
   sourceDocumentId: string;
 }
 
 export interface SingleReceiptCreationData {
-  storageDetails: StorageDetails;
+  storageDetails: StorageMetadata;
   sourceDocumentId: string;
   fileName: string;
   fileSize: number;
@@ -138,6 +138,15 @@ export class DocumentPersistenceService {
   async getReceiptsByDocumentId(documentId: string): Promise<Receipt[]> {
     return await this.receiptRepository.find({
       where: { sourceDocumentId: documentId },
+    });
+  }
+
+  /**
+   * Get a receipt by ID with its extracted text
+   */
+  async getReceiptById(receiptId: string): Promise<Receipt | null> {
+    return await this.receiptRepository.findOne({
+      where: { id: receiptId },
     });
   }
 

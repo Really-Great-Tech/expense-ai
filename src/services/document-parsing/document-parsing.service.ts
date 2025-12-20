@@ -9,8 +9,11 @@ export class DocumentParsingService {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async extractFullDocumentMarkdown(pdfPath: string, documentReader: string): Promise<string> {
-    this.logger.log(`Extracting full document as markdown using ${documentReader}`);
+  /**
+   * Extract full document markdown from buffer (preferred - no temp files)
+   */
+  async extractMarkdownFromBuffer(buffer: Buffer, fileName: string, documentReader: string): Promise<string> {
+    this.logger.log(`Extracting markdown from buffer: ${fileName} (${buffer.length} bytes) using ${documentReader}`);
 
     try {
       const reader = DocumentReaderFactory.getDefaultReader(this.configService, documentReader);
@@ -21,18 +24,23 @@ export class DocumentParsingService {
         timeout: 120000,
       };
 
-      const parseResult = await reader.parseDocument(pdfPath, parseConfig);
+      // Use buffer-based parsing
+      if (reader.parseDocumentFromBuffer) {
+        const parseResult = await reader.parseDocumentFromBuffer(buffer, fileName, parseConfig);
 
-      if (parseResult.success && parseResult.data) {
-        this.logger.log(`Successfully extracted full document (${parseResult.data.length} characters)`);
-        return parseResult.data;
+        if (parseResult.success && parseResult.data) {
+          this.logger.log(`Successfully extracted markdown from buffer (${parseResult.data.length} characters)`);
+          return parseResult.data;
+        } else {
+          const errorMsg = 'error' in parseResult ? parseResult.error : 'Unknown error';
+          this.logger.error(`Failed to parse document from buffer: ${fileName} - ${errorMsg}`);
+          throw new Error(`Document parsing failed: ${errorMsg}`);
+        }
       } else {
-        const errorMsg = 'error' in parseResult ? parseResult.error : 'Unknown error';
-        this.logger.error(`Failed to parse document: ${pdfPath} - ${errorMsg}`);
-        throw new Error(`Document parsing failed: ${errorMsg}`);
+        throw new Error(`Document reader ${documentReader} does not support buffer-based parsing`);
       }
     } catch (error) {
-      this.logger.error(`Error parsing document ${pdfPath}:`, error);
+      this.logger.error(`Error parsing document from buffer ${fileName}:`, error);
       throw error;
     }
   }

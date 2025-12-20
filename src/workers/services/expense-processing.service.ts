@@ -3,7 +3,7 @@ import { AgentFactoryService } from './agent-factory.service';
 import { ProcessingMetricsService } from './processing-metrics.service';
 import { ProcessingStorageService } from './processing-storage.service';
 import { ValidationOrchestratorService } from './validation-orchestrator.service';
-import { StorageResolverService } from '@/storage/services/storage-resolver.service';
+import { S3StorageService } from '@/storage/s3-storage.service';
 import { type CompleteProcessingResult } from '@/common/schemas/expense-schemas';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class ExpenseProcessingService {
     private readonly metricsService: ProcessingMetricsService,
     private readonly storageService: ProcessingStorageService,
     private readonly validationOrchestrator: ValidationOrchestratorService,
-    private readonly storageResolver: StorageResolverService,
+    private readonly s3Storage: S3StorageService,
   ) {
     this.logger.log('ExpenseProcessingService initialized with parallel processing only');
   }
@@ -29,7 +29,7 @@ export class ExpenseProcessingService {
     complianceData: any,
     expenseSchema: any,
     progressCallback?: (stage: string, progress: number) => void,
-    markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string },
+    markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string; markdownSource?: 'stored' | 'extracted' },
     userId?: string,
   ): Promise<CompleteProcessingResult> {
     this.logger.log(` Starting PARALLEL expense processing for: ${filename}`);
@@ -41,9 +41,9 @@ export class ExpenseProcessingService {
     const { timing, trueStartTime } = this.metricsService.createTimingObject(markdownExtractionInfo);
     const agents = this.agentFactory.getAgents();
 
-    // Resolve physical file path from storage key (handles both local and S3)
-    const { path: physicalPath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey);
-    this.logger.debug(`Resolved storage key to physical path: ${physicalPath} (temp: ${isTemp})`);
+    // Download file buffer from S3 for image quality assessment
+    const fileBuffer = await this.s3Storage.getFile(storageKey);
+    this.logger.debug(`Downloaded file from S3: ${storageKey} (${fileBuffer.length} bytes)`);
 
     try {
       // PARALLEL GROUP 1: Independent phases that can run simultaneously
@@ -53,7 +53,7 @@ export class ExpenseProcessingService {
       const parallelGroup1Start = Date.now();
 
       const [formattedQualityAssessment, classification, extraction] = await Promise.all([
-        this.runImageQualityAssessment(physicalPath, timing, agents.imageQualityAssessmentAgent),
+        this.runImageQualityAssessmentFromBuffer(fileBuffer, filename, timing, agents.imageQualityAssessmentAgent),
         this.runFileClassification(markdownContent, country, expenseSchema, timing, agents.fileClassificationAgent),
         this.runDataExtraction(markdownContent, complianceData, timing, agents.dataExtractionAgent),
       ]);
@@ -139,20 +139,15 @@ export class ExpenseProcessingService {
     } catch (error) {
       this.logger.error(` PARALLEL expense processing failed for ${filename}:`, error);
       throw new Error(`Parallel expense processing failed: ${error.message}`);
-    } finally {
-      // Cleanup temp file if it was downloaded from S3
-      if (isTemp) {
-        this.storageResolver.cleanupTempFile(physicalPath);
-      }
     }
   }
 
-  private async runImageQualityAssessment(imagePath: string, timing: any, agent: any) {
+  private async runImageQualityAssessmentFromBuffer(buffer: Buffer, filename: string, timing: any, agent: any) {
     const start = Date.now();
     this.logger.log(' Phase 0: Image Quality Assessment (parallel)');
 
-    const result = await agent.assessImageQuality(imagePath);
-    const formattedResult = agent.formatAssessmentForWorkflow(result, imagePath);
+    const result = await agent.assessImageQualityFromBuffer(buffer, filename);
+    const formattedResult = agent.formatAssessmentForWorkflowFromBuffer(result, filename);
 
     const end = Date.now();
     this.metricsService.recordPhase(timing, 'image_quality_assessment', start, end, {

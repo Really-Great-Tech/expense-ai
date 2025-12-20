@@ -29,8 +29,6 @@ import { ProcessingQueueService } from './services/processing-queue.service';
 // External services
 import { FileValidationService } from '../utils/file-validation.service';
 import { DuplicateDetectionService } from '../utils/duplicate-detection.service';
-import { PdfSplittingService } from '../tools/pdf-splitting/pdf-splitting.service';
-import { DocumentStorageService } from '../services/document-storage/document-storage.service';
 import { DocumentParsingService } from '../services/document-parsing/document-parsing.service';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 
@@ -101,8 +99,6 @@ import { QUEUE_NAMES } from '../common/types';
     ProcessingQueueService,
     FileValidationService,
     DuplicateDetectionService,
-    PdfSplittingService,
-    DocumentStorageService,
     DocumentParsingService,
     {
       provide: DocumentSplitterAgent,

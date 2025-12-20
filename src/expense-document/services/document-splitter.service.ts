@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PageMarkdown, PageAnalysisResult, SplitPdfInfo, InvoiceGroup, SplitAnalysisResponse } from '../types/upload.types';
+import { PageMarkdown, PageAnalysisResult, InvoiceGroup, SplitAnalysisResponse } from '../types/upload.types';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 import { ExpenseDocument, DocumentStatus } from '@/expense-document/entities/expense-document.entity';
 import { Receipt } from '@/expense-document/entities/receipt.entity';
 import { DuplicateDetectionService, DuplicateCheckResult } from '@/utils/duplicate-detection.service';
 import { DocumentParsingService } from '@/services/document-parsing/document-parsing.service';
-import { PdfSplittingService } from '@/tools/pdf-splitting/pdf-splitting.service';
-import { DocumentStorageService } from '@/services/document-storage/document-storage.service';
+import { S3StorageService } from '@/storage/s3-storage.service';
 import { DocumentPersistenceService, ReceiptCreationData } from './document-persistence.service';
 import { ProcessingQueueService } from './processing-queue.service';
 
@@ -18,8 +17,7 @@ export class DocumentSplitterService {
     private readonly documentSplitterAgent: DocumentSplitterAgent,
     private readonly duplicateDetectionService: DuplicateDetectionService,
     private readonly parsingService: DocumentParsingService,
-    private readonly splittingService: PdfSplittingService,
-    private readonly storageService: DocumentStorageService,
+    private readonly s3Storage: S3StorageService,
     private readonly persistenceService: DocumentPersistenceService,
     private readonly queueService: ProcessingQueueService,
   ) {}
@@ -35,12 +33,11 @@ export class DocumentSplitterService {
       duplicateChoice?: 'REFERENCE_EXISTING' | 'FORCE_REPROCESS';
     },
   ): Promise<SplitAnalysisResponse> {
-    let tempDir: string | null = null;
     let expenseDocument: ExpenseDocument;
     let duplicateResult: DuplicateCheckResult | null = null;
 
     try {
-      this.logger.log(`Starting document splitting for file: ${file.originalname}`, {
+      this.logger.log(`Starting document analysis for file: ${file.originalname}`, {
         userId: options.userId,
         fileSize: file.size,
       });
@@ -76,13 +73,28 @@ export class DocumentSplitterService {
         return this.buildResponseFromExisting(expenseDocument, existingReceipts);
       }
 
-      // STEP C: Set PROCESSING status and create temp directory
+      // STEP C: Set PROCESSING status and upload original file to S3
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.PROCESSING);
-      tempDir = this.storageService.getTempDirectory();
-      const originalFilePath = await this.storageService.saveFileTemporarily(file, tempDir);
 
-      // STEP D: Extract full document markdown
-      const fullMarkdown = await this.parsingService.extractFullDocumentMarkdown(originalFilePath, 'textract');
+      // Upload original file buffer to S3 (no temp files needed)
+      const { storageKey: originalStorageKey, storageDetails: originalStorageDetails } =
+        await this.s3Storage.uploadOriginalDocument(
+          file.buffer,
+          file.originalname,
+          expenseDocument.id,
+          options.userId || 'anonymous',
+        );
+
+      // Update document with storage info
+      await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.PROCESSING, {
+        storageKey: originalStorageKey,
+        storageBucket: originalStorageDetails.storageBucket,
+        storageType: originalStorageDetails.storageType,
+        storageUrl: originalStorageDetails.storageUrl,
+      });
+
+      // STEP D: Extract full document markdown directly from buffer (no temp file)
+      const fullMarkdown = await this.parsingService.extractMarkdownFromBuffer(file.buffer, file.originalname, 'textract');
       const pageMarkdowns = this.parsingService.parseMarkdownPages(fullMarkdown);
 
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.TEXTRACT_COMPLETE, {
@@ -97,15 +109,14 @@ export class DocumentSplitterService {
       // STEP E: LLM boundary detection
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.BOUNDARY_DETECTION);
       const pageAnalysis = await this.documentSplitterAgent.analyzePages(pageMarkdowns);
-      this.splittingService.validatePageAnalysis(pageAnalysis, pageMarkdowns.length);
+      this.validatePageAnalysis(pageAnalysis, pageMarkdowns.length);
 
-      // STEP F: PDF splitting
+      // STEP F: Create invoice groups from page analysis (no PDF splitting - store markdown directly)
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.SPLITTING);
-      const splitPdfs = await this.splittingService.createSplitPdfFiles(originalFilePath, pageAnalysis, tempDir);
-      const invoiceGroups = this.combineResultsWithPdfPaths(pageMarkdowns, pageAnalysis, splitPdfs);
+      const invoiceGroups = this.createInvoiceGroupsFromAnalysis(pageMarkdowns, pageAnalysis, file);
 
-      // STEP G: Upload splits and persist receipts
-      const { receipts, uploadedGroups } = await this.uploadAndPersistReceipts(expenseDocument, invoiceGroups);
+      // STEP G: Create receipts with markdown content (no split PDF uploads)
+      const { receipts, uploadedGroups } = await this.createReceiptsFromGroups(expenseDocument, invoiceGroups, originalStorageDetails);
 
       // STEP H: Update document completion
       await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.COMPLETED, {
@@ -132,7 +143,7 @@ export class DocumentSplitterService {
         });
       }
 
-      this.logger.log(`Document splitting completed: ${receipts.length} receipts created`, {
+      this.logger.log(`Document analysis completed: ${receipts.length} receipts created`, {
         expenseDocumentId: expenseDocument.id,
         receiptIds: receipts.map((r) => r.id),
       });
@@ -145,13 +156,13 @@ export class DocumentSplitterService {
           hasMultipleInvoices: pageAnalysis.totalInvoices > 1,
           totalInvoices: pageAnalysis.totalInvoices,
           invoices: uploadedGroups,
-          tempDirectory: tempDir,
+          tempDirectory: '', // No temp directory used
           expenseDocumentId: expenseDocument.id,
           receiptIds: receipts.map((r) => r.id),
         },
       };
     } catch (error) {
-      this.logger.error(`Document splitting failed:`, error, {
+      this.logger.error(`Document analysis failed:`, error, {
         expenseDocumentId: expenseDocument?.id,
       });
 
@@ -165,9 +176,96 @@ export class DocumentSplitterService {
         });
       }
 
-      if (tempDir) await this.storageService.cleanupTempDirectory(tempDir);
       throw error;
     }
+  }
+
+  /**
+   * Validate page analysis results
+   */
+  private validatePageAnalysis(analysis: PageAnalysisResult, totalPages: number): void {
+    if (!analysis || !analysis.pageGroups || analysis.pageGroups.length === 0) {
+      throw new Error('Invalid page analysis: no page groups returned');
+    }
+
+    // Check all pages are covered
+    const coveredPages = new Set<number>();
+    for (const group of analysis.pageGroups) {
+      for (const page of group.pages) {
+        if (page < 1 || page > totalPages) {
+          throw new Error(`Invalid page number ${page} in analysis (total pages: ${totalPages})`);
+        }
+        coveredPages.add(page);
+      }
+    }
+
+    if (coveredPages.size !== totalPages) {
+      this.logger.warn(`Page analysis doesn't cover all pages. Covered: ${coveredPages.size}, Total: ${totalPages}`);
+    }
+  }
+
+  /**
+   * Create invoice groups from page analysis (no PDF splitting)
+   */
+  private createInvoiceGroupsFromAnalysis(
+    pageMarkdowns: PageMarkdown[],
+    analysis: PageAnalysisResult,
+    file: Express.Multer.File,
+  ): InvoiceGroup[] {
+    return analysis.pageGroups.map((group) => {
+      const combinedMarkdown = this.parsingService.combinePageMarkdown(pageMarkdowns, group.pages);
+      const estimatedFileSize = Math.round(file.size / analysis.totalInvoices);
+
+      return {
+        invoiceNumber: group.invoiceNumber,
+        pages: group.pages,
+        content: combinedMarkdown,
+        confidence: group.confidence,
+        reasoning: group.reasoning,
+        totalPages: group.pages.length,
+        pdfPath: null, // No split PDF created
+        fileName: `invoice_${group.invoiceNumber}_${file.originalname}`,
+        fileSize: estimatedFileSize,
+      };
+    });
+  }
+
+  /**
+   * Create receipts from invoice groups (no split PDF uploads)
+   */
+  private async createReceiptsFromGroups(
+    expenseDocument: ExpenseDocument,
+    invoiceGroups: InvoiceGroup[],
+    originalStorageDetails: any,
+  ): Promise<{ receipts: Receipt[]; uploadedGroups: InvoiceGroup[] }> {
+    const receiptsData: ReceiptCreationData[] = [];
+    const uploadedGroups: InvoiceGroup[] = [];
+
+    for (const group of invoiceGroups) {
+      // Create receipt data pointing to original document (no split PDF)
+      receiptsData.push({
+        group,
+        storageDetails: {
+          ...originalStorageDetails,
+          // All receipts point to the same original document
+          storageKey: originalStorageDetails.storageKey,
+        },
+        sourceDocumentId: expenseDocument.id,
+      });
+
+      uploadedGroups.push({
+        ...group,
+        storagePath: originalStorageDetails.storageKey,
+      });
+    }
+
+    const receipts = await this.persistenceService.createReceiptsInTransaction(receiptsData);
+
+    for (let i = 0; i < receipts.length; i++) {
+      uploadedGroups[i].receiptId = receipts[i].id;
+    }
+
+    return { receipts, uploadedGroups };
   }
 
   private async handleDuplicateReference(duplicateResult: DuplicateCheckResult): Promise<SplitAnalysisResponse> {
@@ -230,68 +328,6 @@ export class DocumentSplitterService {
       },
       data: null,
     };
-  }
-
-  private combineResultsWithPdfPaths(pageMarkdowns: PageMarkdown[], analysis: PageAnalysisResult, splitPdfs: SplitPdfInfo[]): InvoiceGroup[] {
-    return analysis.pageGroups.map((group) => {
-      const splitPdf = splitPdfs.find((pdf) => pdf.invoiceNumber === group.invoiceNumber);
-      const combinedMarkdown = this.parsingService.combinePageMarkdown(pageMarkdowns, group.pages);
-
-      return {
-        invoiceNumber: group.invoiceNumber,
-        pages: group.pages,
-        content: combinedMarkdown,
-        confidence: group.confidence,
-        reasoning: group.reasoning,
-        totalPages: group.pages.length,
-        pdfPath: splitPdf?.pdfPath || null,
-        fileName: splitPdf?.fileName || null,
-        fileSize: splitPdf?.fileSize || null,
-      };
-    });
-  }
-
-  private async uploadAndPersistReceipts(
-    expenseDocument: ExpenseDocument,
-    invoiceGroups: InvoiceGroup[],
-  ): Promise<{ receipts: Receipt[]; uploadedGroups: InvoiceGroup[] }> {
-    const receiptsData: ReceiptCreationData[] = [];
-    const uploadedGroups: InvoiceGroup[] = [];
-
-    for (const group of invoiceGroups) {
-      try {
-        if (group.pdfPath) {
-          const { storagePath, storageDetails } = await this.storageService.uploadSplitPdf(
-            group.pdfPath,
-            group.fileName || `invoice_${group.invoiceNumber}.pdf`,
-            expenseDocument.id,
-            expenseDocument.uploadedBy,
-            group.invoiceNumber,
-          );
-
-          receiptsData.push({
-            group,
-            storageDetails,
-            sourceDocumentId: expenseDocument.id,
-          });
-
-          uploadedGroups.push({
-            ...group,
-            storagePath,
-          });
-        }
-      } catch (error) {
-        this.logger.warn(`Upload failed for invoice ${group.invoiceNumber}:`, error);
-      }
-    }
-
-    const receipts = await this.persistenceService.createReceiptsInTransaction(receiptsData);
-
-    for (let i = 0; i < receipts.length; i++) {
-      uploadedGroups[i].receiptId = receipts[i].id;
-    }
-
-    return { receipts, uploadedGroups };
   }
 
   private buildResponseFromExisting(document: ExpenseDocument, receipts: Receipt[]): SplitAnalysisResponse {
@@ -370,7 +406,7 @@ export class DocumentSplitterService {
       });
 
       // STEP C: Upload original file directly (no splitting)
-      const { storagePath, storageDetails } = await this.storageService.uploadOriginalFile(
+      const { storagePath, storageDetails } = await this.s3Storage.uploadOriginalFile(
         file,
         expenseDocument.id,
         options.userId || 'anonymous',
@@ -449,7 +485,11 @@ export class DocumentSplitterService {
     }
   }
 
-  async cleanupTempFiles(tempDirectory: string): Promise<void> {
-    await this.storageService.cleanupTempDirectory(tempDirectory);
+  /**
+   * @deprecated No longer needed - temp files are not created
+   */
+  async cleanupTempFiles(_tempDirectory: string): Promise<void> {
+    // No-op: temp files are no longer created
+    this.logger.debug('cleanupTempFiles called but no temp files are created in new architecture');
   }
 }
