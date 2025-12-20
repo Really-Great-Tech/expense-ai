@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { AppConfigType } from '../config/app.config';
 
 /**
  * Storage metadata returned when uploading documents
@@ -26,15 +27,19 @@ export class S3StorageService {
   private readonly logger = new Logger(S3StorageService.name);
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
+  private readonly appConfig: AppConfigType;
 
   constructor(private configService: ConfigService) {
+    // Get typed app config
+    this.appConfig = this.configService.get<AppConfigType>('app')!;
+
     this.s3Client = new S3Client({
-      region: this.configService.get('AWS_REGION', 'us-east-1'),
+      region: this.appConfig.aws.region,
       maxAttempts: 4,
       retryMode: 'adaptive',
     });
 
-    this.bucketName = this.configService.get('S3_BUCKET_NAME');
+    this.bucketName = this.appConfig.storage.s3BucketName!;
 
     if (!this.bucketName) {
       throw new Error('S3_BUCKET_NAME is required for S3StorageService');

@@ -11,8 +11,12 @@ import { ProcessingStatus } from '@/expense-result/entities/receipt-processing-r
 import { DocumentPersistenceService } from '@/expense-document/services/document-persistence.service';
 import { ReceiptStatus } from '@/expense-document/entities/receipt.entity';
 import { CountryPolicyService } from '@/country-policy/services/country-policy.service';
+import { getAppConfig } from '../config/app.config';
 import * as path from 'path';
 import * as fs from 'fs';
+
+// Get worker concurrency from centralized config (evaluated at module load time)
+const workerConfig = getAppConfig();
 
 /**
  * Expense Processor
@@ -22,7 +26,7 @@ import * as fs from 'fs';
  * By default, processes 5 receipts concurrently.
  */
 @Processor(QUEUE_NAMES.EXPENSE_PROCESSING, {
-  concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
+  concurrency: workerConfig.workers.concurrency,
 })
 export class ExpenseProcessor extends WorkerHost {
   private readonly logger = new Logger(ExpenseProcessor.name);

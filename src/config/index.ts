@@ -1,6 +1,10 @@
-import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 import { dataSourceOptions } from './database';
+import appConfig, { AppConfigType, getAppConfig } from './app.config';
+
+// Re-export centralized config
+export { appConfig, AppConfigType, getAppConfig };
+export { validateEnvironment, getConfigSummary, logConfigSummary } from './env-validation';
 
 interface iConfig {
   env: string;
@@ -12,17 +16,18 @@ interface iConfig {
   };
 }
 
-const configService = new ConfigService();
-
+/**
+ * Legacy configuration factory for backward compatibility
+ * New code should use appConfig or getAppConfig() instead
+ */
 export default (): Partial<iConfig> => {
-  const env = configService.get<string>('NODE_ENV', 'development');
-  const port = parseInt(configService.get<string>('PORT', '3000'), 10);
-  const rawPrivateKey = configService.get<string>('PRIVATE_KEY');
-  const rawPublicKey = configService.get<string>('PUBLIC_KEY');
+  const config = getAppConfig();
+  const rawPrivateKey = config.security.privateKey;
+  const rawPublicKey = config.security.publicKey;
 
   return {
-    env,
-    port,
+    env: config.nodeEnv,
+    port: config.port,
     keys: {
       privateKey: rawPrivateKey ? rawPrivateKey.replace(/\\n/gm, '\n') : '',
       publicKey: rawPublicKey ? rawPublicKey.replace(/\\n/gm, '\n') : '',

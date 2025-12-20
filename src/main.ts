@@ -9,11 +9,17 @@ import { useContainer } from 'class-validator';
 import { HealthCheckService } from '@nestjs/terminus';
 import { DatabaseHealthIndicator } from './health/database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
+import { validateEnvironment } from './config/env-validation';
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Validate environment variables early, before creating the NestJS app
+  logger.log('Validating environment configuration...');
+  validateEnvironment();
+
   try {
     const app = await NestFactory.create(AppModule, { bufferLogs: true });
     const appLogger = app.get(LoggerService);
@@ -23,9 +29,12 @@ async function bootstrap() {
     // Enable class-validator to use NestJS's DI container for custom validators
     useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
+    // Get typed app config
+    const appConfig = configService.get('app')!;
+
     // Request body size limits - prevent large payload attacks
-    const bodyLimit = configService.get('REQUEST_BODY_LIMIT', '1mb');
-    const urlEncodedLimit = configService.get('URL_ENCODED_LIMIT', '1mb');
+    const bodyLimit = appConfig.requestLimits.bodyLimit;
+    const urlEncodedLimit = appConfig.requestLimits.urlEncodedLimit;
 
     app.use(express.json({ limit: bodyLimit }));
     app.use(express.urlencoded({ limit: urlEncodedLimit, extended: true }));
@@ -89,7 +98,7 @@ async function bootstrap() {
 
     // Enhanced CORS configuration
     app.enableCors({
-      origin: configService.get('ALLOWED_ORIGINS', false), // Changed from '*' to false for security
+      origin: appConfig.cors.allowedOrigins, // Changed from '*' to false for security
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
       credentials: true,
       optionsSuccessStatus: 200, // For legacy browser support
@@ -121,7 +130,7 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('expenses-ai/api/docs', app, document);
 
-    const port = configService.get('PORT', 3000);
+    const port = appConfig.port;
     app.enableShutdownHooks();
 
     // Perform startup health checks before accepting traffic

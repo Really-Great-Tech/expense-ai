@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textract';
 import { BedrockRuntimeClient, ConverseCommand, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { AppConfigType } from '../config/app.config';
 
 interface ServiceTestResult {
   status: 'up' | 'down';
@@ -39,9 +40,11 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   private readonly logger = new Logger(AwsServicesHealthIndicator.name);
   private textractClient: TextractClient | null = null;
   private bedrockClient: BedrockRuntimeClient | null = null;
+  private readonly appConfig: AppConfigType;
 
   constructor(private configService: ConfigService) {
     super();
+    this.appConfig = this.configService.get<AppConfigType>('app')!;
     this.initializeClients();
   }
 
@@ -55,19 +58,19 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
    */
   private initializeClients(): void {
     try {
-      const textractRegion = this.configService.get<string>('AWS_REGION', 'us-east-1');
+      const awsRegion = this.appConfig.aws.region;
 
       // Initialize Textract client - uses default credential chain
       this.textractClient = new TextractClient({
-        region: textractRegion,
+        region: awsRegion,
       });
 
       // Initialize Bedrock client - uses default credential chain
       this.bedrockClient = new BedrockRuntimeClient({
-        region: 'us-east-1',
+        region: awsRegion,
       });
 
-      this.logger.log(`AWS clients initialized (Textract: ${textractRegion}, Bedrock: us-east-1)`);
+      this.logger.log(`AWS clients initialized (Textract: ${awsRegion}, Bedrock: ${awsRegion})`);
     } catch (error) {
       this.logger.error(`Failed to initialize AWS clients: ${error.message}`);
     }
@@ -105,7 +108,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         message: 'Textract is operational',
         latency: `${latency}ms`,
         details: {
-          region: this.configService.get('AWS_REGION', 'us-east-1'),
+          region: this.appConfig.aws.region,
           credentialsSource: 'default-chain',
           blocksDetected: response.Blocks?.length || 0,
           documentMetadata: response.DocumentMetadata,
@@ -127,7 +130,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         error: errorMessage,
         details: {
           errorType: error.constructor.name,
-          region: this.configService.get('AWS_REGION', 'us-east-1'),
+          region: this.appConfig.aws.region,
         },
       };
 
@@ -155,34 +158,35 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
    * Get all Bedrock models to test
    */
   private getModelsToTest(): BedrockModelConfig[] {
+    const bedrock = this.appConfig.bedrock;
     return [
       {
         envVar: 'BEDROCK_MODEL',
-        defaultValue: 'us.amazon.nova-pro-v1:0',
+        defaultValue: bedrock.model,
         modelType: 'nova',
         description: 'Primary model (extraction, quality, compliance, splitter)',
       },
       {
         envVar: 'CITATION_MODEL',
-        defaultValue: 'us.amazon.nova-micro-v1:0',
+        defaultValue: bedrock.citationModel,
         modelType: 'nova',
         description: 'Citation generation model',
       },
       {
         envVar: 'BEDROCK_JUDGE_MODEL_1',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        defaultValue: bedrock.judgeModel1,
         modelType: 'claude',
         description: 'Judge model 1 (validation)',
       },
       {
         envVar: 'BEDROCK_JUDGE_MODEL_2',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        defaultValue: bedrock.judgeModel2,
         modelType: 'claude',
         description: 'Judge model 2 (validation)',
       },
       {
         envVar: 'BEDROCK_JUDGE_MODEL_3',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+        defaultValue: bedrock.judgeModel3,
         modelType: 'claude',
         description: 'Judge model 3 (validation)',
       },
@@ -194,10 +198,10 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
    */
   private async testSingleModel(config: BedrockModelConfig): Promise<ModelTestResult> {
     const startTime = Date.now();
-    const modelId = this.configService.get<string>(config.envVar, config.defaultValue);
+    const modelId = config.defaultValue; // Already resolved from appConfig
 
     // Determine model type - use config type, but verify with string if using application profiles
-    const usingApplicationProfile = this.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
+    const usingApplicationProfile = this.appConfig.bedrock.usingApplicationProfile;
     const modelType = usingApplicationProfile ? this.deriveModelType(modelId) : config.modelType;
     const isNova = modelType === 'nova';
 
@@ -292,9 +296,9 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         message: allUp ? 'All Bedrock models operational' : `${downCount}/${modelResults.length} models down`,
         latency: `${latency}ms`,
         details: {
-          region: 'us-east-1',
+          region: this.appConfig.aws.region,
           credentialsSource: 'default-chain',
-          usingApplicationProfile: this.configService.get<string>('USING_APPLICATION_PROFILE', 'false'),
+          usingApplicationProfile: this.appConfig.bedrock.usingApplicationProfile,
           summary: { total: modelResults.length, up: upCount, down: downCount },
           models: modelResults,
         },
@@ -323,7 +327,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         error: errorMessage,
         details: {
           errorType: error.constructor.name,
-          region: 'us-east-1',
+          region: this.appConfig.aws.region,
         },
       };
 

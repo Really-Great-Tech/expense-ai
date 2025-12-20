@@ -8,10 +8,12 @@ import { Logger } from '@nestjs/common';
  * dangerous misconfigurations in production environments.
  *
  * This validator enforces:
- * - NEVER auto-sync schemas in production (data loss risk)
- * - NEVER auto-run migrations in production (manual control required)
  * - SSL enforcement for production databases
  * - Required environment variables validation
+ * - IAM authentication configuration validation
+ *
+ * Note: Schema synchronization is permanently disabled (synchronize: false)
+ * to prevent accidental data loss. Use migrations for all schema changes.
  */
 export class DatabaseConfigValidator {
   private static readonly logger = new Logger('DatabaseConfigValidator');
@@ -45,30 +47,14 @@ export class DatabaseConfigValidator {
 
   /**
    * Validates production safeguards to prevent data loss
+   * Note: synchronize is permanently disabled in database.ts (hardcoded to false)
    */
   private static validateProductionSafeguards(
     configService: ConfigService,
     env: string,
   ): void {
-    // 1. NEVER allow synchronize in production
-    const synchronize = configService.get<string>('TYPEORM_SYNCHRONIZE');
-    // if (synchronize === 'true') {
-    //   throw new Error(
-    //     `❌ CRITICAL: TYPEORM_SYNCHRONIZE=true is NOT allowed in ${env}. ` +
-    //       'This will automatically alter your database schema and can cause DATA LOSS. ' +
-    //       'Use migrations instead: npm run migration:generate && npm run migration:run',
-    //   );
-    // }
-
-    // 2. NEVER auto-run migrations in production
-    const migrationsRun = configService.get<string>('TYPEORM_MIGRATIONS_RUN');
-    // if (migrationsRun === 'true') {
-    //   throw new Error(
-    //     `❌ CRITICAL: TYPEORM_MIGRATIONS_RUN=true is NOT allowed in ${env}. ` +
-    //       'Migrations must be run manually via CLI for safety and control. ' +
-    //       'Use: npm run migration:run',
-    //   );
-    // }
+    // Log that synchronize is permanently disabled
+    this.logger.log('Schema synchronization is permanently disabled (use migrations)');
 
     this.logger.log('Production safeguards validated');
   }
@@ -216,14 +202,6 @@ export class DatabaseConfigValidator {
   private static validateDevelopmentSettings(
     configService: ConfigService,
   ): void {
-    const synchronize = configService.get<string>('TYPEORM_SYNCHRONIZE');
-    if (synchronize === 'true') {
-      this.logger.warn(
-        'DEVELOPMENT MODE: synchronize=true is enabled. ' +
-          'This is OK for development but remember to use migrations for production.',
-      );
-    }
-
     const migrationsRun = configService.get<string>('TYPEORM_MIGRATIONS_RUN');
     if (migrationsRun === 'true') {
       this.logger.warn(
