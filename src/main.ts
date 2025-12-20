@@ -120,7 +120,15 @@ async function bootstrap() {
     }
 
     await app.listen(port);
+
+    // Configure HTTP server timeouts
+    const server = app.getHttpServer();
+    server.setTimeout(300000); // 5 minutes - overall request timeout
+    server.keepAliveTimeout = 65000; // 65 seconds - slightly higher than ALB's 60s default
+    server.headersTimeout = 66000; // 66 seconds - must be > keepAliveTimeout
+
     logger.log(`Application is running on: http://localhost:${port}`);
+    logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s');
   } catch (error) {
     logger.error(
       `Error during application bootstrap: ${error instanceof Error ? error.message : error}`,

@@ -200,7 +200,7 @@ const baseDBConfig: DataSourceOptions = {
   // Connection pool settings optimized for Aurora
   extra: {
     connectionLimit: parseInt(configService.get<string>('DB_CONNECTION_LIMIT', '20'), 10),
-    queueLimit: parseInt(configService.get<string>('DB_QUEUE_LIMIT', '0'), 10),
+    queueLimit: parseInt(configService.get<string>('DB_QUEUE_LIMIT', '100'), 10),
 
     // Add IAM auth plugin if enabled
     ...getIAMAuthConfig(),
