@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, OnModuleInit } from '@nestjs/common';
+import { Module, MiddlewareConsumer, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -16,6 +16,7 @@ import { SecurityMiddleware } from './middleware/security.middleware';
 import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseConfigValidator } from './config/database-validation';
+import { DataSource } from 'typeorm';
 
 @Module({
   imports: [
@@ -63,13 +64,31 @@ import { DatabaseConfigValidator } from './config/database-validation';
   controllers: [AppController],
   providers: [AppService, RedisConfigService],
 })
-export class AppModule implements OnModuleInit {
-  constructor(private configService: ConfigService) {}
+export class AppModule implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AppModule.name);
+
+  constructor(
+    private configService: ConfigService,
+    private dataSource: DataSource,
+  ) {}
 
   async onModuleInit() {
     // Validate database configuration on startup
     // This prevents dangerous misconfigurations in production
     DatabaseConfigValidator.validate(this.configService);
+  }
+
+  async onModuleDestroy() {
+    this.logger.log('Graceful shutdown initiated...');
+
+    // Close database connections
+    if (this.dataSource.isInitialized) {
+      this.logger.log('Closing database connections...');
+      await this.dataSource.destroy();
+      this.logger.log('Database connections closed');
+    }
+
+    this.logger.log('Graceful shutdown complete');
   }
 
   configure(consumer: MiddlewareConsumer) {
