@@ -115,7 +115,7 @@ export class RDSIAMAuthManager {
       this.tokenCache.set(cacheKey, { token, expiresAt });
 
       this.logger.log(
-        `✅ Successfully generated IAM token for ${config.hostname}. ` +
+        `Successfully generated IAM token for ${config.hostname}. ` +
         `Token cached until ${new Date(expiresAt).toISOString()}`,
       );
 
@@ -138,7 +138,7 @@ export class RDSIAMAuthManager {
 
       // All retries exhausted
       this.logger.error(
-        `❌ Failed to generate IAM token after ${this.MAX_RETRIES} attempts: ${errorMessage}`,
+        `Failed to generate IAM token after ${this.MAX_RETRIES} attempts: ${errorMessage}`,
       );
 
       throw new Error(

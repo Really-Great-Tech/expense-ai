@@ -88,12 +88,12 @@ export class BedrockLlmService {
 
       this.temperature = config?.temperature ?? 0.7; // Default temperature
       this.logger.log(
-        `✅ Bedrock client initialized: model=${this.modelId}, ` +
+        `Bedrock client initialized: model=${this.modelId}, ` +
           `type=${this.modelType || 'auto-detect'}, ` +
           `appProfile=${this.usingApplicationProfile}, temp=${this.temperature}`,
       );
     } catch (error) {
-      this.logger.warn(`⚠️ Failed to initialize Bedrock client: ${error.message}`);
+      this.logger.warn(`Failed to initialize Bedrock client: ${error.message}`);
       this.bedrockClient = null;
     }
   }
@@ -149,7 +149,7 @@ export class BedrockLlmService {
 
     const response = await this.bedrockClient!.send(command);
 
-    this.logger.log(`✅ Nova chat completed successfully using model: ${this.modelId}`);
+    this.logger.log(`Nova chat completed successfully using model: ${this.modelId}`);
 
     // Return same format as other providers for consistency
     return {
@@ -193,7 +193,7 @@ export class BedrockLlmService {
     const response = await this.bedrockClient!.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-    this.logger.log(`✅ Bedrock chat completed successfully using model: ${this.modelId}`);
+    this.logger.log(`Bedrock chat completed successfully using model: ${this.modelId}`);
 
     // Return same format as Anthropic client for consistency
     return {
@@ -272,7 +272,7 @@ export class BedrockLlmService {
     const response = await this.bedrockClient.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-    this.logger.log(`✅ Vision chat completed using model: ${this.modelId}`);
+    this.logger.log(`Vision chat completed using model: ${this.modelId}`);
 
     return {
       message: {

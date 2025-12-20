@@ -1,39 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
-import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
-import { RedisDebugService } from './redis-debug.service';
 import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
 
 /**
  * Health Module
  *
  * Provides comprehensive health check endpoints for system monitoring.
- * Includes both basic (ping-based) and enhanced (operational) health checks.
+ * Uses enhanced health indicators for meaningful operational tests.
  *
  * Features:
- * - Basic health checks: Fast ping tests for load balancers
- * - Enhanced health checks: Meaningful operational tests (read/write)
+ * - Redis health checks: Read/write operations with proper TLS validation
+ * - Database health checks: Query execution and connection pool monitoring
  * - Migration status checks: Database schema validation
- * - Debug diagnostics: Redis/Bull configuration testing
+ * - AWS services health: Textract and Bedrock connectivity
  */
 @Module({
   imports: [TerminusModule],
   controllers: [HealthController],
   providers: [
-    RedisHealthIndicator,
     DatabaseHealthIndicator,
     RedisHealthEnhancedIndicator,
-    RedisDebugService,
     AwsServicesHealthIndicator,
   ],
   exports: [
-    RedisHealthIndicator,
     DatabaseHealthIndicator,
     RedisHealthEnhancedIndicator,
-    RedisDebugService,
     AwsServicesHealthIndicator,
   ],
 })

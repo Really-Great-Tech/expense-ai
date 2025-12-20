@@ -94,7 +94,9 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
     if (tlsEnabled) {
       config.tls = {
         servername: endpoint,
-        checkServerIdentity: () => undefined,
+        // Use default Node.js certificate validation
+        // ElastiCache uses AWS-managed certificates validated against system CA store
+        rejectUnauthorized: true,
       };
       this.logger.log(`TLS enabled for Redis connection (servername: ${endpoint})`);
     }

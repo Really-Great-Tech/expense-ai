@@ -25,11 +25,14 @@ ENV NODE_ENV=${NODE_ENV}
 WORKDIR /usr/src/app
 
 # Install system dependencies including Python and build tools for native modules
+# ca-certificates ensures up-to-date root CA store for TLS validation (AWS ElastiCache, RDS)
 RUN apk add --no-cache \
     curl=8.14.1-r2 \
+    ca-certificates \
     python3 \
     make \
-    g++
+    g++ && \
+    update-ca-certificates
 
 COPY package*.json ./
 COPY tsconfig*.json ./
@@ -90,8 +93,8 @@ EXPOSE 3000
 EXPOSE 9229
 
 
-# Migrations run automatically via TypeORM's migrationsRun: true config
-# No need for entrypoint script - TypeORM handles migrations on app startup
-# Clear any inherited ENTRYPOINT from base image
-ENTRYPOINT []
+# Migrations controlled via TYPEORM_MIGRATIONS_RUN env var (true/false)
+# Set TYPEORM_MIGRATIONS_RUN=true to run migrations before app starts
+# migrationsRun is disabled in app to prevent race conditions in multi-instance deployments
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

@@ -16,8 +16,6 @@ import { DocumentSplitterModule } from './document-splitter/document-splitter.mo
 import { LoggerModule } from './logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseConfigValidator } from './config/database-validation';
-import { MigrationService } from './config/migration.service';
-import { MigrationController } from './config/migration.controller';
 
 @Module({
   imports: [
@@ -62,36 +60,16 @@ import { MigrationController } from './config/migration.controller';
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
   ],
-  controllers: [AppController, MigrationController],
-  providers: [AppService, RedisConfigService, MigrationService],
+  controllers: [AppController],
+  providers: [AppService, RedisConfigService],
 })
 export class AppModule implements OnModuleInit {
-  private readonly logger = new (require('@nestjs/common').Logger)(AppModule.name);
-
-  constructor(
-    private configService: ConfigService,
-    private migrationService: MigrationService,
-  ) {}
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     // Validate database configuration on startup
     // This prevents dangerous misconfigurations in production
     DatabaseConfigValidator.validate(this.configService);
-
-    // Log migration status on startup (migrations run automatically via migrationsRun: true)
-    this.logger.log('Checking migration status after startup...');
-    try {
-      const hasPending = await this.migrationService.hasPendingMigrations();
-      const history = await this.migrationService.getMigrationHistory();
-
-      if (hasPending) {
-        this.logger.warn('WARNING: There are still pending migrations after startup!');
-      } else {
-        this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
-      }
-    } catch (error) {
-      this.logger.error('Failed to check migration status:', error);
-    }
   }
 
   configure(consumer: MiddlewareConsumer) {
