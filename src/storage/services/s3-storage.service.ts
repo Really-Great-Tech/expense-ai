@@ -17,6 +17,8 @@ export class S3StorageService implements FileStorageService {
     // 4. EC2 Instance metadata (Instance Profile)
     this.s3Client = new S3Client({
       region: this.configService.get('AWS_REGION', 'us-east-1'),
+      maxAttempts: 4,
+      retryMode: 'adaptive',
     });
     
     this.bucketName = this.configService.get('S3_BUCKET_NAME');
