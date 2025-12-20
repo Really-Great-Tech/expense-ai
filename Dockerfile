@@ -25,11 +25,14 @@ ENV NODE_ENV=${NODE_ENV}
 WORKDIR /usr/src/app
 
 # Install system dependencies including Python and build tools for native modules
+# ca-certificates ensures up-to-date root CA store for TLS validation (AWS ElastiCache, RDS)
 RUN apk add --no-cache \
     curl=8.14.1-r2 \
+    ca-certificates \
     python3 \
     make \
-    g++
+    g++ && \
+    update-ca-certificates
 
 COPY package*.json ./
 COPY tsconfig*.json ./

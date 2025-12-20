@@ -1,10 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
-import { RedisHealthIndicator } from './redis-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
-import { RedisDebugService } from './redis-debug.service';
 import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
 
 /**
@@ -13,10 +11,7 @@ import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
  * Provides comprehensive health check endpoints for monitoring system health.
  * Used by load balancers, monitoring systems, and DevOps tooling.
  *
- * Endpoint Types:
- * - Basic checks: Simple ping-based health checks (fast, lightweight)
- * - Enhanced checks: Meaningful operational tests with read/write operations
- * - Migration checks: Database schema validation
+ * All Redis checks use RedisHealthEnhancedIndicator with proper TLS validation.
  */
 @ApiTags('health')
 @Controller('expenses-ai')
@@ -24,10 +19,8 @@ export class HealthController {
   constructor(
     private health: HealthCheckService,
     private db: TypeOrmHealthIndicator,
-    private redis: RedisHealthIndicator,
     private dbEnhanced: DatabaseHealthIndicator,
     private redisEnhanced: RedisHealthEnhancedIndicator,
-    private redisDebug: RedisDebugService,
     private awsServices: AwsServicesHealthIndicator,
   ) {}
 
@@ -44,8 +37,8 @@ export class HealthController {
       // Check database connection
       () => this.db.pingCheck('database'),
 
-      // Check Redis connection (BullMQ job queue)
-      () => this.redis.isHealthy('redis-queue'),
+      // Check Redis connection (BullMQ job queue) - uses enhanced indicator with proper TLS
+      () => this.redisEnhanced.isHealthy('redis-queue'),
     ]);
   }
 
@@ -73,9 +66,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Redis is healthy' })
   @ApiResponse({ status: 503, description: 'Redis is unhealthy' })
   checkRedis() {
-    return this.health.check([
-      () => this.redis.isHealthy('redis-queue'),
-    ]);
+    return this.health.check([() => this.redisEnhanced.isHealthy('redis-queue')]);
   }
 
   /**
@@ -134,54 +125,6 @@ export class HealthController {
   }
 
   /**
-   * Enhanced Redis health check
-   * Tests actual Redis operations with read/write operations
-   * More comprehensive than a simple ping - verifies data persistence
-   */
-  @Get('health/redis/enhanced')
-  @HealthCheck()
-  @ApiOperation({
-    summary: 'Enhanced Redis health check',
-    description:
-      'Performs meaningful Redis test by executing write, read, and delete operations. ' +
-      'Returns operation latencies and Redis server info.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Redis is fully operational',
-    schema: {
-      example: {
-        status: 'ok',
-        info: {
-          'redis-queue': {
-            status: 'up',
-            message: 'Redis is fully operational',
-            operations: {
-              write: 'success',
-              read: 'success',
-              delete: 'success',
-            },
-            latency: {
-              write: '8ms',
-              read: '3ms',
-              total: '15ms',
-            },
-            server: {
-              version: '7.0.11',
-              uptimeSeconds: 86400,
-              connectedClients: 2,
-            },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 503, description: 'Redis is unhealthy' })
-  checkRedisEnhanced() {
-    return this.health.check([() => this.redisEnhanced.isHealthy('redis-queue')]);
-  }
-
-  /**
    * Database migration status check
    * Verifies that all migrations have been applied
    */
@@ -226,64 +169,6 @@ export class HealthController {
   })
   checkMigrations() {
     return this.health.check([() => this.dbEnhanced.checkMigrationStatus()]);
-  }
-
-  /**
-   * Redis/Bull Debug Diagnostic Endpoint
-   * Tests both standalone and cluster Redis configurations with Bull queue operations
-   * Use this to diagnose why jobs are not being triggered
-   */
-  @Get('health/redis/debug')
-  @ApiOperation({
-    summary: 'Debug Redis/Bull configuration',
-    description: `
-**Comprehensive diagnostic endpoint for debugging Redis and Bull queue issues.**
-
-This endpoint tests BOTH standalone and cluster Redis configurations to identify:
-- Which Redis connection mode works (standalone vs cluster)
-- Whether Bull queue can add/remove jobs successfully
-- Configuration mismatches (e.g., REDIS_CLUSTER_ENABLED=true when ElastiCache is not in cluster mode)
-
-**Tests performed:**
-1. Standalone Redis: connect, ping, write, read, delete
-2. Cluster Redis: connect, ping, write, read, delete
-3. Standalone Bull: create queue, add job, get counts, remove job
-4. Cluster Bull: create queue, add job, get counts, remove job
-
-**Use when:**
-- Jobs are not being triggered (504 timeout on upload)
-- Redis health checks pass but Bull operations fail
-- Uncertain whether ElastiCache is in cluster mode or not
-
-**Note:** This endpoint may take 30-60 seconds to complete all tests.
-    `,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Debug diagnostic completed',
-    schema: {
-      example: {
-        timestamp: '2025-01-15T10:30:00Z',
-        environment: {
-          REDIS_MODE: 'managed',
-          REDIS_HOST: 'my-elasticache...',
-          REDIS_CLUSTER_ENABLED: 'true',
-        },
-        standalone_redis_test: { overall_status: 'success', steps: [] },
-        cluster_redis_test: { overall_status: 'failed', steps: [] },
-        standalone_bull_test: { overall_status: 'success', steps: [] },
-        cluster_bull_test: { overall_status: 'failed', steps: [] },
-        diagnosis: {
-          working_modes: ['standalone-redis', 'standalone-bull'],
-          failing_modes: ['cluster-redis', 'cluster-bull'],
-          root_cause: 'MISMATCH: REDIS_CLUSTER_ENABLED=true but ElastiCache is NOT in cluster mode',
-          recommended_fix: 'Set REDIS_CLUSTER_ENABLED=false',
-        },
-      },
-    },
-  })
-  async debugRedis() {
-    return this.redisDebug.runFullDiagnostic();
   }
 
   /**

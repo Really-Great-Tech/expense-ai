@@ -392,7 +392,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     if (tlsEnabled) {
       config.tls = {
         servername: endpoint,
-        checkServerIdentity: () => undefined,
+        // Use default Node.js certificate validation
+        // ElastiCache uses AWS-managed certificates validated against system CA store
+        rejectUnauthorized: true,
       };
     }
 
@@ -455,7 +457,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     if (tlsEnabled) {
       config.tls = {
         servername: endpoint,
-        checkServerIdentity: () => undefined,
+        // Use default Node.js certificate validation
+        // ElastiCache uses AWS-managed certificates validated against system CA store
+        rejectUnauthorized: true,
       };
     }
 
