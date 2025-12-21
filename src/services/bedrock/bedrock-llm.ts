@@ -1,6 +1,8 @@
 import { BedrockRuntimeClient, ConverseCommand, ContentBlock, Message } from '@aws-sdk/client-bedrock-runtime';
 import { Logger } from '@nestjs/common';
+import { BrokenCircuitError } from 'cockatiel';
 import { getAppConfig, AppConfigType } from '../../config/app.config';
+import { getGlobalCircuitBreakerService } from '../../resilience';
 
 // ============================================================================
 // Types
@@ -135,36 +137,48 @@ export class BedrockLlmService {
   }
 
   // Unified chat - ConverseCommand works for all models
+  // Wrapped with circuit breaker to prevent cascading failures
   async chat(options: { messages: ChatMessage[] }): Promise<ChatResponse> {
-    const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
+    const circuitBreaker = getGlobalCircuitBreakerService().getBedrockBreaker();
 
-    const messages: Message[] = conversationMessages.map((msg) => ({
-      role: msg.role as 'user' | 'assistant',
-      content: this.formatContentBlocks(msg.content),
-    }));
+    try {
+      return await circuitBreaker.execute(async () => {
+        const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
 
-    const command = new ConverseCommand({
-      modelId: this.profile.arn,
-      messages,
-      system: systemMessage ? [{ text: systemMessage }] : undefined,
-      inferenceConfig: {
-        maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
-        temperature: this.temperature,
-      },
-    });
+        const messages: Message[] = conversationMessages.map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: this.formatContentBlocks(msg.content),
+        }));
 
-    const response = await this.client.send(command);
-    const content = response.output?.message?.content || [];
-    const text = content.map((block) => ('text' in block ? block.text : '')).join('');
+        const command = new ConverseCommand({
+          modelId: this.profile.arn,
+          messages,
+          system: systemMessage ? [{ text: systemMessage }] : undefined,
+          inferenceConfig: {
+            maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
+            temperature: this.temperature,
+          },
+        });
 
-    return {
-      message: { content: text },
-      usage: {
-        input_tokens: response.usage?.inputTokens || 0,
-        output_tokens: response.usage?.outputTokens || 0,
-      },
-      modelUsed: this.profile.arn,
-    };
+        const response = await this.client.send(command);
+        const content = response.output?.message?.content || [];
+        const text = content.map((block) => ('text' in block ? block.text : '')).join('');
+
+        return {
+          message: { content: text },
+          usage: {
+            input_tokens: response.usage?.inputTokens || 0,
+            output_tokens: response.usage?.outputTokens || 0,
+          },
+          modelUsed: this.profile.arn,
+        };
+      });
+    } catch (error) {
+      if (error instanceof BrokenCircuitError) {
+        throw new Error('Bedrock service temporarily unavailable (circuit breaker open)');
+      }
+      throw error;
+    }
   }
 
   // Vision support

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { AppConfigType } from '../config/app.config';
+import { CircuitBreakerService } from '../resilience';
 
 /**
  * Storage metadata returned when uploading documents
@@ -29,7 +30,10 @@ export class S3StorageService {
   private readonly bucketName: string;
   private readonly appConfig: AppConfigType;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private circuitBreakerService: CircuitBreakerService,
+  ) {
     // Get typed app config
     this.appConfig = this.configService.get<AppConfigType>('app')!;
 
@@ -53,18 +57,22 @@ export class S3StorageService {
   // ============================================
 
   async uploadFile(buffer: Buffer, key: string, metadata?: Record<string, string>): Promise<string> {
-    try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: this.getContentType(key),
-        Metadata: metadata,
-      });
+    const breaker = this.circuitBreakerService.getS3Breaker();
 
-      await this.s3Client.send(command);
-      this.logger.log(`File uploaded to S3: s3://${this.bucketName}/${key}`);
-      return key;
+    try {
+      return await breaker.execute(async () => {
+        const command = new PutObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: this.getContentType(key),
+          Metadata: metadata,
+        });
+
+        await this.s3Client.send(command);
+        this.logger.log(`File uploaded to S3: s3://${this.bucketName}/${key}`);
+        return key;
+      });
     } catch (error) {
       this.logger.error(`Failed to upload file ${key} to S3:`, error);
       throw error;
@@ -72,28 +80,32 @@ export class S3StorageService {
   }
 
   async downloadFile(key: string): Promise<Buffer> {
+    const breaker = this.circuitBreakerService.getS3Breaker();
+
     try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
+      return await breaker.execute(async () => {
+        const command = new GetObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        });
+
+        const response = await this.s3Client.send(command);
+
+        if (!response.Body) {
+          throw new Error(`No body returned for file ${key}`);
+        }
+
+        const chunks: Buffer[] = [];
+        const stream = response.Body as any;
+
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+
+        const buffer = Buffer.concat(chunks);
+        this.logger.debug(`File downloaded from S3: ${key} (${buffer.length} bytes)`);
+        return buffer;
       });
-
-      const response = await this.s3Client.send(command);
-
-      if (!response.Body) {
-        throw new Error(`No body returned for file ${key}`);
-      }
-
-      const chunks: Buffer[] = [];
-      const stream = response.Body as any;
-
-      for await (const chunk of stream) {
-        chunks.push(chunk);
-      }
-
-      const buffer = Buffer.concat(chunks);
-      this.logger.debug(`File downloaded from S3: ${key} (${buffer.length} bytes)`);
-      return buffer;
     } catch (error) {
       this.logger.error(`Failed to download file ${key} from S3:`, error);
       throw error;
@@ -141,14 +153,18 @@ export class S3StorageService {
   }
 
   async deleteFile(key: string): Promise<void> {
-    try {
-      const command = new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
+    const breaker = this.circuitBreakerService.getS3Breaker();
 
-      await this.s3Client.send(command);
-      this.logger.log(`File deleted from S3: ${key}`);
+    try {
+      await breaker.execute(async () => {
+        const command = new DeleteObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        });
+
+        await this.s3Client.send(command);
+        this.logger.log(`File deleted from S3: ${key}`);
+      });
     } catch (error) {
       this.logger.error(`Failed to delete file ${key} from S3:`, error);
       throw error;

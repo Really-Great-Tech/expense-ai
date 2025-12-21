@@ -4,6 +4,7 @@ import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
 import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
+import { CircuitBreakerHealthIndicator } from './circuit-breaker-health.indicator';
 
 /**
  * Health Check Controller
@@ -22,6 +23,7 @@ export class HealthController {
     private dbEnhanced: DatabaseHealthIndicator,
     private redisEnhanced: RedisHealthEnhancedIndicator,
     private awsServices: AwsServicesHealthIndicator,
+    private circuitBreaker: CircuitBreakerHealthIndicator,
   ) {}
 
   /**
@@ -270,5 +272,44 @@ export class HealthController {
   })
   checkAwsServices() {
     return this.health.check([() => this.awsServices.checkAllServices('aws-services')]);
+  }
+
+  /**
+   * Circuit breaker status endpoint
+   * Returns status of all circuit breakers for monitoring dashboards
+   */
+  @Get('health/circuit-breakers')
+  @ApiOperation({
+    summary: 'Get circuit breaker status',
+    description: 'Returns status of all circuit breakers. Does not fail on open circuits - use for monitoring.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Circuit breaker status',
+    schema: {
+      example: {
+        status: 'ok',
+        info: {
+          'circuit-breakers': {
+            status: 'up',
+            summary: {
+              total: 4,
+              closed: 3,
+              halfOpen: 0,
+              open: 1,
+            },
+            circuits: [
+              { name: 'bedrock', state: 'open' },
+              { name: 'textract', state: 'closed' },
+              { name: 's3', state: 'closed' },
+              { name: 'database', state: 'closed' },
+            ],
+          },
+        },
+      },
+    },
+  })
+  getCircuitBreakerStatus() {
+    return this.health.check([() => this.circuitBreaker.getSummary('circuit-breakers')]);
   }
 }

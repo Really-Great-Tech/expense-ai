@@ -2,7 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Block, Relationship, FeatureType } from '@aws-sdk/client-textract';
+import { BrokenCircuitError } from 'cockatiel';
 import { DocumentReader, TextractConfig, ApiResponse } from '../../utils/types';
+import { getGlobalCircuitBreakerService } from '../../resilience';
 
 export interface TextractApiServiceOptions {
   region?: string;
@@ -422,53 +424,66 @@ export class TextractApiService implements DocumentReader {
 
   /**
    * Process single-page documents using synchronous APIs
+   * Wrapped with circuit breaker to prevent cascading failures
    */
   private async processSinglePageDocument(fileBuffer: Buffer, config: TextractConfig): Promise<ApiResponse<string>> {
+    const circuitBreaker = getGlobalCircuitBreakerService().getTextractBreaker();
+
     try {
-      // Determine which Textract API to use based on config
-      const featureTypes = config.featureTypes || [];
-      let blocks: Block[] = [];
+      return await circuitBreaker.execute(async () => {
+        // Determine which Textract API to use based on config
+        const featureTypes = config.featureTypes || [];
+        let blocks: Block[] = [];
 
-      this.logger.log(`   Using Textract API: ${featureTypes.length > 0 ? 'AnalyzeDocument' : 'DetectDocumentText'}`);
-      this.logger.log(`   Feature types: ${featureTypes.join(', ') || 'none'}`);
+        this.logger.log(`   Using Textract API: ${featureTypes.length > 0 ? 'AnalyzeDocument' : 'DetectDocumentText'}`);
+        this.logger.log(`   Feature types: ${featureTypes.join(', ') || 'none'}`);
 
-      if (featureTypes.length > 0) {
-        // Use AnalyzeDocument for advanced features (tables, forms, etc.)
-        const analyzeCommand = new AnalyzeDocumentCommand({
-          Document: {
-            Bytes: fileBuffer,
-          },
-          FeatureTypes: featureTypes as FeatureType[],
-        });
+        if (featureTypes.length > 0) {
+          // Use AnalyzeDocument for advanced features (tables, forms, etc.)
+          const analyzeCommand = new AnalyzeDocumentCommand({
+            Document: {
+              Bytes: fileBuffer,
+            },
+            FeatureTypes: featureTypes as FeatureType[],
+          });
 
-        this.logger.log(`   Sending AnalyzeDocument request to Textract...`);
-        const analyzeResponse = await this.textractClient.send(analyzeCommand);
-        blocks = analyzeResponse.Blocks || [];
-        this.logger.log(`    AnalyzeDocument successful, received ${blocks.length} blocks`);
-      } else {
-        // Use DetectDocumentText for simple text extraction
-        const detectCommand = new DetectDocumentTextCommand({
-          Document: {
-            Bytes: fileBuffer,
-          },
-        });
+          this.logger.log('   Sending AnalyzeDocument request to Textract...');
+          const analyzeResponse = await this.textractClient.send(analyzeCommand);
+          blocks = analyzeResponse.Blocks || [];
+          this.logger.log(`    AnalyzeDocument successful, received ${blocks.length} blocks`);
+        } else {
+          // Use DetectDocumentText for simple text extraction
+          const detectCommand = new DetectDocumentTextCommand({
+            Document: {
+              Bytes: fileBuffer,
+            },
+          });
 
-        this.logger.log(`   Sending DetectDocumentText request to Textract...`);
-        const detectResponse = await this.textractClient.send(detectCommand);
-        blocks = detectResponse.Blocks || [];
-        this.logger.log(`    DetectDocumentText successful, received ${blocks.length} blocks`);
+          this.logger.log('   Sending DetectDocumentText request to Textract...');
+          const detectResponse = await this.textractClient.send(detectCommand);
+          blocks = detectResponse.Blocks || [];
+          this.logger.log(`    DetectDocumentText successful, received ${blocks.length} blocks`);
+        }
+
+        // Convert blocks to markdown
+        const markdownContent = this.convertBlocksToMarkdown(blocks);
+
+        this.logger.log(`Single-page document parsed successfully. Content length: ${markdownContent.length} characters`);
+
+        return {
+          success: true,
+          data: markdownContent,
+        };
+      });
+    } catch (error) {
+      if (error instanceof BrokenCircuitError) {
+        this.logger.error('Textract service temporarily unavailable (circuit breaker open)');
+        return {
+          success: false,
+          error: 'Textract service temporarily unavailable (circuit breaker open)',
+        };
       }
 
-      // Convert blocks to markdown
-      const markdownContent = this.convertBlocksToMarkdown(blocks);
-
-      this.logger.log(`Single-page document parsed successfully. Content length: ${markdownContent.length} characters`);
-
-      return {
-        success: true,
-        data: markdownContent,
-      };
-    } catch (error) {
       this.logger.error(
         ` Error in single-page processing: ${error instanceof Error ? error.message : error}`,
         error instanceof Error ? error.stack : undefined,

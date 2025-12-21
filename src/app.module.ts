@@ -16,6 +16,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityMiddleware } from './middleware/security.middleware';
 import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
+import { ResilienceModule } from './resilience';
 import { DatabaseConfigValidator } from './config/database-validation';
 import { DataSource } from 'typeorm';
 
@@ -60,6 +61,7 @@ import { DataSource } from 'typeorm';
     CountryPolicyModule,
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
+    ResilienceModule, // Circuit breaker for AWS services
   ],
   controllers: [AppController],
   providers: [AppService, RedisConfigService],
