@@ -34,7 +34,7 @@ describe('IssueDetectionAgent', () => {
       }),
     );
 
-    agent = new IssueDetectionAgent('bedrock');
+    agent = new IssueDetectionAgent();
     agent['llm'] = mockLlmService;
   });
 
@@ -245,7 +245,7 @@ describe('IssueDetectionAgent', () => {
         throw new Error('File not found');
       });
 
-      const newAgent = new IssueDetectionAgent('bedrock');
+      const newAgent = new IssueDetectionAgent();
       expect(newAgent['expenseSchema']).toBeNull();
     });
   });

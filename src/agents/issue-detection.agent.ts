@@ -4,7 +4,7 @@ import * as path from 'path';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
-import { MODEL_CONFIG } from './config/models.config';
+import { AGENT_PROFILES } from './config/models.config';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -13,35 +13,22 @@ import { MODEL_CONFIG } from './config/models.config';
 export class IssueDetectionAgent extends BaseAgent {
   protected llm: ILLMService;
   private expenseSchema: any;
-  private currentProvider: 'bedrock' | 'anthropic';
-  private readonly defaultModelId: string;
 
-  constructor(provider: 'bedrock' | 'anthropic' = 'bedrock', defaultModelId: string = MODEL_CONFIG.COMPLIANCE) {
+  constructor() {
     super();
-    this.currentProvider = provider;
-    this.defaultModelId = defaultModelId;
-    this.logger.log(`Initializing IssueDetectionAgent with provider: ${provider}`);
-    this.llm = new BedrockLlmService({ modelType: 'nova' });
+    this.logger.log('Initializing IssueDetectionAgent');
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.COMPLIANCE });
 
     // Load expense schema
     this.loadExpenseSchema();
   }
 
   /**
-   * Get the actual model name used, accounting for fallback scenarios
+   * Get the actual model name used
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    if (this.currentProvider === 'bedrock' && this.llm.getCurrentModelName) {
-      // For BedrockLlmService, get the actual model name (handles fallback)
-      return this.llm.getCurrentModelName();
-    } else if (this.currentProvider === 'bedrock') {
-      // Fallback for older BedrockLlmService without getCurrentModelName
-      return this.defaultModelId;
-    } else {
-      // Direct Anthropic usage
-      return 'claude-3-5-sonnet-20241022';
-    }
+    return this.llm.getCurrentModelName();
   }
 
   /**

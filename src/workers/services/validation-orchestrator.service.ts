@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ExpenseComplianceUQLMValidator';
 import { ParallelExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ParallelExpenseComplianceUQLMValidator';
 import { ProcessingTiming } from './processing-metrics.service';
@@ -9,25 +8,25 @@ export class ValidationOrchestratorService {
   private readonly logger = new Logger(ValidationOrchestratorService.name);
   private complianceValidator: ExpenseComplianceUQLMValidator | ParallelExpenseComplianceUQLMValidator;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor() {
     this.initializeValidator();
   }
 
   private initializeValidator(): void {
     try {
-      const useParallelValidation = this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') !== 'false';
+      const useParallelValidation = (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') !== 'false';
 
       if (useParallelValidation) {
         this.logger.log(' Initializing PARALLEL LLM-as-judge compliance validator...');
-        this.complianceValidator = new ParallelExpenseComplianceUQLMValidator(this.logger, this.configService);
+        this.complianceValidator = new ParallelExpenseComplianceUQLMValidator(this.logger);
         this.logger.log(' PARALLEL LLM-as-judge compliance validator initialized successfully');
         this.logger.log(' Parallel Configuration:');
-        this.logger.log(`   - Dimension Concurrency: ${this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6')}`);
-        this.logger.log(`   - Judge Concurrency: ${this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3')}`);
-        this.logger.log(`   - Rate Limit: ${this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10')} req/sec`);
+        this.logger.log(`   - Dimension Concurrency: ${process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6'}`);
+        this.logger.log(`   - Judge Concurrency: ${process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3'}`);
+        this.logger.log(`   - Rate Limit: ${process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10'} req/sec`);
       } else {
         this.logger.log(' Initializing SEQUENTIAL LLM-as-judge compliance validator...');
-        this.complianceValidator = new ExpenseComplianceUQLMValidator(this.logger, this.configService);
+        this.complianceValidator = new ExpenseComplianceUQLMValidator(this.logger);
         this.logger.log(' Sequential LLM-as-judge compliance validator initialized successfully');
       }
     } catch (error) {
@@ -56,7 +55,7 @@ export class ValidationOrchestratorService {
       const validationStart = Date.now();
 
       const isParallelValidator = this.complianceValidator instanceof ParallelExpenseComplianceUQLMValidator;
-      const parallelEnabled = this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') !== 'false';
+      const parallelEnabled = (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') !== 'false';
 
       this.logger.log(' Phase 5: LLM-as-Judge Validation');
       this.logger.log(
@@ -68,9 +67,9 @@ export class ValidationOrchestratorService {
       if (isParallelValidator && parallelEnabled) {
         this.logger.log(' STARTING PARALLEL LLM VALIDATION');
         this.logger.log(' Configuration:');
-        this.logger.log(`   - Dimension Concurrency: ${this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6')}`);
-        this.logger.log(`   - Judge Concurrency: ${this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3')}`);
-        this.logger.log(`   - Rate Limit: ${this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10')} req/sec`);
+        this.logger.log(`   - Dimension Concurrency: ${process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6'}`);
+        this.logger.log(`   - Judge Concurrency: ${process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3'}`);
+        this.logger.log(`   - Rate Limit: ${process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10'} req/sec`);
         executionMode = 'parallel';
       } else {
         this.logger.log(' Using sequential validation');

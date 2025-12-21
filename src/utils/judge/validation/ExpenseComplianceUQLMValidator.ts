@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
+import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -22,39 +23,20 @@ export class ExpenseComplianceUQLMValidator {
   private bedrockServices: BedrockLlmService[];
   private logger: Logger;
   private validationVersion: string = '1.0.0';
-  private readonly configService: ConfigService;
 
-  constructor(logger?: Logger, configService?: ConfigService) {
+  constructor(logger?: Logger, _configService?: ConfigService) {
     this.logger = logger || new Logger(ExpenseComplianceUQLMValidator.name);
-    this.configService = configService ?? new ConfigService();
-    
+
     // Initialize multiple Bedrock services for judge panel with different temperatures
-    const judgeConfigs = [
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_1', 'eu.anthropic.claude-3-7-sonnet-20250219-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_1_TEMPERATURE', '0.3'))
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_2', 'eu.anthropic.claude-3-haiku-20240307-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_2_TEMPERATURE', '0.7'))
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_3', 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_3_TEMPERATURE', '0.5'))
-      }
+    this.bedrockServices = [
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
     ];
 
-    this.bedrockServices = judgeConfigs.map((config) =>
-      new BedrockLlmService({
-        modelId: config.modelId,
-        temperature: config.temperature,
-        modelType: 'claude',
-      }),
-    );
-    
-    this.logger.log('ExpenseComplianceUQLMValidator initialized with 3 judge models and custom temperatures');
-    judgeConfigs.forEach((config, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${config.modelId} (temp: ${config.temperature})`);
+    this.logger.log('ExpenseComplianceUQLMValidator initialized with 3 judge models');
+    this.bedrockServices.forEach((service, index) => {
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${[0.3, 0.7, 0.5][index]})`);
     });
   }
 

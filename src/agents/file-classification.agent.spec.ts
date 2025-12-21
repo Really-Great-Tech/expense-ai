@@ -15,7 +15,7 @@ describe('FileClassificationAgent', () => {
       getCurrentModelName: jest.fn().mockReturnValue('claude-3-5-sonnet'),
     } as any;
 
-    agent = new FileClassificationAgent('bedrock', 'claude-3-5-sonnet');
+    agent = new FileClassificationAgent();
     agent['llm'] = mockLlmService;
   });
 
@@ -194,14 +194,10 @@ describe('FileClassificationAgent', () => {
       expect(newAgent['currentProvider']).toBe('bedrock');
     });
 
-    it('should accept custom provider', () => {
-      const newAgent = new FileClassificationAgent('anthropic');
-      expect(newAgent['currentProvider']).toBe('anthropic');
-    });
-
-    it('should use MODEL_CONFIG default when no modelName provided', () => {
-      const newAgent = new FileClassificationAgent('bedrock');
-      expect(newAgent['modelName']).toBeDefined();
+    it('should use profile-based configuration', () => {
+      const newAgent = new FileClassificationAgent();
+      // Profile configuration is handled internally via AGENT_PROFILES
+      expect(newAgent['llm']).toBeDefined();
     });
   });
 

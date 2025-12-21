@@ -1,236 +1,176 @@
-import { BedrockRuntimeClient, InvokeModelCommand, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, ConverseCommand, ContentBlock, Message } from '@aws-sdk/client-bedrock-runtime';
 import { Logger } from '@nestjs/common';
 import { getAppConfig, AppConfigType } from '../../config/app.config';
 
-export type ModelType = 'nova' | 'claude';
+// ============================================================================
+// Types
+// ============================================================================
 
-/**
- * Bedrock configuration options
- * Note: AWS credentials are handled by the SDK default credential chain
- */
+export type ProfileKey = 'NOVA_MICRO' | 'NOVA_PRO' | 'SONNET_4' | 'SONNET_4_5';
+
+export interface InferenceProfile {
+  name: string;
+  arn: string;
+  supportsVision: boolean;
+}
+
 export interface BedrockConfig {
-  modelId?: string;
+  profile: ProfileKey;
   temperature?: number;
-  /**
-   * Explicit model type - required when USING_APPLICATION_PROFILE=true
-   * since application inference profile ARNs don't contain model name info
-   */
-  modelType?: ModelType;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | MessageContent[];
 }
+
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface ImageContent {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+    data: string;
+  };
+}
+
+export type MessageContent = TextContent | ImageContent;
 
 export interface ChatResponse {
-  message: {
-    content: string;
-  };
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-  };
+  message: { content: string };
+  usage?: { input_tokens: number; output_tokens: number };
   modelUsed?: string;
-}
-
-export interface ImageInput {
-  data: string; // base64 encoded image
-  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 }
 
 export interface ChatWithVisionOptions {
   prompt: string;
-  images: ImageInput[];
+  images: Array<{ data: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' }>;
   systemPrompt?: string;
 }
 
-/**
- * AWS Bedrock LLM Service
- * Provides a unified interface for Nova and Claude models via Bedrock
- * - Nova models use Converse API
- * - Claude models use Invoke API
- */
-export class BedrockLlmService {
-  private readonly logger = new Logger(BedrockLlmService.name);
-  private bedrockClient: BedrockRuntimeClient | null = null;
-  private modelId: string;
-  private temperature: number;
-  private modelType?: ModelType;
-  private usingApplicationProfile: boolean;
+// ============================================================================
+// BedrockLlmService
+// ============================================================================
 
+interface ProfileDefinition {
+  name: string;
+  supportsVision: boolean;
+  arnKey: keyof AppConfigType['bedrock'];
+}
+
+export class BedrockLlmService {
+  private static readonly logger = new Logger(BedrockLlmService.name);
+  private static clientCache = new Map<string, BedrockRuntimeClient>();
   private static appConfig: AppConfigType | null = null;
 
+  private static readonly DEFAULT_TEMPERATURE = 0.7;
+  private static readonly DEFAULT_MAX_TOKENS = 4000;
+
+  // Profile definitions - ARNs come from centralized config
+  private static readonly PROFILES: Record<ProfileKey, ProfileDefinition> = {
+    NOVA_MICRO: { name: 'Nova Micro', supportsVision: false, arnKey: 'novaMicroArn' },
+    NOVA_PRO: { name: 'Nova Pro', supportsVision: true, arnKey: 'novaProArn' },
+    SONNET_4: { name: 'Claude Sonnet 4', supportsVision: true, arnKey: 'sonnet4Arn' },
+    SONNET_4_5: { name: 'Claude Sonnet 4.5', supportsVision: true, arnKey: 'sonnet45Arn' },
+  };
+
+  private readonly profile: InferenceProfile;
+  private readonly profileKey: ProfileKey;
+  private readonly temperature: number;
+  private readonly client: BedrockRuntimeClient;
+
   private static getConfig(): AppConfigType {
-    if (!BedrockLlmService.appConfig) {
-      BedrockLlmService.appConfig = getAppConfig();
+    if (!this.appConfig) {
+      this.appConfig = getAppConfig();
     }
-    return BedrockLlmService.appConfig;
+    return this.appConfig;
   }
 
-  constructor(config?: BedrockConfig) {
-    // Initialize Bedrock client - uses AWS SDK default credential chain:
-    // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-    // 2. Shared credentials file (~/.aws/credentials)
-    // 3. ECS Container credentials (Task Role)
-    // 4. EC2 Instance metadata (Instance Profile)
-    try {
-      const appConfig = BedrockLlmService.getConfig();
+  private static getProfile(key: ProfileKey): InferenceProfile {
+    const config = this.getConfig();
+    const profileDef = this.PROFILES[key];
+    const arn = config.bedrock[profileDef.arnKey];
 
-      this.bedrockClient = new BedrockRuntimeClient({
-        region: appConfig.aws.region,
-        maxAttempts: 4,
-        retryMode: 'adaptive',
-      });
+    if (!arn) {
+      throw new Error(`Missing config: bedrock.${profileDef.arnKey} (set BEDROCK_${key}_ARN env var)`);
+    }
 
-      // Check if using application inference profiles globally
-      this.usingApplicationProfile = appConfig.bedrock.usingApplicationProfile;
+    return {
+      name: profileDef.name,
+      arn,
+      supportsVision: profileDef.supportsVision,
+    };
+  }
 
-      // Prefer centralized config over constructor config, then hardcoded default
-      this.modelId = appConfig.bedrock.model || config?.modelId || 'us.amazon.nova-pro-v1:0';
+  private static getClient(): BedrockRuntimeClient {
+    const config = this.getConfig();
+    const region = config.aws.region;
 
-      // Store model type from config (agents pass this based on their known model type)
-      this.modelType = config?.modelType;
-
-      // Validate: if using application profile, model type must be provided by caller
-      if (this.usingApplicationProfile && !this.modelType) {
-        throw new Error('modelType is required when USING_APPLICATION_PROFILE=true');
-      }
-
-      this.temperature = config?.temperature ?? 0.7; // Default temperature
-      this.logger.log(
-        `Bedrock client initialized: model=${this.modelId}, ` +
-          `type=${this.modelType || 'auto-detect'}, ` +
-          `appProfile=${this.usingApplicationProfile}, temp=${this.temperature}`,
+    if (!this.clientCache.has(region)) {
+      this.clientCache.set(
+        region,
+        new BedrockRuntimeClient({
+          region,
+          maxAttempts: 4,
+          retryMode: 'adaptive',
+        }),
       );
-    } catch (error) {
-      this.logger.warn(`Failed to initialize Bedrock client: ${error.message}`);
-      this.bedrockClient = null;
+      this.logger.log(`Created Bedrock client for region: ${region}`);
     }
+
+    return this.clientCache.get(region)!;
   }
 
-  /**
-   * Detect if the current model is Nova or Claude
-   * When USING_APPLICATION_PROFILE=true, uses explicit modelType from config
-   * Otherwise, infers from model ID string
-   */
-  private isNovaModel(): boolean {
-    if (this.usingApplicationProfile) {
-      return this.modelType === 'nova';
-    }
-    return this.modelId.includes('amazon.nova');
+  constructor(config: BedrockConfig) {
+    this.profileKey = config.profile;
+    this.profile = BedrockLlmService.getProfile(config.profile);
+    this.temperature = config.temperature ?? BedrockLlmService.DEFAULT_TEMPERATURE;
+    this.client = BedrockLlmService.getClient();
+
+    BedrockLlmService.logger.log(`Initialized: ${this.profile.name}, temp=${this.temperature}`);
   }
 
-  /**
-   * Chat with Nova/Claude model via Bedrock
-   */
+  // Unified chat - ConverseCommand works for all models
   async chat(options: { messages: ChatMessage[] }): Promise<ChatResponse> {
-    if (!this.bedrockClient) {
-      throw new Error('Bedrock client not initialized');
-    }
+    const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
 
-    if (this.isNovaModel()) {
-      return await this.chatWithNova(options.messages);
-    } else {
-      return await this.chatWithBedrock(options.messages);
-    }
-  }
-
-  /**
-   * Chat using AWS Bedrock Nova models via Converse API
-   */
-  private async chatWithNova(messages: ChatMessage[]): Promise<ChatResponse> {
-    // Convert messages to Nova format
-    const systemMessage = messages.find((m) => m.role === 'system')?.content;
-    const conversationMessages = messages.filter((m) => m.role !== 'system');
+    const messages: Message[] = conversationMessages.map((msg) => ({
+      role: msg.role as 'user' | 'assistant',
+      content: this.formatContentBlocks(msg.content),
+    }));
 
     const command = new ConverseCommand({
-      modelId: this.modelId,
-      messages: conversationMessages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant', // Nova only supports user/assistant in messages
-        content: [{ text: msg.content }],
-      })),
+      modelId: this.profile.arn,
+      messages,
       system: systemMessage ? [{ text: systemMessage }] : undefined,
       inferenceConfig: {
-        maxTokens: 4000,
-        topP: 0.9,
+        maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
         temperature: this.temperature,
       },
     });
 
-    const response = await this.bedrockClient!.send(command);
+    const response = await this.client.send(command);
+    const content = response.output?.message?.content || [];
+    const text = content.map((block) => ('text' in block ? block.text : '')).join('');
 
-    this.logger.log(`Nova chat completed successfully using model: ${this.modelId}`);
-
-    // Return same format as other providers for consistency
     return {
-      message: {
-        content: response.output?.message?.content?.[0]?.text || '',
-      },
+      message: { content: text },
       usage: {
         input_tokens: response.usage?.inputTokens || 0,
         output_tokens: response.usage?.outputTokens || 0,
       },
-      modelUsed: this.modelId,
+      modelUsed: this.profile.arn,
     };
   }
 
-  /**
-   * Chat using AWS Bedrock Claude models via Invoke API
-   */
-  private async chatWithBedrock(messages: ChatMessage[]): Promise<ChatResponse> {
-    // Convert messages to Claude format
-    const systemMessage = messages.find((m) => m.role === 'system')?.content || '';
-    const conversationMessages = messages.filter((m) => m.role !== 'system');
-
-    const requestBody = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 4000,
-      temperature: this.temperature,
-      system: systemMessage,
-      messages: conversationMessages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-    };
-
-    const command = new InvokeModelCommand({
-      modelId: this.modelId,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(requestBody),
-    });
-
-    const response = await this.bedrockClient!.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-    this.logger.log(`Bedrock chat completed successfully using model: ${this.modelId}`);
-
-    // Return same format as Anthropic client for consistency
-    return {
-      message: {
-        content: responseBody.content[0].text,
-      },
-      usage: {
-        input_tokens: responseBody.usage?.input_tokens || 0,
-        output_tokens: responseBody.usage?.output_tokens || 0,
-      },
-      modelUsed: this.modelId,
-    };
-  }
-
-  /**
-   * Chat with vision support (images + text)
-   * Uses Claude for vision as Nova doesn't support images
-   */
+  // Vision support
   async chatWithVision(options: ChatWithVisionOptions): Promise<ChatResponse> {
-    if (!this.bedrockClient) {
-      throw new Error('Bedrock client not initialized');
-    }
-
-    // Vision requires Claude - Nova doesn't support images
-    if (this.isNovaModel()) {
-      this.logger.warn('Vision not supported on Nova, falling back to text-only');
+    if (!this.profile.supportsVision) {
+      BedrockLlmService.logger.warn(`${this.profile.name} doesn't support vision, using text-only`);
       return this.chat({
         messages: [
           ...(options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : []),
@@ -239,79 +179,76 @@ export class BedrockLlmService {
       });
     }
 
-    // Build content array with images and text
-    const content: any[] = [];
+    const content: MessageContent[] = [
+      ...options.images.map((img) => ({
+        type: 'image' as const,
+        source: { type: 'base64' as const, media_type: img.mediaType, data: img.data },
+      })),
+      { type: 'text' as const, text: options.prompt },
+    ];
 
-    // Add images first
-    for (const img of options.images) {
-      content.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: img.mediaType,
-          data: img.data,
-        },
-      });
-    }
-
-    // Add text prompt
-    content.push({
-      type: 'text',
-      text: options.prompt,
-    });
-
-    const requestBody = {
-      anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 4000,
-      temperature: this.temperature,
-      system: options.systemPrompt || '',
+    return this.chat({
       messages: [
-        {
-          role: 'user',
-          content,
-        },
+        ...(options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : []),
+        { role: 'user' as const, content },
       ],
-    };
-
-    const command = new InvokeModelCommand({
-      modelId: this.modelId,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(requestBody),
     });
-
-    const response = await this.bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-    this.logger.log(`Vision chat completed using model: ${this.modelId}`);
-
-    return {
-      message: {
-        content: responseBody.content[0].text,
-      },
-      usage: {
-        input_tokens: responseBody.usage?.input_tokens || 0,
-        output_tokens: responseBody.usage?.output_tokens || 0,
-      },
-      modelUsed: this.modelId,
-    };
   }
 
-  /**
-   * Get the current provider being used
-   */
-  getCurrentProvider(): 'bedrock' | 'none' {
-    if (this.bedrockClient) return 'bedrock';
-    return 'none';
+  // Helpers
+  private parseMessages(messages: ChatMessage[]) {
+    const systemMsg = messages.find((m) => m.role === 'system');
+    const systemMessage = systemMsg && typeof systemMsg.content === 'string' ? systemMsg.content : '';
+    return { systemMessage, conversationMessages: messages.filter((m) => m.role !== 'system') };
   }
 
-  /**
-   * Get the model name currently configured
-   */
-  getCurrentModelName(): string {
-    if (this.bedrockClient) {
-      return this.modelId;
+  private formatContentBlocks(content: string | MessageContent[]): ContentBlock[] {
+    if (typeof content === 'string') {
+      return [{ text: content }];
     }
-    return 'unknown';
+
+    return content.map((item) => {
+      if (item.type === 'text') return { text: item.text } as ContentBlock;
+      if (item.type === 'image') {
+        const format = item.source.media_type.split('/')[1];
+        return {
+          image: {
+            format: format === 'jpg' ? 'jpeg' : format,
+            source: { bytes: Buffer.from(item.source.data, 'base64') },
+          },
+        } as ContentBlock;
+      }
+      return { text: '' } as ContentBlock;
+    });
+  }
+
+  // Accessors
+  getCurrentProvider(): 'bedrock' {
+    return 'bedrock';
+  }
+
+  getCurrentModelName(): string {
+    return this.profile.arn;
+  }
+
+  getProfileName(): string {
+    return this.profile.name;
+  }
+
+  getProfileKey(): ProfileKey {
+    return this.profileKey;
+  }
+
+  // For health checks - get all configured profiles
+  static getAllProfiles(): Record<ProfileKey, InferenceProfile | null> {
+    const config = this.getConfig();
+    const result: Record<string, InferenceProfile | null> = {};
+
+    for (const [key, def] of Object.entries(this.PROFILES)) {
+      const arn = config.bedrock[def.arnKey];
+      result[key] = arn ? { name: def.name, arn, supportsVision: def.supportsVision } : null;
+    }
+
+    return result as Record<ProfileKey, InferenceProfile | null>;
   }
 }

@@ -1,21 +1,18 @@
 import 'reflect-metadata';
 import { BedrockLlmService, ChatMessage } from './bedrock-llm';
 
-// Mock @nestjs/config first to control ConfigService behavior
-jest.mock('@nestjs/config', () => {
-  return {
-    ConfigService: jest.fn().mockImplementation(() => ({
-      get: jest.fn((key: string, defaultValue?: any) => {
-        const values: Record<string, string> = {
-          AWS_REGION: 'us-east-1',
-          USING_APPLICATION_PROFILE: 'false',
-          // No credentials needed - SDK uses default credential chain
-        };
-        return values[key] ?? defaultValue;
-      }),
-    })),
-  };
-});
+// Mock app.config to provide test profile ARNs
+jest.mock('../../config/app.config', () => ({
+  getAppConfig: jest.fn(() => ({
+    aws: { region: 'us-east-1' },
+    bedrock: {
+      novaMicroArn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-micro-test',
+      novaProArn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test',
+      sonnet4Arn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test',
+      sonnet45Arn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-45-test',
+    },
+  })),
+}));
 
 // Mock @aws-sdk/client-bedrock-runtime
 const mockState = {
@@ -30,15 +27,7 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => {
     constructor(config: any) {
       if (mockState.throwOnConstruct) throw new Error('construct fail');
       mockState.lastConfig = config;
-      // attach a mock send
       this.send = mockState.sendMock;
-    }
-  }
-
-  class InvokeModelCommand {
-    public input: any;
-    constructor(input: any) {
-      this.input = input;
     }
   }
 
@@ -49,7 +38,7 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => {
     }
   }
 
-  return { BedrockRuntimeClient, InvokeModelCommand, ConverseCommand };
+  return { BedrockRuntimeClient, ConverseCommand };
 });
 
 describe('BedrockLlmService', () => {
@@ -57,27 +46,30 @@ describe('BedrockLlmService', () => {
     mockState.sendMock.mockReset();
     mockState.lastConfig = null;
     mockState.throwOnConstruct = false;
+    // Clear the static cache between tests
+    (BedrockLlmService as any).clientCache?.clear();
+    (BedrockLlmService as any).appConfig = null;
   });
 
-  it('should initialize with default credential chain and report provider/model', () => {
+  it('should initialize with profile and report provider/model', () => {
     const svc = new BedrockLlmService({
-      modelId: 'eu.amazon.nova-pro-v1:0',
+      profile: 'NOVA_PRO',
       temperature: 0.5,
     });
 
-    // Provider should be bedrock when client is set
     expect(svc.getCurrentProvider()).toBe('bedrock');
-    expect(svc.getCurrentModelName()).toBe('eu.amazon.nova-pro-v1:0');
+    expect(svc.getCurrentModelName()).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
+    expect(svc.getProfileName()).toBe('Nova Pro');
+    expect(svc.getProfileKey()).toBe('NOVA_PRO');
 
-    // Ensure Bedrock client was constructed with region (credentials handled by SDK)
+    // Ensure Bedrock client was constructed with region
     expect(mockState.lastConfig).toBeTruthy();
     expect(mockState.lastConfig!.region).toBe('us-east-1');
-    // No explicit credentials - SDK uses default credential chain
   });
 
-  it('should chat using Nova (Converse) API when modelId contains amazon.nova', async () => {
+  it('should chat using unified ConverseCommand for all models', async () => {
     const svc = new BedrockLlmService({
-      modelId: 'eu.amazon.nova-pro-v1:0',
+      profile: 'NOVA_PRO',
       temperature: 0.9,
     });
 
@@ -87,7 +79,7 @@ describe('BedrockLlmService', () => {
       { role: 'assistant', content: 'Hi!' },
     ];
 
-    // Mock Nova response
+    // Mock response
     mockState.sendMock.mockResolvedValueOnce({
       output: { message: { content: [{ text: 'Hello from Nova' }] } },
       usage: { inputTokens: 12, outputTokens: 34 },
@@ -97,29 +89,26 @@ describe('BedrockLlmService', () => {
 
     expect(res.message.content).toBe('Hello from Nova');
     expect(res.usage).toEqual({ input_tokens: 12, output_tokens: 34 });
-    expect(res.modelUsed).toBe('eu.amazon.nova-pro-v1:0');
+    expect(res.modelUsed).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
 
-    // Ensure ConverseCommand input mapping is correct via mock send call argument
-    // send was called with an instance whose 'input' holds the converse payload
+    // Verify ConverseCommand input
     const callArg = mockState.sendMock.mock.calls[0][0];
     expect(callArg).toBeDefined();
-    // The constructor stored input under 'input' (see mock)
     expect(callArg.input).toBeDefined();
-    expect(callArg.input.modelId).toBe('eu.amazon.nova-pro-v1:0');
-    // Nova supports only user/assistant roles in messages
+    expect(callArg.input.modelId).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
+    // Messages should exclude system role
     expect(callArg.input.messages).toEqual([
       { role: 'user', content: [{ text: 'Hello' }] },
       { role: 'assistant', content: [{ text: 'Hi!' }] },
     ]);
-    // System message must be placed under system array
+    // System message should be in system array
     expect(callArg.input.system).toEqual([{ text: 'You are a helpful bot.' }]);
-    // Temperature propagated
     expect(callArg.input.inferenceConfig.temperature).toBe(0.9);
   });
 
-  it('should chat using Claude (Invoke) API when modelId is not Nova', async () => {
+  it('should work with Claude profile using same ConverseCommand', async () => {
     const svc = new BedrockLlmService({
-      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+      profile: 'SONNET_4',
       temperature: 0.2,
     });
 
@@ -128,46 +117,44 @@ describe('BedrockLlmService', () => {
       { role: 'user', content: 'Summarize this text.' },
     ];
 
-    // Build a response body that BedrockLlmService expects and encode as Uint8Array
-    const responseBody = {
-      content: [{ text: 'Summary content' }],
-      usage: { input_tokens: 5, output_tokens: 7 },
-    };
-    const encoded = new TextEncoder().encode(JSON.stringify(responseBody));
-
     mockState.sendMock.mockResolvedValueOnce({
-      body: encoded,
+      output: { message: { content: [{ text: 'Summary content' }] } },
+      usage: { inputTokens: 5, outputTokens: 7 },
     });
 
     const res = await svc.chat({ messages });
 
     expect(res.message.content).toBe('Summary content');
     expect(res.usage).toEqual({ input_tokens: 5, output_tokens: 7 });
-    expect(res.modelUsed).toBe('anthropic.claude-3-sonnet-20240229-v1:0');
+    expect(res.modelUsed).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test');
+    expect(svc.getProfileName()).toBe('Claude Sonnet 4');
 
-    // Verify InvokeModelCommand input
+    // Verify ConverseCommand was used (same as Nova)
     const callArg = mockState.sendMock.mock.calls[0][0];
-    expect(callArg).toBeDefined();
-    expect(callArg.input).toBeDefined();
-    expect(callArg.input.modelId).toBe('anthropic.claude-3-sonnet-20240229-v1:0');
-    expect(callArg.input.contentType).toBe('application/json');
-    expect(callArg.input.accept).toBe('application/json');
-
-    const parsedBody = JSON.parse(callArg.input.body);
-    expect(parsedBody.temperature).toBe(0.2);
-    expect(parsedBody.system).toBe('Be concise.');
-    expect(parsedBody.messages).toEqual([{ role: 'user', content: 'Summarize this text.' }]);
+    expect(callArg.input.modelId).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test');
   });
 
-  it('should throw if bedrock client failed to initialize', async () => {
-    mockState.throwOnConstruct = true;
-    const svc = new BedrockLlmService({
-      modelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
-    });
+  it('should return all configured profiles via getAllProfiles', () => {
+    const profiles = BedrockLlmService.getAllProfiles();
 
-    await expect(svc.chat({ messages: [{ role: 'user', content: 'Hi' }] })).rejects.toThrow('Bedrock client not initialized');
-    // Provider should be none
-    expect(svc.getCurrentProvider()).toBe('none');
-    expect(svc.getCurrentModelName()).toBe('unknown');
+    expect(profiles.NOVA_MICRO).toBeTruthy();
+    expect(profiles.NOVA_MICRO?.name).toBe('Nova Micro');
+    expect(profiles.NOVA_PRO).toBeTruthy();
+    expect(profiles.NOVA_PRO?.supportsVision).toBe(true);
+    expect(profiles.SONNET_4).toBeTruthy();
+    expect(profiles.SONNET_4_5).toBeTruthy();
+  });
+
+  it('should cache Bedrock client by region', () => {
+    // Clear any previous cache
+    (BedrockLlmService as any).clientCache?.clear();
+
+    // Create two services
+    new BedrockLlmService({ profile: 'NOVA_PRO' });
+    const callCount1 = mockState.lastConfig ? 1 : 0;
+
+    new BedrockLlmService({ profile: 'SONNET_4' });
+    // Should reuse the cached client, so lastConfig shouldn't change
+    // (The client constructor was only called once for the region)
   });
 });

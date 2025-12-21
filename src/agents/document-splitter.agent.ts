@@ -2,7 +2,7 @@ import { BaseAgent } from '@/agents/base.agent';
 import { BedrockLlmService } from '@/services/bedrock/bedrock-llm';
 import { PageMarkdown, PageAnalysisResult } from '@/expense-document/types/upload.types';
 import type { ILLMService } from './types/llm.types';
-import { MODEL_CONFIG } from './config/models.config';
+import { AGENT_PROFILES } from './config/models.config';
 
 /**
  * Agent responsible for analyzing multi-page PDF documents to identify separate receipts/invoices
@@ -11,10 +11,10 @@ import { MODEL_CONFIG } from './config/models.config';
 export class DocumentSplitterAgent extends BaseAgent {
   protected llm: ILLMService;
 
-  constructor(provider: 'bedrock' | 'anthropic' = 'bedrock') {
+  constructor() {
     super();
-    this.logger.log(`Initializing DocumentSplitterAgent with provider: ${provider}`);
-    this.llm = new BedrockLlmService({ modelId: MODEL_CONFIG.DOCUMENT_SPLITTER, modelType: 'nova' });
+    this.logger.log('Initializing DocumentSplitterAgent');
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.DOCUMENT_SPLITTER });
   }
 
   /**

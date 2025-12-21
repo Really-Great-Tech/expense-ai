@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { FileClassificationAgent } from '../../agents/file-classification.agent';
 import { DataExtractionAgent } from '../../agents/data-extraction.agent';
 import { IssueDetectionAgent } from '../../agents/issue-detection.agent';
@@ -19,23 +18,20 @@ export class AgentFactoryService {
   private readonly logger = new Logger(AgentFactoryService.name);
   private agents: AgentSet;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor() {
     this.initializeAgents();
   }
 
   private initializeAgents(): void {
-    const provider: 'bedrock' | 'anthropic' = 'bedrock';
-    this.logger.log(`Initializing agents with provider: ${provider}`);
+    this.logger.log('Initializing agents with profile-based Bedrock configuration');
 
-    const defaultBedrockModel = this.configService.get<string>('BEDROCK_MODEL', 'eu.amazon.nova-pro-v1:0');
-    const citationModel = this.configService.get<string>('CITATION_MODEL', 'amazon.nova-micro-v1:0');
-
+    // Agents now use centralized profile configuration from AGENT_PROFILES
     this.agents = {
-      fileClassificationAgent: new FileClassificationAgent(provider, defaultBedrockModel),
-      dataExtractionAgent: new DataExtractionAgent(provider, defaultBedrockModel),
-      issueDetectionAgent: new IssueDetectionAgent(provider, defaultBedrockModel),
-      citationGeneratorAgent: new CitationGeneratorAgent(provider, citationModel),
-      imageQualityAssessmentAgent: new ImageQualityAssessmentAgent(provider, defaultBedrockModel),
+      fileClassificationAgent: new FileClassificationAgent(),
+      dataExtractionAgent: new DataExtractionAgent(),
+      issueDetectionAgent: new IssueDetectionAgent(),
+      citationGeneratorAgent: new CitationGeneratorAgent(),
+      imageQualityAssessmentAgent: new ImageQualityAssessmentAgent(),
     };
 
     this.logger.log('All agents initialized successfully');

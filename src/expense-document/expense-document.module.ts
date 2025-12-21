@@ -103,8 +103,7 @@ import { QUEUE_NAMES } from '../common/types';
     {
       provide: DocumentSplitterAgent,
       useFactory: () => {
-        const provider: 'bedrock' | 'anthropic' = 'bedrock';
-        return new DocumentSplitterAgent(provider);
+        return new DocumentSplitterAgent();
       },
     },
   ],

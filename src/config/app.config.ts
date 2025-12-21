@@ -59,14 +59,12 @@ export interface AppConfigType {
     s3BucketName: string | undefined;
   };
 
-  // Bedrock/LLM
+  // Bedrock/LLM - Application Inference Profiles
   bedrock: {
-    model: string;
-    usingApplicationProfile: boolean;
-    citationModel: string;
-    judgeModel1: string;
-    judgeModel2: string;
-    judgeModel3: string;
+    novaMicroArn: string;
+    novaProArn: string;
+    sonnet4Arn: string;
+    sonnet45Arn: string;
   };
 
   // Workers
@@ -169,15 +167,13 @@ export default registerAs('app', (): AppConfigType => {
     },
 
     // ==========================================================================
-    // BEDROCK/LLM
+    // BEDROCK/LLM - Application Inference Profile ARNs
     // ==========================================================================
     bedrock: {
-      model: process.env.BEDROCK_MODEL || 'us.amazon.nova-pro-v1:0',
-      usingApplicationProfile: process.env.USING_APPLICATION_PROFILE === 'true',
-      citationModel: process.env.CITATION_MODEL || 'us.amazon.nova-micro-v1:0',
-      judgeModel1: process.env.BEDROCK_JUDGE_MODEL_1 || 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-      judgeModel2: process.env.BEDROCK_JUDGE_MODEL_2 || 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-      judgeModel3: process.env.BEDROCK_JUDGE_MODEL_3 || 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
+      novaMicroArn: process.env.BEDROCK_NOVA_MICRO_ARN || '',
+      novaProArn: process.env.BEDROCK_NOVA_PRO_ARN || '',
+      sonnet4Arn: process.env.BEDROCK_SONNET_4_ARN || '',
+      sonnet45Arn: process.env.BEDROCK_SONNET_4_5_ARN || '',
     },
 
     // ==========================================================================

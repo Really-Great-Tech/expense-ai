@@ -1,27 +1,32 @@
 /**
  * Centralized model configuration for all agents
- * Provides default model IDs and settings for different agent types
+ * Provides profile keys and settings for different agent types
  */
 
-export const MODEL_CONFIG = {
-  // File classification model - needs strong reasoning
-  CLASSIFICATION: 'claude-3-5-sonnet',
+import type { ProfileKey } from '../../services/bedrock/bedrock-llm';
 
-  // Data extraction model - balanced performance
-  EXTRACTION: 'eu.amazon.nova-pro-v1:0',
+export const AGENT_PROFILES = {
+  // File classification - needs strong reasoning
+  CLASSIFICATION: 'SONNET_4' as ProfileKey,
 
-  // Citation generation model - optimized for structured output
-  CITATION: 'amazon.nova-micro-v1:0',
+  // Data extraction - balanced performance
+  EXTRACTION: 'NOVA_PRO' as ProfileKey,
 
-  // Image quality assessment model
-  QUALITY_ASSESSMENT: 'eu.amazon.nova-pro-v1:0',
+  // Citation generation - optimized for structured output
+  CITATION: 'NOVA_MICRO' as ProfileKey,
 
-  // Compliance and issue detection model
-  COMPLIANCE: 'eu.amazon.nova-pro-v1:0',
+  // Image quality assessment
+  QUALITY_ASSESSMENT: 'NOVA_PRO' as ProfileKey,
 
-  // Document splitting model
-  DOCUMENT_SPLITTER: 'eu.amazon.nova-pro-v1:0',
+  // Compliance and issue detection
+  COMPLIANCE: 'NOVA_PRO' as ProfileKey,
+
+  // Document splitting
+  DOCUMENT_SPLITTER: 'NOVA_PRO' as ProfileKey,
 } as const;
+
+// Judge panel profile
+export const JUDGE_PROFILE: ProfileKey = 'SONNET_4';
 
 /**
  * Default inference configuration
@@ -48,8 +53,7 @@ export const INFERENCE_CONFIG = {
  */
 export const PROVIDER_CONFIG = {
   DEFAULT_PROVIDER: 'bedrock' as const,
-  SUPPORTED_PROVIDERS: ['bedrock', 'anthropic'] as const,
+  SUPPORTED_PROVIDERS: ['bedrock'] as const,
 } as const;
 
-export type ModelConfigKey = keyof typeof MODEL_CONFIG;
 export type SupportedProvider = (typeof PROVIDER_CONFIG.SUPPORTED_PROVIDERS)[number];

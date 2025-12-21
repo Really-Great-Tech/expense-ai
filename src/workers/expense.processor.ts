@@ -27,6 +27,8 @@ const workerConfig = getAppConfig();
  */
 @Processor(QUEUE_NAMES.EXPENSE_PROCESSING, {
   concurrency: workerConfig.workers.concurrency,
+  stalledInterval: 300000, // 5 min - detect stuck jobs
+  drainDelay: 300, // 300ms - graceful shutdown
 })
 export class ExpenseProcessor extends WorkerHost {
   private readonly logger = new Logger(ExpenseProcessor.name);
@@ -350,5 +352,10 @@ ${markdownContent}`;
   @OnWorkerEvent('error')
   onWorkerError(error: Error) {
     this.logger.error(`Worker error: ${error.message}`, error.stack);
+  }
+
+  @OnWorkerEvent('stalled')
+  onStalled(jobId: string) {
+    this.logger.error(`Job ${jobId} has stalled - worker may have crashed or job exceeded lock duration`);
   }
 }

@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator';
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
+import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -87,39 +87,20 @@ export class ParallelExpenseComplianceUQLMValidator {
   private sequentialValidator: ExpenseComplianceUQLMValidator;
   private bedrockServices: BedrockLlmService[];
   private validationVersion: string = '2.0.0-parallel';
-  private readonly configService: ConfigService;
 
-  constructor(logger?: Logger, configService?: ConfigService) {
+  constructor(logger?: Logger) {
     this.logger = logger || new Logger(ParallelExpenseComplianceUQLMValidator.name);
-    this.configService = configService ?? new ConfigService();
 
     // Create sequential validator for fallback
-    this.sequentialValidator = new ExpenseComplianceUQLMValidator(this.logger, this.configService);
+    this.sequentialValidator = new ExpenseComplianceUQLMValidator(this.logger);
 
-    // Initialize Bedrock services with different temperatures (same as base class)
-    const judgeConfigs = [
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_1', 'eu.anthropic.claude-3-7-sonnet-20250219-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_1_TEMPERATURE', '0.3')),
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_2', 'eu.anthropic.claude-3-haiku-20240307-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_2_TEMPERATURE', '0.7')),
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_3', 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_3_TEMPERATURE', '0.5')),
-      },
+    // Initialize Bedrock services with different temperatures using unified profile
+    // All judges use the same profile (SONNET_4) but with different temperatures for diversity
+    this.bedrockServices = [
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
     ];
-
-    this.bedrockServices = judgeConfigs.map(
-      (config) =>
-        new BedrockLlmService({
-          modelId: config.modelId,
-          temperature: config.temperature,
-          modelType: 'claude',
-        }),
-    );
 
     // Initialize parallel validation configuration from environment variables
     this.config = this.loadParallelConfig();
@@ -140,21 +121,22 @@ export class ParallelExpenseComplianceUQLMValidator {
       judgeModelsCount: this.bedrockServices.length,
     });
 
-    judgeConfigs.forEach((config, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${config.modelId} (temp: ${config.temperature})`);
+    this.bedrockServices.forEach((service, index) => {
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${index === 0 ? 0.3 : index === 1 ? 0.7 : 0.5})`);
     });
   }
 
   /**
    * Load parallel validation configuration from environment variables
+   * Note: These are validation-specific settings, not part of centralized app config
    */
   private loadParallelConfig(): ParallelValidationConfig {
     return {
-      parallelValidationEnabled: this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') === 'true',
-      dimensionConcurrency: parseInt(this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6'), 10),
-      judgeConcurrency: parseInt(this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3'), 10),
-      jobConcurrency: parseInt(this.configService.get<string>('VALIDATION_JOB_CONCURRENCY', '5'), 10),
-      bedrockRateLimitPerSecond: parseInt(this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10'), 10),
+      parallelValidationEnabled: (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') === 'true',
+      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6', 10),
+      judgeConcurrency: parseInt(process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3', 10),
+      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '5', 10),
+      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10', 10),
       fallbackToSequential: true,
       minSuccessfulDimensions: 3, // Minimum 50% success rate
     };
