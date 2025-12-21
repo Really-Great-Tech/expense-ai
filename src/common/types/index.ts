@@ -20,6 +20,35 @@ export interface DocumentProcessingData {
   filePath?: string; // @deprecated Use storageKey instead
 }
 
+/**
+ * Job data for document splitting queue
+ * Used to process multi-page documents and split them into individual receipts
+ */
+export interface DocumentSplittingJobData {
+  /** ExpenseDocument ID */
+  documentId: string;
+  /** S3 storage key for the original document */
+  storageKey: string;
+  /** S3 bucket name */
+  storageBucket: string;
+  /** Storage type */
+  storageType: 'local' | 's3';
+  /** Original file name */
+  originalFileName: string;
+  /** File size in bytes */
+  fileSize: number;
+  /** MIME type */
+  mimeType: string;
+  /** User who uploaded the document */
+  userId: string;
+  /** Country for compliance */
+  country: string;
+  /** ICP code */
+  icp: string;
+  /** Document reader to use (e.g., 'textract') */
+  documentReader?: string;
+}
+
 export interface ExpenseLineItem {
   description: string;
   amount: string;

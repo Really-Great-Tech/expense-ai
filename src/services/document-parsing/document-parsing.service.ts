@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentReaderFactory } from '@/utils/documentReaderFactory';
 import { PageMarkdown } from '@/expense-document/types/upload.types';
+import { PageImage } from '@/services/pdf-conversion/pdf-to-image.service';
 
 @Injectable()
 export class DocumentParsingService {
@@ -96,5 +97,38 @@ export class DocumentParsingService {
       })
       .filter((content) => content.length > 0)
       .join('\n\n---\n\n');
+  }
+
+  /**
+   * Parse markdown pages and merge with page images for vision analysis
+   * @param fullMarkdown Full markdown content from document extraction
+   * @param pageImages Array of page images from PDF conversion
+   * @returns PageMarkdown array with imageBase64 populated for each page
+   */
+  parseMarkdownPagesWithImages(fullMarkdown: string, pageImages: PageImage[]): PageMarkdown[] {
+    this.logger.log(`Parsing markdown with ${pageImages.length} images`);
+
+    // First parse the markdown into pages
+    const pages = this.parseMarkdownPages(fullMarkdown);
+
+    // Create a map of page number to image for fast lookup
+    const imageMap = new Map<number, string>();
+    for (const img of pageImages) {
+      imageMap.set(img.pageNumber, img.imageBase64);
+    }
+
+    // Merge images into pages
+    for (const page of pages) {
+      const imageBase64 = imageMap.get(page.pageNumber);
+      if (imageBase64) {
+        page.imageBase64 = imageBase64;
+        this.logger.debug(`Added image to page ${page.pageNumber}`);
+      }
+    }
+
+    const pagesWithImages = pages.filter((p) => p.imageBase64).length;
+    this.logger.log(`Parsed ${pages.length} pages, ${pagesWithImages} with images`);
+
+    return pages;
   }
 }

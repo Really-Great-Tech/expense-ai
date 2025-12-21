@@ -142,6 +142,15 @@ export class DocumentPersistenceService {
   }
 
   /**
+   * Get an ExpenseDocument by ID
+   */
+  async getExpenseDocumentById(documentId: string): Promise<ExpenseDocument | null> {
+    return await this.expenseDocumentRepository.findOne({
+      where: { id: documentId },
+    });
+  }
+
+  /**
    * Get a receipt by ID with its extracted text
    */
   async getReceiptById(receiptId: string): Promise<Receipt | null> {

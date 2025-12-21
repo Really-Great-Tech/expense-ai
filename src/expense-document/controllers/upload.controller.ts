@@ -206,8 +206,8 @@ The documentReader parameter specifies the reader for downstream processing of s
         throw new HttpException(pageCountResult.error, HttpStatus.BAD_REQUEST);
       }
 
-      // Step 2: Proceed with document analysis
-      const result = await this.documentSplitterService.analyzeAndSplitDocument(file, {
+      // Step 2: Proceed with document analysis (async - enqueues to background queue)
+      const result = await this.documentSplitterService.analyzeAndSplitDocumentAsync(file, {
         documentReader: body.documentReader,
         userId: body.userId,
         country: body.country,

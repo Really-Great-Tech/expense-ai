@@ -147,7 +147,7 @@ export class ExpenseProcessingService {
     this.logger.log(' Phase 0: Image Quality Assessment (parallel)');
 
     const result = await agent.assessImageQualityFromBuffer(buffer, filename);
-    const formattedResult = agent.formatAssessmentForWorkflowFromBuffer(result, filename);
+    const formattedResult = agent.formatAssessmentForWorkflow(result, filename);
 
     const end = Date.now();
     this.metricsService.recordPhase(timing, 'image_quality_assessment', start, end, {

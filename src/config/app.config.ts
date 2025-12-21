@@ -70,6 +70,7 @@ export interface AppConfigType {
   // Workers
   workers: {
     concurrency: number;
+    splitterConcurrency: number;
     maxRetryAttempts: number;
     jobTimeout: number;
   };
@@ -181,6 +182,7 @@ export default registerAs('app', (): AppConfigType => {
     // ==========================================================================
     workers: {
       concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
+      splitterConcurrency: parseInt(process.env.SPLITTER_CONCURRENCY || '25', 10),
       maxRetryAttempts: parseInt(process.env.MAX_RETRY_ATTEMPTS || '3', 10),
       jobTimeout: parseInt(process.env.JOB_TIMEOUT || '300000', 10),
     },
