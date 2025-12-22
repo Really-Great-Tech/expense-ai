@@ -23,7 +23,7 @@ export class TextractApiService implements DocumentReader {
   private readonly logger = new Logger(TextractApiService.name);
 
   constructor(options: TextractApiServiceOptions = {}) {
-    const awsRegion = options.region || 'us-east-1';
+    const awsRegion = options.region || 'eu-west-1';
     this.uploadPath = options.uploadPath || './uploads';
     this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
 

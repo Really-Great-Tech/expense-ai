@@ -241,7 +241,7 @@ export function createPasswordProvider(configService: ConfigService) {
   const hostname = configService.get<string>('MYSQL_HOST');
   const port = parseInt(configService.get<string>('MYSQL_PORT', '3306'), 10);
   const username = configService.get<string>('MYSQL_USER');
-  const region = configService.get<string>('AWS_REGION', 'us-east-1');
+  const region = configService.get<string>('AWS_REGION', 'eu-west-1');
 
   if (!hostname || !username || !region) {
     throw new Error(

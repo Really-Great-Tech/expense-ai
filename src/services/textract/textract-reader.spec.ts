@@ -25,7 +25,7 @@ jest.mock('@aws-sdk/client-textract', () => {
 });
 
 describe('TextractApiService', () => {
-  const createService = () => new TextractApiService({ region: 'us-east-1', uploadPath: './uploads' });
+  const createService = () => new TextractApiService({ region: 'eu-west-1', uploadPath: './uploads' });
 
   beforeEach(() => {
     jest.clearAllMocks();

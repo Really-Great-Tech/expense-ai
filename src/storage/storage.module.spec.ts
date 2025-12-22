@@ -27,9 +27,9 @@ describe('StorageModule', () => {
   beforeEach(() => {
     configValues = {
       S3_BUCKET_NAME: 'test-bucket',
-      AWS_REGION: 'us-east-1',
+      AWS_REGION: 'eu-west-1',
       app: {
-        aws: { region: 'us-east-1' },
+        aws: { region: 'eu-west-1' },
         storage: { s3BucketName: 'test-bucket' },
       },
     };
