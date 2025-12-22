@@ -155,7 +155,7 @@ export default registerAs('app', (): AppConfigType => {
     // AWS
     // ==========================================================================
     aws: {
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env.AWS_REGION || 'eu-west-1',
     },
 
     // ==========================================================================
