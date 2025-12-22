@@ -8,7 +8,7 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 FROM node:22-alpine
 WORKDIR /usr/src/app
-RUN apk add --no-cache curl ca-certificates python3 make g++ && adduser -S -u 1001 nodejs
+RUN apk add --no-cache curl ca-certificates && adduser -S -u 1001 nodejs
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /usr/src/app/dist ./dist
