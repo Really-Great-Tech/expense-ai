@@ -55,19 +55,13 @@ export class DatabaseConfigValidator {
 
   /**
    * Validates database mode configuration
-   * Enforces strict separation between local MySQL and Aurora MySQL modes
-   *
-   * Rules:
-   * - Aurora MySQL (AURORA_MYSQL=true): Must use IAM auth, no password allowed
-   * - Local MySQL (AURORA_MYSQL!=true): Must use localhost, password auth only
+   * Enforces IAM auth for Aurora MySQL
    */
   private static validateDatabaseMode(configService: ConfigService): void {
     const isAuroraMySQL = configService.get<string>('AURORA_MYSQL') === 'true';
 
     if (isAuroraMySQL) {
       this.validateAuroraMySQLConfiguration(configService);
-    } else {
-      this.validateLocalMySQLConfiguration(configService);
     }
   }
 
@@ -100,30 +94,6 @@ export class DatabaseConfigValidator {
     }
 
     this.logger.log('Aurora MySQL configuration validated (IAM auth enforced)');
-  }
-
-  /**
-   * Validates local MySQL configuration
-   * Ensures only localhost connections are allowed for non-Aurora MySQL
-   */
-  private static validateLocalMySQLConfiguration(configService: ConfigService): void {
-    this.logger.log('Validating local MySQL configuration...');
-
-    const host = configService.get<string>('MYSQL_HOST', 'localhost');
-    const allowedHosts = ['localhost', '127.0.0.1'];
-
-    if (!allowedHosts.includes(host)) {
-      throw new Error(
-        'CRITICAL: Non-Aurora MySQL connections are only allowed to localhost. ' +
-          'Current MYSQL_HOST="' +
-          host +
-          '" is not allowed. ' +
-          'For Aurora MySQL, set AURORA_MYSQL=true and use IAM authentication. ' +
-          'For local development, use MYSQL_HOST=localhost or MYSQL_HOST=127.0.0.1.',
-      );
-    }
-
-    this.logger.log(`Local MySQL configuration validated (host: ${host})`);
   }
 
   /**
