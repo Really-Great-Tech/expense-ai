@@ -191,7 +191,8 @@ describe('FileClassificationAgent', () => {
   describe('constructor', () => {
     it('should initialize with default provider', () => {
       const newAgent = new FileClassificationAgent();
-      expect(newAgent['currentProvider']).toBe('bedrock');
+      expect(newAgent['defaultModelId']).toBeDefined();
+      expect(newAgent['llm']).toBeDefined();
     });
 
     it('should use profile-based configuration', () => {

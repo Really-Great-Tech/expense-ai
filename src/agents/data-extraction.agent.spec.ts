@@ -211,8 +211,8 @@ describe('DataExtractionAgent', () => {
   describe('constructor', () => {
     it('should initialize with default provider and model', () => {
       const newAgent = new DataExtractionAgent();
-      expect(newAgent['currentProvider']).toBe('bedrock');
       expect(newAgent['defaultModelId']).toBeDefined();
+      expect(newAgent['llm']).toBeDefined();
     });
 
     it('should use profile-based configuration', () => {

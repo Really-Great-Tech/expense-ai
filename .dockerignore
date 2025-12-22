@@ -25,8 +25,7 @@ showcase/
 scripts/
 validation_results/
 
-# Build artifacts (rebuilt in Docker)
-dist/
+# Build artifacts
 node_modules/
 
 # Environment

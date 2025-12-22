@@ -2,14 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { StorageModule } from './storage.module';
 import { S3StorageService } from './s3-storage.service';
+import { CircuitBreakerService } from '../resilience';
 
 // Skip S3 tests in CI environment (SDK uses default credential chain in production)
 const shouldSkipS3Tests = process.env.CI === 'true';
 const describeS3 = shouldSkipS3Tests ? describe.skip : describe;
 
 describe('StorageModule', () => {
-  let configValues: Record<string, string | undefined>;
+  let configValues: Record<string, any>;
   let mockConfigService: jest.Mocked<ConfigService>;
+  let mockCircuitBreakerService: jest.Mocked<CircuitBreakerService>;
 
   const buildModule = async () => {
     return Test.createTestingModule({
@@ -17,6 +19,8 @@ describe('StorageModule', () => {
     })
       .overrideProvider(ConfigService)
       .useValue(mockConfigService)
+      .overrideProvider(CircuitBreakerService)
+      .useValue(mockCircuitBreakerService)
       .compile();
   };
 
@@ -24,6 +28,10 @@ describe('StorageModule', () => {
     configValues = {
       S3_BUCKET_NAME: 'test-bucket',
       AWS_REGION: 'us-east-1',
+      app: {
+        aws: { region: 'us-east-1' },
+        storage: { s3BucketName: 'test-bucket' },
+      },
     };
     mockConfigService = {
       get: jest.fn((key: string, defaultValue?: any) => {
@@ -31,6 +39,12 @@ describe('StorageModule', () => {
         return value !== undefined ? value : defaultValue;
       }),
     } as unknown as jest.Mocked<ConfigService>;
+
+    mockCircuitBreakerService = {
+      getS3Breaker: jest.fn().mockReturnValue({
+        execute: jest.fn().mockImplementation((fn) => fn()),
+      }),
+    } as unknown as jest.Mocked<CircuitBreakerService>;
   });
 
   describeS3('S3 Storage Configuration', () => {
@@ -45,6 +59,7 @@ describe('StorageModule', () => {
 
     it('should throw error when S3_BUCKET_NAME is not set', async () => {
       delete configValues.S3_BUCKET_NAME;
+      configValues.app.storage.s3BucketName = undefined;
 
       await expect(buildModule()).rejects.toThrow('S3_BUCKET_NAME is required for S3StorageService');
     });

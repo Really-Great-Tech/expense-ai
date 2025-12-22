@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { AgentFactoryService } from './agent-factory.service';
 import { FileClassificationAgent } from '../../agents/file-classification.agent';
 import { DataExtractionAgent } from '../../agents/data-extraction.agent';
@@ -7,31 +6,24 @@ import { IssueDetectionAgent } from '../../agents/issue-detection.agent';
 import { CitationGeneratorAgent } from '../../agents/citation-generator.agent';
 import { ImageQualityAssessmentAgent } from '../../agents/image-quality-assessment.agent';
 
+// Mock the BedrockLlmService to avoid requiring AWS credentials
+jest.mock('../../services/bedrock/bedrock-llm', () => ({
+  BedrockLlmService: jest.fn().mockImplementation(() => ({
+    chat: jest.fn(),
+    getCurrentModelName: jest.fn().mockReturnValue('mocked-model'),
+    getCurrentProvider: jest.fn().mockReturnValue('bedrock'),
+  })),
+}));
+
 describe('AgentFactoryService', () => {
   let service: AgentFactoryService;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AgentFactoryService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string, defaultValue?: string) => {
-              const config = {
-                BEDROCK_MODEL: 'eu.amazon.nova-pro-v1:0',
-                CITATION_MODEL: 'amazon.nova-micro-v1:0',
-              };
-              return config[key] || defaultValue;
-            }),
-          },
-        },
-      ],
+      providers: [AgentFactoryService],
     }).compile();
 
     service = module.get<AgentFactoryService>(AgentFactoryService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   afterEach(() => {
@@ -45,18 +37,20 @@ describe('AgentFactoryService', () => {
 
     it('should initialize with correct provider', () => {
       expect(service).toBeDefined();
-      // Verify logger was called with correct message
+      // Agents now use profile-based configuration via AGENT_PROFILES
     });
 
-    it('should use configured bedrock model', () => {
+    it('should initialize agents using profile-based configuration', () => {
       const agents = service.getAgents();
-      expect(configService.get).toHaveBeenCalledWith('BEDROCK_MODEL', 'eu.amazon.nova-pro-v1:0');
+      // Profile-based configuration is handled internally by agents via AGENT_PROFILES
       expect(agents).toBeDefined();
+      expect(agents.fileClassificationAgent).toBeDefined();
+      expect(agents.dataExtractionAgent).toBeDefined();
     });
 
-    it('should use configured citation model', () => {
+    it('should initialize citation generator agent', () => {
       const agents = service.getAgents();
-      expect(configService.get).toHaveBeenCalledWith('CITATION_MODEL', 'amazon.nova-micro-v1:0');
+      // Citation agent uses AGENT_PROFILES.CITATION profile
       expect(agents.citationGeneratorAgent).toBeDefined();
     });
   });

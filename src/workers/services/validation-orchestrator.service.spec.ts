@@ -78,7 +78,12 @@ describe('ValidationOrchestratorService', () => {
   });
 
   describe('initialization with sequential validation', () => {
+    const originalEnv = process.env;
+
     beforeEach(async () => {
+      // Set process.env for sequential validation (service reads from process.env directly)
+      process.env = { ...originalEnv, PARALLEL_VALIDATION_ENABLED: 'false' };
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ValidationOrchestratorService,
@@ -95,6 +100,10 @@ describe('ValidationOrchestratorService', () => {
       }).compile();
 
       service = module.get<ValidationOrchestratorService>(ValidationOrchestratorService);
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
     it('should initialize with sequential validator', () => {
@@ -202,8 +211,12 @@ describe('ValidationOrchestratorService', () => {
 
   describe('validateCompliance - with sequential validator', () => {
     let timing: ProcessingTiming;
+    const originalEnv = process.env;
 
     beforeEach(async () => {
+      // Set process.env for sequential validation (service reads from process.env directly)
+      process.env = { ...originalEnv, PARALLEL_VALIDATION_ENABLED: 'false' };
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ValidationOrchestratorService,
@@ -221,6 +234,10 @@ describe('ValidationOrchestratorService', () => {
 
       service = module.get<ValidationOrchestratorService>(ValidationOrchestratorService);
       timing = createMockTiming();
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
     });
 
     it('should validate compliance with sequential validator', async () => {

@@ -86,8 +86,22 @@ describe('RedisHealthEnhancedIndicator', () => {
   };
 
   const buildModule = async (configMap: Record<string, string | undefined>) => {
+    // Build app config based on configMap
+    // Don't default host to 'localhost' if not provided - let the service handle validation
+    const appConfig = {
+      redis: {
+        mode: configMap['REDIS_MODE'] || 'local',
+        host: configMap['REDIS_HOST'], // undefined if not provided (for managed mode validation)
+        port: parseInt(configMap['REDIS_PORT'] || '6379', 10),
+        tlsEnabled: configMap['REDIS_TLS_ENABLED'] === 'true',
+      },
+    };
+
     const mockConfigService: jest.Mocked<ConfigService> = {
       get: jest.fn((key: string, defaultValue?: any) => {
+        if (key === 'app') {
+          return appConfig;
+        }
         const value = configMap[key];
         return value !== undefined ? value : defaultValue;
       }),

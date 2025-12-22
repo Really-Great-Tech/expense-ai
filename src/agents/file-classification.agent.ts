@@ -10,6 +10,7 @@ import { AGENT_PROFILES } from './config/models.config';
  */
 export class FileClassificationAgent extends BaseAgent {
   protected llm: ILLMService;
+  protected readonly defaultModelId: string = 'claude-3-5-sonnet';
 
   constructor() {
     super();
@@ -22,7 +23,10 @@ export class FileClassificationAgent extends BaseAgent {
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    return this.llm.getCurrentModelName();
+    if (this.llm?.getCurrentModelName) {
+      return this.llm.getCurrentModelName();
+    }
+    return this.defaultModelId;
   }
 
   /**

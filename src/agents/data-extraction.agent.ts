@@ -10,6 +10,7 @@ import { AGENT_PROFILES } from './config/models.config';
  */
 export class DataExtractionAgent extends BaseAgent {
   protected llm: ILLMService;
+  protected readonly defaultModelId: string = 'eu.amazon.nova-pro-v1:0';
 
   constructor() {
     super();
@@ -22,7 +23,10 @@ export class DataExtractionAgent extends BaseAgent {
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    return this.llm.getCurrentModelName();
+    if (this.llm?.getCurrentModelName) {
+      return this.llm.getCurrentModelName();
+    }
+    return this.defaultModelId;
   }
 
   /**

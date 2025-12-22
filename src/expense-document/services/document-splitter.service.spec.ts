@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { DocumentSplitterService } from './document-splitter.service';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 import { DuplicateDetectionService } from '@/utils/duplicate-detection.service';
@@ -6,6 +7,7 @@ import { DocumentParsingService } from '@/services/document-parsing/document-par
 import { S3StorageService } from '@/storage/s3-storage.service';
 import { DocumentPersistenceService } from './document-persistence.service';
 import { ProcessingQueueService } from './processing-queue.service';
+import { QUEUE_NAMES } from '@/common/types';
 
 describe('DocumentSplitterService', () => {
   let service: DocumentSplitterService;
@@ -48,6 +50,10 @@ describe('DocumentSplitterService', () => {
       enqueueReceiptProcessing: jest.fn(),
     };
 
+    const mockSplitterQueue = {
+      add: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DocumentSplitterService,
@@ -74,6 +80,10 @@ describe('DocumentSplitterService', () => {
         {
           provide: ProcessingQueueService,
           useValue: mockQueueImplementation,
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.DOCUMENT_SPLITTING),
+          useValue: mockSplitterQueue,
         },
       ],
     }).compile();

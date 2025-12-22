@@ -5,6 +5,7 @@ import { HealthController } from './health.controller';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './redis-health-enhanced.indicator';
 import { AwsServicesHealthIndicator } from './aws-services-health.indicator';
+import { CircuitBreakerHealthIndicator } from './circuit-breaker-health.indicator';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -14,6 +15,7 @@ describe('HealthController', () => {
   let mockDatabaseHealthIndicator: jest.Mocked<DatabaseHealthIndicator>;
   let mockRedisHealthEnhancedIndicator: jest.Mocked<RedisHealthEnhancedIndicator>;
   let mockAwsServicesHealthIndicator: jest.Mocked<AwsServicesHealthIndicator>;
+  let mockCircuitBreakerHealthIndicator: jest.Mocked<CircuitBreakerHealthIndicator>;
 
   beforeEach(async () => {
     mockHealthCheckService = {
@@ -46,6 +48,10 @@ describe('HealthController', () => {
       checkAllServices: jest.fn().mockResolvedValue({ 'aws-services': { status: 'up' } }),
     } as any;
 
+    mockCircuitBreakerHealthIndicator = {
+      isHealthy: jest.fn().mockResolvedValue({ 'circuit-breakers': { status: 'up' } }),
+    } as any;
+
     moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
       providers: [
@@ -54,6 +60,7 @@ describe('HealthController', () => {
         { provide: DatabaseHealthIndicator, useValue: mockDatabaseHealthIndicator },
         { provide: RedisHealthEnhancedIndicator, useValue: mockRedisHealthEnhancedIndicator },
         { provide: AwsServicesHealthIndicator, useValue: mockAwsServicesHealthIndicator },
+        { provide: CircuitBreakerHealthIndicator, useValue: mockCircuitBreakerHealthIndicator },
       ],
     }).compile();
 
