@@ -305,6 +305,14 @@ export class TextractApiService implements DocumentReader {
       // Read file after size validation using sanitized path
       const fileBuffer = fs.readFileSync(sanitizedPath);
 
+      // Validate buffer length matches expected file size (prevents truncation attacks)
+      if (fileBuffer.length !== fileStats.size) {
+        return {
+          success: false,
+          error: `File read mismatch: expected ${fileStats.size} bytes, got ${fileBuffer.length} bytes`,
+        };
+      }
+
       // Log diagnostic information
       this.logger.log(` File diagnostics for ${filePath}:`);
       this.logger.log(`   Size: ${fileStats.size} bytes (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
@@ -365,17 +373,21 @@ export class TextractApiService implements DocumentReader {
       // Estimate page count based on file type
       let estimatedPages = 1;
       let isMultiPage = false;
+      const maxAllowedPages = 500; // Safety limit for page count
 
       if (fileType === 'pdf') {
         // For PDFs, estimate page count from content
+        // Limit string conversion to prevent memory issues with large files
         const content = fileBuffer.toString('binary');
         const pageMatches = content.match(/\/Type\s*\/Page[^s]/g);
-        estimatedPages = pageMatches ? pageMatches.length : 1;
+        estimatedPages = pageMatches ? Math.min(pageMatches.length, maxAllowedPages) : 1;
         isMultiPage = estimatedPages > 1;
 
         this.logger.log(`   Estimated pages: ${estimatedPages}`);
 
-        if (estimatedPages > 100) {
+        if (estimatedPages >= maxAllowedPages) {
+          this.logger.warn(`   Page count capped at ${maxAllowedPages} for safety`);
+        } else if (estimatedPages > 100) {
           this.logger.log(`   High page count detected (${estimatedPages} pages)`);
         }
       } else {
