@@ -15,39 +15,22 @@ interface EnvRequirement {
  * Variables required in production (no safe defaults)
  */
 const REQUIRED_IN_PRODUCTION: EnvRequirement[] = [
-  { name: 'MYSQL_HOST', description: 'Database host' },
+  { name: 'MYSQL_HOST', description: 'Aurora MySQL host' },
   { name: 'MYSQL_USER', description: 'Database username' },
   { name: 'MYSQL_DATABASE', description: 'Database name' },
+  { name: 'REDIS_HOST', description: 'ElastiCache Redis host' },
   { name: 'S3_BUCKET_NAME', description: 'S3 bucket for file storage' },
 ];
 
 /**
- * Conditional requirements based on other configuration
- *
- * Database modes:
- * - Local MySQL (AURORA_MYSQL !== 'true'): Requires MYSQL_PASSWORD
- * - Aurora MySQL (AURORA_MYSQL === 'true'): Requires IAM auth, no password
+ * Additional required variables for IAM authentication
+ * (Aurora MySQL with IAM auth only - no password auth supported)
  */
 const CONDITIONAL_REQUIREMENTS: EnvRequirement[] = [
   {
-    name: 'MYSQL_PASSWORD',
-    description: 'Database password (required for local MySQL only)',
-    condition: () => process.env.AURORA_MYSQL !== 'true' && process.env.MYSQL_IAM_AUTH_ENABLED !== 'true',
-  },
-  {
-    name: 'MYSQL_IAM_AUTH_ENABLED',
-    description: 'IAM authentication (required for Aurora MySQL)',
-    condition: () => process.env.AURORA_MYSQL === 'true' && process.env.MYSQL_IAM_AUTH_ENABLED !== 'true',
-  },
-  {
     name: 'AWS_REGION',
-    description: 'AWS region (required for Aurora MySQL IAM auth)',
-    condition: () => process.env.AURORA_MYSQL === 'true',
-  },
-  {
-    name: 'REDIS_HOST',
-    description: 'Redis host (required when REDIS_MODE=managed)',
-    condition: () => process.env.REDIS_MODE === 'managed',
+    description: 'AWS region (required for IAM auth)',
+    condition: () => true, // Always required - IAM auth only
   },
 ];
 
@@ -133,40 +116,24 @@ export function validateEnvironment(): void {
  * @param redactSecrets - Whether to redact sensitive values (default: true)
  */
 export function getConfigSummary(redactSecrets = true): Record<string, string | undefined> {
-  const sensitiveKeys = [
-    'MYSQL_PASSWORD',
-    'REDIS_PASSWORD',
-    'AWS_SECRET_ACCESS_KEY',
-    'PRIVATE_KEY',
-    'PUBLIC_KEY',
-  ];
+  const sensitiveKeys = ['AWS_SECRET_ACCESS_KEY'];
 
   const allVars = [
     // Application
     'NODE_ENV',
     'PORT',
-    // Database
-    'AURORA_MYSQL',
+    // Database (Aurora MySQL - IAM auth only)
     'MYSQL_HOST',
     'MYSQL_PORT',
     'MYSQL_USER',
-    'MYSQL_PASSWORD',
     'MYSQL_DATABASE',
-    'MYSQL_SSL',
-    'MYSQL_IAM_AUTH_ENABLED',
-    // Redis
+    // Redis (ElastiCache)
     'REDIS_HOST',
-    'REDIS_PORT',
-    'REDIS_PASSWORD',
-    'REDIS_MODE',
-    'REDIS_TLS_ENABLED',
     // AWS
     'AWS_REGION',
     'AWS_ACCESS_KEY_ID',
     'AWS_SECRET_ACCESS_KEY',
-    // Storage
-    'STORAGE_TYPE',
-    'UPLOAD_PATH',
+    // Storage (S3)
     'S3_BUCKET_NAME',
     // Bedrock
     'BEDROCK_MODEL',

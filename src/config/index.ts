@@ -10,10 +10,6 @@ interface iConfig {
   env: string;
   port: number;
   database: DataSourceOptions;
-  keys: {
-    privateKey: string;
-    publicKey: string;
-  };
 }
 
 /**
@@ -22,16 +18,10 @@ interface iConfig {
  */
 export default (): Partial<iConfig> => {
   const config = getAppConfig();
-  const rawPrivateKey = config.security.privateKey;
-  const rawPublicKey = config.security.publicKey;
 
   return {
     env: config.nodeEnv,
     port: config.port,
-    keys: {
-      privateKey: rawPrivateKey ? rawPrivateKey.replace(/\\n/gm, '\n') : '',
-      publicKey: rawPublicKey ? rawPublicKey.replace(/\\n/gm, '\n') : '',
-    },
     database: dataSourceOptions,
   };
 };

@@ -226,28 +226,16 @@ export class RDSIAMAuthManager {
  * This function can be used directly in TypeORM configuration
  *
  * @param configService NestJS ConfigService instance
- * @returns Function that generates IAM auth token or returns static password
+ * @returns Function that generates IAM auth token
  */
 export function createPasswordProvider(configService: ConfigService) {
-  const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
-
-  if (!useIAMAuth) {
-    // Return static password for traditional authentication
-    const password = configService.get<string>('MYSQL_PASSWORD');
-    return () => password;
-  }
-
-  // Return IAM token generator for IAM authentication
   const hostname = configService.get<string>('MYSQL_HOST');
   const port = parseInt(configService.get<string>('MYSQL_PORT', '3306'), 10);
   const username = configService.get<string>('MYSQL_USER');
   const region = configService.get<string>('AWS_REGION', 'eu-west-1');
 
   if (!hostname || !username || !region) {
-    throw new Error(
-      'Missing required IAM authentication configuration: ' +
-      'MYSQL_HOST, MYSQL_USER, and AWS_REGION must be set when MYSQL_IAM_AUTH_ENABLED=true',
-    );
+    throw new Error('Missing required IAM authentication configuration: MYSQL_HOST, MYSQL_USER, and AWS_REGION must be set.');
   }
 
   const signerConfig: RDSSignerConfig = {
@@ -260,24 +248,4 @@ export function createPasswordProvider(configService: ConfigService) {
   return async () => {
     return RDSIAMAuthManager.getAuthToken(signerConfig);
   };
-}
-
-/**
- * Synchronous wrapper for TypeORM MySQL driver
- * MySQL2 driver doesn't support async password providers, so we need
- * to generate the token synchronously during connection initialization
- */
-export function createMySQLPasswordProvider(configService: ConfigService) {
-  const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
-
-  if (!useIAMAuth) {
-    // Return static password for traditional authentication
-    const password = configService.get<string>('MYSQL_PASSWORD');
-    return password;
-  }
-
-  // For MySQL with IAM auth, we need to use connection pool events
-  // to generate tokens. This is handled in the database.ts configuration.
-  // For now, return a placeholder that will be overridden
-  return 'IAM_AUTH_TOKEN_PLACEHOLDER';
 }

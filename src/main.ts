@@ -13,9 +13,27 @@ import { validateEnvironment } from './config/env-validation';
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
 
-async function bootstrap() {
-  const logger = new Logger('Bootstrap');
+const logger = new Logger('Bootstrap');
 
+function gracefulExit(error: Error | string, exitCode = 1): void {
+  const message = error instanceof Error ? error.message : error;
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  logger.error(`Fatal error: ${message}`, stack);
+  logger.error('Application failed to start - shutting down');
+
+  setTimeout(() => process.exit(exitCode), 100);
+}
+
+process.on('uncaughtException', (error) => {
+  gracefulExit(error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  gracefulExit(reason instanceof Error ? reason : new Error(String(reason)));
+});
+
+async function bootstrap() {
   // Validate environment variables early, before creating the NestJS app
   logger.log('Validating environment configuration...');
   validateEnvironment();
@@ -166,14 +184,7 @@ async function bootstrap() {
     logger.log(`Application is running on: http://localhost:${port}`);
     logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s');
   } catch (error) {
-    logger.error(
-      `Error during application bootstrap: ${error instanceof Error ? error.message : error}`,
-      error instanceof Error ? error.stack : undefined,
-    );
-    logger.error('Application failed to start - shutting down');
-
-    // Allow async logger to flush before exit
-    setTimeout(() => process.exit(1), 100);
+    gracefulExit(error instanceof Error ? error : new Error(String(error)));
   }
 }
 
