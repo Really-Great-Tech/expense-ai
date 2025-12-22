@@ -85,7 +85,7 @@ export class TextractApiService implements DocumentReader {
       ];
 
       // Check if the file is within allowed directories
-      const isWithinAllowedDir = allowedDirectories.some(allowedDir => {
+      const isWithinAllowedDir = allowedDirectories.some((allowedDir) => {
         try {
           const relativePath = path.relative(allowedDir, normalizedPath);
           return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
@@ -113,7 +113,6 @@ export class TextractApiService implements DocumentReader {
       }
 
       return { isValid: true, sanitizedPath: normalizedPath };
-
     } catch (error) {
       return { 
         isValid: false, 
@@ -282,17 +281,11 @@ export class TextractApiService implements DocumentReader {
         };
       }
 
-      // Read file and get diagnostic information using sanitized path
-      const fileBuffer = fs.readFileSync(sanitizedPath);
+      // Get file stats first to validate size before reading into memory
       const fileStats = fs.statSync(sanitizedPath);
 
-      // Log diagnostic information
-      this.logger.log(` File diagnostics for ${filePath}:`);
-      this.logger.log(`   Size: ${fileStats.size} bytes (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
-      this.logger.log(`   Buffer length: ${fileBuffer.length}`);
-      this.logger.log(`   File extension: ${filePath.split('.').pop()}`);
-
-      // Check file size limits (Textract limit is 10MB for synchronous)
+      // Check file size limits BEFORE reading (Textract limit is 10MB for synchronous)
+      // This prevents loading excessively large files into memory
       const maxSizeBytes = 10 * 1024 * 1024; // 10MB
       if (fileStats.size > maxSizeBytes) {
         return {
@@ -300,6 +293,23 @@ export class TextractApiService implements DocumentReader {
           error: `File too large for Textract: ${(fileStats.size / 1024 / 1024).toFixed(2)}MB (max: 10MB)`,
         };
       }
+
+      // Validate file size is within reasonable bounds (additional safety check)
+      if (fileStats.size <= 0) {
+        return {
+          success: false,
+          error: `Invalid file size: ${fileStats.size} bytes`,
+        };
+      }
+
+      // Read file after size validation using sanitized path
+      const fileBuffer = fs.readFileSync(sanitizedPath);
+
+      // Log diagnostic information
+      this.logger.log(` File diagnostics for ${filePath}:`);
+      this.logger.log(`   Size: ${fileStats.size} bytes (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
+      this.logger.log(`   Buffer length: ${fileBuffer.length}`);
+      this.logger.log(`   File extension: ${filePath.split('.').pop()}`);
 
       // Detect file type by header
       const fileHeader = fileBuffer.slice(0, 8);

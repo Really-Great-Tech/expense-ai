@@ -1,6 +1,6 @@
 FROM node:22-alpine AS builder
 WORKDIR /usr/src/app
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3~=3.12 make~=4.4 g++~=13
 COPY package*.json tsconfig*.json nest-cli.json ./
 RUN npm ci
 COPY . .
@@ -8,7 +8,7 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 FROM node:22-alpine
 WORKDIR /usr/src/app
-RUN apk add --no-cache curl ca-certificates python3 make g++ && adduser -S -u 1001 nodejs
+RUN apk add --no-cache curl~=8 ca-certificates~=20241010 python3~=3.12 make~=4.4 g++~=13 && adduser -S -u 1001 nodejs
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /usr/src/app/dist ./dist
