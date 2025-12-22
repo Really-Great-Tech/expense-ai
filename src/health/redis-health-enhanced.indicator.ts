@@ -157,8 +157,18 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     readLatency: number;
     serverInfo: any;
   }> {
-    // Connect to Redis
-    await redis.connect();
+    // Connect to Redis with logging
+    const { host, port } = this.appConfig.redis;
+    this.logger.log(`Connecting to Redis at ${host}:${port}...`);
+
+    try {
+      await redis.connect();
+      this.logger.log('Redis connection established');
+    } catch (connectError) {
+      const msg = connectError instanceof Error ? connectError.message : String(connectError);
+      this.logger.error(`Redis connection failed: ${msg}`);
+      throw connectError;
+    }
 
     const testKey = `${this.HEALTH_CHECK_KEY_PREFIX}${Date.now()}`;
     const testValue = JSON.stringify({
@@ -347,17 +357,34 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     const { host: endpoint, port } = this.appConfig.redis;
 
     if (!endpoint) {
-      throw new Error('REDIS_HOST is required');
+      throw new Error('REDIS_HOST is required - set REDIS_HOST environment variable');
     }
 
-    return new Redis({
+    this.logger.debug(`Creating Redis connection to ${endpoint}:${port}`);
+
+    const redis = new Redis({
       host: endpoint,
       port,
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true,
-      connectTimeout: 10000,
+      connectTimeout: 5000, // 5 second connection timeout
+      commandTimeout: 5000, // 5 second command timeout
+      retryStrategy: (times) => {
+        if (times > 2) {
+          this.logger.error(`Redis connection failed after ${times} attempts`);
+          return null; // Stop retrying
+        }
+        return Math.min(times * 200, 1000); // Retry with backoff
+      },
     });
+
+    // Log connection errors
+    redis.on('error', (err) => {
+      this.logger.error(`Redis error: ${err.message}`);
+    });
+
+    return redis;
   }
 
   /**
@@ -368,16 +395,26 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     const { host: endpoint, port } = this.appConfig.redis;
 
     if (!endpoint) {
-      throw new Error('REDIS_HOST is required');
+      throw new Error('REDIS_HOST is required - set REDIS_HOST environment variable');
     }
 
-    return new Redis({
+    this.logger.debug(`Creating BullMQ Redis connection to ${endpoint}:${port}`);
+
+    const redis = new Redis({
       host: endpoint,
       port,
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: false,
-      connectTimeout: 10000,
+      connectTimeout: 5000, // 5 second connection timeout
+      commandTimeout: 5000, // 5 second command timeout
     });
+
+    // Log connection errors
+    redis.on('error', (err) => {
+      this.logger.error(`BullMQ Redis error: ${err.message}`);
+    });
+
+    return redis;
   }
 
   /**
