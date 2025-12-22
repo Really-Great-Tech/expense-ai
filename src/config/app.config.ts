@@ -162,7 +162,7 @@ export default registerAs('app', (): AppConfigType => {
     // STORAGE
     // ==========================================================================
     storage: {
-      type: (process.env.STORAGE_TYPE || 'local') as 'local' | 's3',
+      type: (process.env.STORAGE_TYPE || 's3') as 'local' | 's3',
       uploadPath: process.env.UPLOAD_PATH || './uploads',
       s3BucketName: process.env.S3_BUCKET_NAME,
     },
