@@ -80,7 +80,8 @@ describe('TextractApiService', () => {
     // Minimal PDF-like buffer with 2 page indicators
     const pdfHeader = Buffer.from('%PDF-1.7\n/Type /Page\n/Type /Page\n', 'utf-8');
     mockExists(true);
-    mockStat(4096);
+    // mockStat must match actual buffer size for security validation
+    mockStat(pdfHeader.length);
     mockReadBuffer(pdfHeader);
 
     const splitSpy = jest.spyOn(service as any, 'splitPdfIntoPages').mockResolvedValue([
@@ -111,11 +112,11 @@ describe('TextractApiService', () => {
   it('should fail when file exceeds Textract size limit', async () => {
     const service = createService();
 
-    // PNG header but too large size
-    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]);
+    // File size is validated BEFORE reading, so mockStat determines the error
+    // The buffer is never read when size check fails
     mockExists(true);
     mockStat(10 * 1024 * 1024 + 1); // just over 10MB
-    mockReadBuffer(pngHeader);
+    // No buffer mock needed - file read happens after size validation
 
     const res: any = await service.parseDocument('uploads/too-big.png');
 
