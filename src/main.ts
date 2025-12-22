@@ -29,7 +29,9 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  gracefulExit(reason instanceof Error ? reason : new Error(String(reason)));
+  // Log unhandled rejections but don't exit - they are often non-fatal (e.g., deadlocks in background jobs)
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error(`Unhandled rejection: ${error.message}`, error.stack);
 });
 
 async function bootstrap() {
