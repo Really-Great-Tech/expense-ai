@@ -215,6 +215,174 @@ describe('BaseAgent', () => {
     });
   });
 
+  describe('getPromptVersionTags', () => {
+    it('should return empty array when no prompt loaded', () => {
+      const tags = agent['getPromptVersionTags']();
+      expect(tags).toEqual([]);
+    });
+
+    it('should return version tags after loading prompt', async () => {
+      await agent.testGetPromptTemplate('data-extraction-prompt');
+      const tags = agent['getPromptVersionTags']();
+
+      expect(Array.isArray(tags)).toBe(true);
+      expect(tags.length).toBeGreaterThan(0);
+      expect(tags[0]).toContain('data-extraction-prompt');
+    });
+
+    it('should include general version tag when version is known', async () => {
+      await agent.testGetPromptTemplate('data-extraction-prompt');
+      const tags = agent['getPromptVersionTags']();
+
+      // Should have both prompt-specific and general version tags
+      const hasGeneralVersionTag = tags.some((t) => t.startsWith('prompt-v') && !t.includes('data-extraction'));
+      expect(hasGeneralVersionTag || tags.some((t) => t.includes('unknown'))).toBe(true);
+    });
+  });
+
+  describe('getAllPromptVersionTags', () => {
+    it('should return tags for multiple prompts', () => {
+      const promptInfos = [
+        { name: 'prompt1', version: 1, config: {} },
+        { name: 'prompt2', version: 2, config: {} },
+      ];
+
+      const tags = agent['getAllPromptVersionTags'](promptInfos);
+
+      expect(tags).toContain('prompt1-v1');
+      expect(tags).toContain('prompt2-v2');
+      expect(tags).toContain('prompt-v1');
+      expect(tags).toContain('prompt-v2');
+    });
+
+    it('should handle prompts without version', () => {
+      const promptInfos = [
+        { name: 'prompt1', config: {} },
+        { name: 'prompt2', version: undefined, config: {} },
+      ];
+
+      const tags = agent['getAllPromptVersionTags'](promptInfos);
+
+      expect(tags).toContain('prompt1-vunknown');
+      expect(tags).toContain('prompt2-vunknown');
+      // Should not include general version tag for unknown versions
+      expect(tags.filter((t) => t === 'prompt-vunknown').length).toBe(0);
+    });
+
+    it('should deduplicate version numbers', () => {
+      const promptInfos = [
+        { name: 'prompt1', version: 1, config: {} },
+        { name: 'prompt2', version: 1, config: {} },
+        { name: 'prompt3', version: 2, config: {} },
+      ];
+
+      const tags = agent['getAllPromptVersionTags'](promptInfos);
+
+      // Should only have one prompt-v1 tag, not two
+      const v1Tags = tags.filter((t) => t === 'prompt-v1');
+      expect(v1Tags.length).toBe(1);
+    });
+
+    it('should handle empty promptInfos array', () => {
+      const tags = agent['getAllPromptVersionTags']([]);
+      expect(tags).toEqual([]);
+    });
+  });
+
+  describe('executeLLMRequest', () => {
+    it('should throw error when LLM is not initialized', async () => {
+      const agentWithoutLlm = new TestAgent(null as any);
+
+      const { z } = require('zod');
+      const schema = z.object({ result: z.string() });
+
+      await expect(agentWithoutLlm['executeLLMRequest']('test', {}, schema)).rejects.toThrow(
+        'LLM service not initialized',
+      );
+    });
+
+    it('should execute LLM request with prompt and validate response', async () => {
+      const mockResponse = { result: 'success' };
+      mockLlmService.chat.mockResolvedValue({
+        message: { content: JSON.stringify(mockResponse) },
+      });
+
+      const { z } = require('zod');
+      const schema = z.object({ result: z.string() });
+
+      const result = await agent['executeLLMRequest']('data-extraction-prompt', { markdownContent: 'test' }, schema);
+
+      expect(result).toEqual(mockResponse);
+      expect(mockLlmService.chat).toHaveBeenCalled();
+    });
+
+    it('should include system prompt when provided', async () => {
+      const mockResponse = { result: 'success' };
+      mockLlmService.chat.mockResolvedValue({
+        message: { content: JSON.stringify(mockResponse) },
+      });
+
+      const { z } = require('zod');
+      const schema = z.object({ result: z.string() });
+
+      await agent['executeLLMRequest']('data-extraction-prompt', { markdownContent: 'test' }, schema, {
+        systemPrompt: 'You are a helpful assistant',
+      });
+
+      expect(mockLlmService.chat).toHaveBeenCalledWith({
+        messages: expect.arrayContaining([
+          expect.objectContaining({ role: 'system', content: 'You are a helpful assistant' }),
+        ]),
+      });
+    });
+
+    it('should use provided messages when available', async () => {
+      const mockResponse = { result: 'success' };
+      mockLlmService.chat.mockResolvedValue({
+        message: { content: JSON.stringify(mockResponse) },
+      });
+
+      const { z } = require('zod');
+      const schema = z.object({ result: z.string() });
+      const customMessages = [{ role: 'user' as const, content: 'custom message' }];
+
+      await agent['executeLLMRequest']('data-extraction-prompt', { markdownContent: 'test' }, schema, {
+        messages: customMessages,
+      });
+
+      expect(mockLlmService.chat).toHaveBeenCalledWith({
+        messages: customMessages,
+      });
+    });
+  });
+
+  describe('extractContentFromResponse edge cases', () => {
+    it('should handle null/undefined content', () => {
+      const response: ChatResponse = {
+        message: { content: null as any },
+      };
+      const result = agent.testExtractContentFromResponse(response);
+      expect(result).toBe('');
+    });
+
+    it('should handle empty array', () => {
+      const response: ChatResponse = {
+        message: { content: [] },
+      };
+      const result = agent.testExtractContentFromResponse(response);
+      // Empty array doesn't satisfy length > 0, falls through to object handling and gets stringified
+      expect(result).toBe('[]');
+    });
+
+    it('should stringify array when first item lacks text property', () => {
+      const response: ChatResponse = {
+        message: { content: [{ type: 'text' }] as any }, // Missing text property
+      };
+      const result = agent.testExtractContentFromResponse(response);
+      expect(typeof result).toBe('string');
+    });
+  });
+
   describe('Integration: Full workflow', () => {
     it('should handle complete prompt loading and compilation workflow', async () => {
       // Load prompt

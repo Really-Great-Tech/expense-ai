@@ -5,23 +5,22 @@ import { DocumentReaderType } from './types';
 const createConfigService = (values: Record<string, any> = {}) => new ConfigService(values);
 
 describe('DocumentReaderFactory', () => {
-
   describe('createReader', () => {
     it('should create Textract reader', () => {
       const configService = createConfigService({
-        AWS_SECRET_ACCESS_KEY: 'test-secret',
         AWS_REGION: 'us-east-1',
         UPLOAD_PATH: './uploads',
+        // No credentials needed - SDK uses default credential chain
       });
 
-      const reader = DocumentReaderFactory.createReader(DocumentReaderType.TEXTRACT, 'test-access-key', configService);
+      const reader = DocumentReaderFactory.createReader(DocumentReaderType.TEXTRACT, configService);
       expect(reader).toBeDefined();
       expect(reader.constructor.name).toBe('TextractApiService');
     });
 
     it('should throw error for unsupported reader type', () => {
       expect(() => {
-        DocumentReaderFactory.createReader('unsupported', 'test-key');
+        DocumentReaderFactory.createReader('unsupported');
       }).toThrow('Unsupported document reader type: unsupported');
     });
   });
@@ -30,25 +29,14 @@ describe('DocumentReaderFactory', () => {
     it('should return Textract reader when configured', () => {
       const configService = createConfigService({
         DOCUMENT_READER: DocumentReaderType.TEXTRACT,
-        AWS_ACCESS_KEY_ID: 'test-access-key',
-        AWS_SECRET_ACCESS_KEY: 'test-secret-key',
         AWS_REGION: 'us-east-1',
         UPLOAD_PATH: './uploads',
+        // No credentials needed - SDK uses default credential chain
       });
 
       const reader = DocumentReaderFactory.getDefaultReader(configService);
       expect(reader).toBeDefined();
       expect(reader.constructor.name).toBe('TextractApiService');
-    });
-
-    it('should throw error when AWS credentials are missing for Textract', () => {
-      const configService = createConfigService({
-        DOCUMENT_READER: DocumentReaderType.TEXTRACT,
-      });
-
-      expect(() => {
-        DocumentReaderFactory.getDefaultReader(configService);
-      }).toThrow('Textract AWS credentials not configured');
     });
 
     it('should throw error for unsupported reader type in environment', () => {
@@ -67,10 +55,9 @@ describe('Document Reader Integration', () => {
   it('should have consistent interface between readers', async () => {
     const configService = createConfigService({
       DOCUMENT_READER: DocumentReaderType.TEXTRACT,
-      AWS_ACCESS_KEY_ID: 'test-access-key',
-      AWS_SECRET_ACCESS_KEY: 'test-secret-key',
       AWS_REGION: 'us-east-1',
       UPLOAD_PATH: './uploads',
+      // No credentials needed - SDK uses default credential chain
     });
 
     const textractReader = DocumentReaderFactory.getDefaultReader(configService);

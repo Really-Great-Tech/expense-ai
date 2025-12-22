@@ -49,9 +49,19 @@ export class DatabaseHealthIndicator extends HealthIndicator {
       // Parse result
       const { version, maxConnections, currentConnections } = result as any;
 
+      const utilizationPercent = Math.round((currentConnections / maxConnections) * 100);
+
+      // Warn if pool utilization is high (>80%)
+      if (utilizationPercent > 80) {
+        this.logger.warn(
+          `Database connection pool utilization high: ${utilizationPercent}% ` +
+            `(${currentConnections}/${maxConnections} connections)`,
+        );
+      }
+
       this.logger.debug(
         `Database health check passed: MySQL ${version}, ` +
-          `${currentConnections}/${maxConnections} connections, ` +
+          `${currentConnections}/${maxConnections} connections (${utilizationPercent}%), ` +
           `${responseTime}ms response time`,
       );
 
@@ -62,8 +72,9 @@ export class DatabaseHealthIndicator extends HealthIndicator {
         currentConnections,
         responseTime: `${responseTime}ms`,
         connectionPool: {
-          status: 'healthy',
-          utilizationPercent: Math.round((currentConnections / maxConnections) * 100),
+          status: utilizationPercent > 80 ? 'warning' : 'healthy',
+          utilizationPercent,
+          warning: utilizationPercent > 80 ? 'Pool utilization exceeds 80%' : undefined,
         },
       });
     } catch (error) {
@@ -118,36 +129,5 @@ export class DatabaseHealthIndicator extends HealthIndicator {
         reject(new Error(`Database query timeout after ${ms}ms`));
       }, ms);
     });
-  }
-
-  /**
-   * Check migration status
-   * Useful for ensuring database schema is up-to-date
-   */
-  async checkMigrationStatus(): Promise<HealthIndicatorResult> {
-    try {
-      const hasPending = await this.dataSource.showMigrations();
-
-      if (hasPending) {
-        this.logger.warn('Database has pending migrations');
-        return this.getStatus('migrations', false, {
-          message: 'Pending migrations detected',
-          hasPendingMigrations: true,
-          recommendation: 'Run migrations via CLI or POST /migrations/run endpoint',
-        });
-      }
-
-      return this.getStatus('migrations', true, {
-        message: 'All migrations applied',
-        hasPendingMigrations: false,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Migration status check failed: ${errorMessage}`);
-
-      return this.getStatus('migrations', false, {
-        message: `Failed to check migration status: ${errorMessage}`,
-      });
-    }
   }
 }

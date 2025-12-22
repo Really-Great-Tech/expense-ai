@@ -1,8 +1,8 @@
 import { FileClassificationAgent } from './file-classification.agent';
-import { BedrockLlmService } from '../utils/bedrockLlm';
-import { FileClassificationResultSchema } from '../schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { FileClassificationResultSchema } from '../common/schemas/expense-schemas';
 
-jest.mock('../utils/bedrockLlm');
+jest.mock('../services/bedrock/bedrock-llm');
 
 describe('FileClassificationAgent', () => {
   let agent: FileClassificationAgent;
@@ -15,7 +15,7 @@ describe('FileClassificationAgent', () => {
       getCurrentModelName: jest.fn().mockReturnValue('claude-3-5-sonnet'),
     } as any;
 
-    agent = new FileClassificationAgent('bedrock', 'claude-3-5-sonnet');
+    agent = new FileClassificationAgent();
     agent['llm'] = mockLlmService;
   });
 
@@ -191,17 +191,14 @@ describe('FileClassificationAgent', () => {
   describe('constructor', () => {
     it('should initialize with default provider', () => {
       const newAgent = new FileClassificationAgent();
-      expect(newAgent['currentProvider']).toBe('bedrock');
+      expect(newAgent['defaultModelId']).toBeDefined();
+      expect(newAgent['llm']).toBeDefined();
     });
 
-    it('should accept custom provider', () => {
-      const newAgent = new FileClassificationAgent('anthropic');
-      expect(newAgent['currentProvider']).toBe('anthropic');
-    });
-
-    it('should use MODEL_CONFIG default when no modelName provided', () => {
-      const newAgent = new FileClassificationAgent('bedrock');
-      expect(newAgent['modelName']).toBeDefined();
+    it('should use profile-based configuration', () => {
+      const newAgent = new FileClassificationAgent();
+      // Profile configuration is handled internally via AGENT_PROFILES
+      expect(newAgent['llm']).toBeDefined();
     });
   });
 

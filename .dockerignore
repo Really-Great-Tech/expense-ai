@@ -1,11 +1,52 @@
-setup.sh
-test
-showcase
-dist
-.env.example
+# Git
+.git
 .gitignore
-docker-compose.yml
-Dockerfile
-endpoints.json
-README.md
+
+# IDE/Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+
+# Test files
+test/
+coverage/
+**/*.spec.ts
+**/*.test.ts
+jest*.json
+
+# Development
 .husky
+setup.sh
+showcase/
+scripts/
+validation_results/
+
+# Build artifacts
+node_modules/
+
+# Environment
+.env*
+!.env.example
+
+# CI/CD
+.github/
+
+# Misc
+*.log
+.DS_Store
+.cspell.json
+.editorconfig
+.eslintrc.js
+.prettierrc
+.jscpd.json
+bun.lock
+commitlint.config.js
+
+# Docker (avoid recursive copy)
+Dockerfile
+docker-compose*.yml
+.dockerignore

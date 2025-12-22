@@ -13,14 +13,14 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { BedrockLlmService } from '../utils/bedrockLlm';
-import { PageMarkdown } from '../document-splitter/types/document-splitter.types';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { PageMarkdown } from '../expense-document/types/upload.types';
 import {
   DocumentSplitterEvalAgent,
   SplitResult,
   PageGroup,
 } from './document-splitter-eval.agent';
-import { MODEL_CONFIG } from './config/models.config';
+import { AGENT_PROFILES } from './config/models.config';
 
 // Configuration constants
 const MAX_PAGES = 20;
@@ -73,7 +73,7 @@ export class UniversalDocumentSplitterAgent {
 
   constructor() {
     this.llm = new BedrockLlmService({
-      modelId: MODEL_CONFIG.DOCUMENT_SPLITTER,
+      profile: AGENT_PROFILES.DOCUMENT_SPLITTER,
       temperature: 0.1, // Very low for consistency
     });
     this.evalAgent = new DocumentSplitterEvalAgent();

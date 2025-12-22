@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator';
-import { BedrockLlmService } from '../../bedrockLlm';
+import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
+import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -14,7 +14,7 @@ import {
   ValidationErrorType,
   IssueValidationScore,
 } from './types';
-import pLimit from '../../p-limit';
+import pLimit from '../../../tools/p-limit/limit';
 
 /**
  * Configuration interface for parallel validation
@@ -87,39 +87,20 @@ export class ParallelExpenseComplianceUQLMValidator {
   private sequentialValidator: ExpenseComplianceUQLMValidator;
   private bedrockServices: BedrockLlmService[];
   private validationVersion: string = '2.0.0-parallel';
-  private readonly configService: ConfigService;
 
-  constructor(logger?: Logger, configService?: ConfigService) {
+  constructor(logger?: Logger) {
     this.logger = logger || new Logger(ParallelExpenseComplianceUQLMValidator.name);
-    this.configService = configService ?? new ConfigService();
 
     // Create sequential validator for fallback
-    this.sequentialValidator = new ExpenseComplianceUQLMValidator(this.logger, this.configService);
+    this.sequentialValidator = new ExpenseComplianceUQLMValidator(this.logger);
 
-    // Initialize Bedrock services with different temperatures (same as base class)
-    const judgeConfigs = [
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_1', 'eu.anthropic.claude-3-7-sonnet-20250219-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_1_TEMPERATURE', '0.3')),
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_2', 'eu.anthropic.claude-3-haiku-20240307-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_2_TEMPERATURE', '0.7')),
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_3', 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_3_TEMPERATURE', '0.5')),
-      },
+    // Initialize Bedrock services with different temperatures using unified profile
+    // All judges use the same profile (SONNET_4) but with different temperatures for diversity
+    this.bedrockServices = [
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
     ];
-
-    this.bedrockServices = judgeConfigs.map(
-      (config) =>
-        new BedrockLlmService({
-          modelId: config.modelId,
-          temperature: config.temperature,
-          modelType: 'claude',
-        }),
-    );
 
     // Initialize parallel validation configuration from environment variables
     this.config = this.loadParallelConfig();
@@ -130,7 +111,7 @@ export class ParallelExpenseComplianceUQLMValidator {
     this.jobLimiter = pLimit(this.config.jobConcurrency);
     this.rateLimiter = pLimit(this.config.bedrockRateLimitPerSecond);
 
-    this.logger.log(`✅ ParallelExpenseComplianceUQLMValidator initialized with config:`, {
+    this.logger.log(`ParallelExpenseComplianceUQLMValidator initialized with config:`, {
       parallelValidationEnabled: this.config.parallelValidationEnabled,
       dimensionConcurrency: this.config.dimensionConcurrency,
       judgeConcurrency: this.config.judgeConcurrency,
@@ -140,21 +121,22 @@ export class ParallelExpenseComplianceUQLMValidator {
       judgeModelsCount: this.bedrockServices.length,
     });
 
-    judgeConfigs.forEach((config, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${config.modelId} (temp: ${config.temperature})`);
+    this.bedrockServices.forEach((service, index) => {
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${index === 0 ? 0.3 : index === 1 ? 0.7 : 0.5})`);
     });
   }
 
   /**
    * Load parallel validation configuration from environment variables
+   * Note: These are validation-specific settings, not part of centralized app config
    */
   private loadParallelConfig(): ParallelValidationConfig {
     return {
-      parallelValidationEnabled: this.configService.get<string>('PARALLEL_VALIDATION_ENABLED', 'true') === 'true',
-      dimensionConcurrency: parseInt(this.configService.get<string>('VALIDATION_DIMENSION_CONCURRENCY', '6'), 10),
-      judgeConcurrency: parseInt(this.configService.get<string>('VALIDATION_JUDGE_CONCURRENCY', '3'), 10),
-      jobConcurrency: parseInt(this.configService.get<string>('VALIDATION_JOB_CONCURRENCY', '5'), 10),
-      bedrockRateLimitPerSecond: parseInt(this.configService.get<string>('BEDROCK_RATE_LIMIT_PER_SECOND', '10'), 10),
+      parallelValidationEnabled: (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') === 'true',
+      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6', 10),
+      judgeConcurrency: parseInt(process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3', 10),
+      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '5', 10),
+      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10', 10),
       fallbackToSequential: true,
       minSuccessfulDimensions: 3, // Minimum 50% success rate
     };
@@ -174,12 +156,12 @@ export class ParallelExpenseComplianceUQLMValidator {
     const startTime = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
 
-    this.logger.log(`🚀 Starting PARALLEL compliance validation for ${country} ${receiptType}`);
-    this.logger.log(`📊 Parallel config: ${this.config.dimensionConcurrency} dimensions, ${this.config.judgeConcurrency} judges per dimension`);
+    this.logger.log(`Starting PARALLEL compliance validation for ${country} ${receiptType}`);
+    this.logger.log(`Parallel config: ${this.config.dimensionConcurrency} dimensions, ${this.config.judgeConcurrency} judges per dimension`);
 
     // Check if parallel validation is enabled
     if (!this.config.parallelValidationEnabled) {
-      this.logger.log('⚠️ Parallel validation disabled, falling back to sequential');
+      this.logger.log('Parallel validation disabled, falling back to sequential');
       return this.sequentialValidator.validateComplianceResponse(aiResponse, country, receiptType, icp, complianceJson, extractedJson);
     }
 
@@ -212,7 +194,7 @@ export class ParallelExpenseComplianceUQLMValidator {
 
       if (successfulDimensions.length < this.config.minSuccessfulDimensions) {
         if (this.config.fallbackToSequential) {
-          this.logger.warn(`⚠️ Only ${successfulDimensions.length}/${validationResults.length} dimensions successful, falling back to sequential`);
+          this.logger.warn(`Only ${successfulDimensions.length}/${validationResults.length} dimensions successful, falling back to sequential`);
           return this.sequentialValidator.validateComplianceResponse(aiResponse, country, receiptType, icp, complianceJson, extractedJson);
         } else {
           throw new ValidationError(
@@ -262,16 +244,16 @@ export class ParallelExpenseComplianceUQLMValidator {
 
       const processingTime = endTime - startTime;
       this.logger.log(
-        `✅ PARALLEL validation completed in ${processingTime}ms (${successfulDimensions.length}/${validationResults.length} dimensions successful)`,
+        `PARALLEL validation completed in ${processingTime}ms (${successfulDimensions.length}/${validationResults.length} dimensions successful)`,
       );
 
       return overallAssessment;
     } catch (error) {
-      this.logger.error(`❌ Parallel validation failed: ${error.message}`);
+      this.logger.error(`Parallel validation failed: ${error.message}`);
 
       // Fallback to sequential if enabled
       if (this.config.fallbackToSequential) {
-        this.logger.log('🔄 Falling back to sequential validation');
+        this.logger.log('Falling back to sequential validation');
         return this.sequentialValidator.validateComplianceResponse(aiResponse, country, receiptType, icp, complianceJson, extractedJson);
       }
 
@@ -386,13 +368,13 @@ export class ParallelExpenseComplianceUQLMValidator {
   ): Promise<ComplianceValidationResult[]> {
     const dimensions = Object.values(ValidationDimension);
 
-    this.logger.log(`🔄 Processing ${dimensions.length} dimensions in parallel (concurrency: ${this.config.dimensionConcurrency})`);
+    this.logger.log(`Processing ${dimensions.length} dimensions in parallel (concurrency: ${this.config.dimensionConcurrency})`);
 
     // Create validation tasks for each dimension
     const validationTasks = dimensions.map((dimension) =>
       this.dimensionLimiter(async () => {
         try {
-          this.logger.log(`📊 Starting parallel validation for dimension: ${ValidationUtils.dimensionToString(dimension)}`);
+          this.logger.log(`Starting parallel validation for dimension: ${ValidationUtils.dimensionToString(dimension)}`);
 
           const validationPrompt = this._createValidationPrompt(
             aiResponse,
@@ -409,10 +391,10 @@ export class ParallelExpenseComplianceUQLMValidator {
           // Level 2 Parallelization: Use parallel judges within this dimension
           const result = await this._validateDimensionWithParallelJudges(validationPrompt, dimension, extractedIssues);
 
-          this.logger.log(`✅ Completed parallel validation for dimension: ${ValidationUtils.dimensionToString(dimension)}`);
+          this.logger.log(`Completed parallel validation for dimension: ${ValidationUtils.dimensionToString(dimension)}`);
           return result;
         } catch (error) {
-          this.logger.error(`❌ Error in parallel validation for ${dimension}: ${error.message}`);
+          this.logger.error(`Error in parallel validation for ${dimension}: ${error.message}`);
           return this._createErrorResult(dimension, error.message);
         }
       }),
@@ -428,7 +410,7 @@ export class ParallelExpenseComplianceUQLMValidator {
         validationResults.push(result.value as ComplianceValidationResult);
       } else {
         const dimension = dimensions[index];
-        this.logger.error(`❌ Dimension validation rejected for ${dimension}: ${result.reason}`);
+        this.logger.error(`Dimension validation rejected for ${dimension}: ${result.reason}`);
         validationResults.push(this._createErrorResult(dimension, result.reason?.message || 'Unknown error'));
       }
     });
@@ -445,7 +427,7 @@ export class ParallelExpenseComplianceUQLMValidator {
     extractedIssues?: Array<{ issue_type: string; description: string }>,
   ): Promise<ComplianceValidationResult> {
     try {
-      this.logger.log(`🏛️ Starting parallel judge panel for ${dimension} (${this.bedrockServices.length} judges)`);
+      this.logger.log(`Starting parallel judge panel for ${dimension} (${this.bedrockServices.length} judges)`);
 
       // Create judge tasks with rate limiting
       const judgeTasks = this.bedrockServices.map((service, index) =>
@@ -470,7 +452,7 @@ export class ParallelExpenseComplianceUQLMValidator {
               } as JudgeResult;
             });
           } catch (error) {
-            this.logger.warn(`⚠️ Parallel judge ${index + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
+            this.logger.warn(`Parallel judge ${index + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
             return {
               model_name: modelName,
               confidence_score: 0.0,
@@ -525,7 +507,7 @@ export class ParallelExpenseComplianceUQLMValidator {
         }
       });
 
-      this.logger.log(`🏛️ Parallel judge panel completed for ${dimension}: ${successfulJudges}/${this.bedrockServices.length} judges successful`);
+      this.logger.log(`Parallel judge panel completed for ${dimension}: ${successfulJudges}/${this.bedrockServices.length} judges successful`);
 
       // Use the first successful response as primary, or first response if none successful
       const primaryResponse = judgeResponses.find((r) => !r.startsWith('Error:')) || judgeResponses[0];
@@ -561,7 +543,7 @@ export class ParallelExpenseComplianceUQLMValidator {
         issueValidationScores,
       );
     } catch (error) {
-      this.logger.error(`❌ Parallel judge panel failed for ${dimension}: ${error.message}`);
+      this.logger.error(`Parallel judge panel failed for ${dimension}: ${error.message}`);
       return this._createErrorResult(dimension, error.message);
     }
   }
@@ -570,12 +552,12 @@ export class ParallelExpenseComplianceUQLMValidator {
    * Level 3 Parallelization: Process multiple validation jobs in parallel
    */
   async validateBatchJobsInParallel(jobs: ValidationJob[]): Promise<ValidationSummary[]> {
-    this.logger.log(`🚀 Starting batch parallel validation for ${jobs.length} jobs (concurrency: ${this.config.jobConcurrency})`);
+    this.logger.log(`Starting batch parallel validation for ${jobs.length} jobs (concurrency: ${this.config.jobConcurrency})`);
 
     const batchTasks = jobs.map((job) =>
       this.jobLimiter(async () => {
         try {
-          this.logger.log(`📋 Processing job ${job.id}`);
+          this.logger.log(`Processing job ${job.id}`);
 
           const result = await this.validateComplianceResponseParallel(
             job.aiResponse,
@@ -586,10 +568,10 @@ export class ParallelExpenseComplianceUQLMValidator {
             job.extractedJson,
           );
 
-          this.logger.log(`✅ Completed job ${job.id}`);
+          this.logger.log(`Completed job ${job.id}`);
           return result;
         } catch (error) {
-          this.logger.error(`❌ Job ${job.id} failed: ${error.message}`);
+          this.logger.error(`Job ${job.id} failed: ${error.message}`);
           throw error;
         }
       }),
@@ -607,12 +589,12 @@ export class ParallelExpenseComplianceUQLMValidator {
         validationSummaries.push(result.value as ValidationSummary);
         successfulJobs++;
       } else {
-        this.logger.error(`❌ Batch job ${jobs[index].id} rejected: ${result.reason}`);
+        this.logger.error(`Batch job ${jobs[index].id} rejected: ${result.reason}`);
         // Could create a failed validation summary here if needed
       }
     });
 
-    this.logger.log(`✅ Batch parallel validation completed: ${successfulJobs}/${jobs.length} jobs successful`);
+    this.logger.log(`Batch parallel validation completed: ${successfulJobs}/${jobs.length} jobs successful`);
 
     return validationSummaries;
   }
@@ -1064,7 +1046,7 @@ SUMMARY: [Brief assessment]`;
       this.rateLimiter = pLimit(this.config.bedrockRateLimitPerSecond);
     }
 
-    this.logger.log('🔧 Parallel validation configuration updated:', newConfig);
+    this.logger.log('Parallel validation configuration updated:', newConfig);
   }
 
   /**

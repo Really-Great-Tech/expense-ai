@@ -1,8 +1,8 @@
-import { CitationResultSchema, type CitationResult } from '../schemas/expense-schemas';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { CitationResultSchema, type CitationResult } from '../common/schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
-import { MODEL_CONFIG, INFERENCE_CONFIG } from './config/models.config';
+import { AGENT_PROFILES, INFERENCE_CONFIG } from './config/models.config';
 
 /**
  * Agent responsible for generating citations mapping extracted fields to source document text
@@ -10,35 +10,19 @@ import { MODEL_CONFIG, INFERENCE_CONFIG } from './config/models.config';
  */
 export class CitationGeneratorAgent extends BaseAgent {
   protected llm: ILLMService;
-  private currentProvider: 'bedrock' | 'anthropic';
-  private readonly citationModelId: string;
 
-  constructor(provider: 'bedrock' | 'anthropic' = 'bedrock', citationModelId: string = MODEL_CONFIG.CITATION) {
+  constructor() {
     super();
-    this.currentProvider = provider;
-    this.logger.log(`Initializing CitationGeneratorAgent with provider: ${provider}`);
-
-    // Use Nova Micro for citations - better for structured output
-    this.citationModelId = citationModelId;
-    this.llm = new BedrockLlmService({ modelId: this.citationModelId, modelType: 'nova' });
-    this.logger.log(`Using model for citations: ${this.citationModelId}`);
+    this.logger.log('Initializing CitationGeneratorAgent');
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.CITATION });
   }
 
   /**
-   * Get the actual model name used, accounting for fallback scenarios
+   * Get the actual model name used
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    if (this.currentProvider === 'bedrock' && this.llm.getCurrentModelName) {
-      // For BedrockLlmService, get the actual model name (handles fallback)
-      return this.llm.getCurrentModelName();
-    } else if (this.currentProvider === 'bedrock') {
-      // Fallback for older BedrockLlmService without getCurrentModelName
-      return this.citationModelId;
-    } else {
-      // Direct Anthropic usage
-      return 'claude-3-5-sonnet';
-    }
+    return this.llm.getCurrentModelName();
   }
 
   /**

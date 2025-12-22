@@ -25,7 +25,6 @@ import {
 } from './types';
 
 // Import the main validator classes
-import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator';
 import {
   ParallelExpenseComplianceUQLMValidator,
@@ -272,13 +271,12 @@ export function validateSystemHealth(): {
   recommendedConfiguration: any;
 } {
   try {
-    const configService = new ConfigService();
-    const parallelValidator = new ParallelExpenseComplianceUQLMValidator(undefined, configService);
-    const sequentialValidator = new ExpenseComplianceUQLMValidator(undefined, configService);
-    
+    const parallelValidator = new ParallelExpenseComplianceUQLMValidator();
+    const sequentialValidator = new ExpenseComplianceUQLMValidator();
+
     const parallelReady = parallelValidator.isParallelValidationReady();
     const stats = parallelValidator.getPerformanceStats();
-    
+
     return {
       parallelValidationAvailable: parallelReady,
       sequentialValidationAvailable: true,

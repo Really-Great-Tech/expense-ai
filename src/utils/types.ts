@@ -45,6 +45,7 @@ export interface DocumentReaderConfig {
 
 export interface DocumentReader {
   parseDocument(filePath: string, config?: DocumentReaderConfig): Promise<ApiResponse<string>>;
+  parseDocumentFromBuffer?(buffer: Buffer, fileName: string, config?: DocumentReaderConfig): Promise<ApiResponse<string>>;
 }
 
 export enum DocumentReaderType {

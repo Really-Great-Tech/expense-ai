@@ -1,43 +1,43 @@
-import { Module, MiddlewareConsumer, OnModuleInit } from '@nestjs/common';
+import { Module, MiddlewareConsumer, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config';
-import { DocumentModule } from './document/document.module';
-import { ProcessingModule } from './processing/processing.module';
+import appConfig, { AppConfigType } from './config/app.config';
+import { ExpenseDocumentModule } from './expense-document/expense-document.module';
+import { WorkersModule } from './workers/workers.module';
+import { ExpenseResultModule } from './expense-result/expense-result.module';
 import { CountryPolicyModule } from './country-policy/country-policy.module';
 import { RedisConfigService } from './config/redis.config';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityMiddleware } from './middleware/security.middleware';
-import { DocumentSplitterModule } from './document-splitter/document-splitter.module';
-import { LoggerModule } from './logger/logger.module';
+import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
+import { ResilienceModule } from './resilience';
 import { DatabaseConfigValidator } from './config/database-validation';
-import { MigrationService } from './config/migration.service';
-import { MigrationController } from './config/migration.controller';
+import { DataSource } from 'typeorm';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [configuration],
+      load: [configuration, appConfig],
     }),
-    // Throttling
+    // Throttling - uses centralized app config
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const ttl = parseInt(configService.get<string>('THROTTLE_TTL', '60'), 10);
-        const limit = parseInt(configService.get<string>('THROTTLE_LIMIT', '100'), 10);
+        const config = configService.get<AppConfigType>('app')!;
 
         return {
           throttlers: [
             {
-              ttl,
-              limit,
+              ttl: config.throttle.ttl,
+              limit: config.throttle.limit,
             },
           ],
         };
@@ -55,43 +55,42 @@ import { MigrationController } from './config/migration.controller';
       inject: [ConfigService],
     }),
     ScheduleModule.forRoot(),
-    DocumentModule,
-    DocumentSplitterModule,
-    ProcessingModule,
+    ExpenseDocumentModule,
+    WorkersModule,
+    ExpenseResultModule,
     CountryPolicyModule,
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
+    ResilienceModule, // Circuit breaker for AWS services
   ],
-  controllers: [AppController, MigrationController],
-  providers: [AppService, RedisConfigService, MigrationService],
+  controllers: [AppController],
+  providers: [AppService, RedisConfigService],
 })
-export class AppModule implements OnModuleInit {
-  private readonly logger = new (require('@nestjs/common').Logger)(AppModule.name);
+export class AppModule implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AppModule.name);
 
   constructor(
     private configService: ConfigService,
-    private migrationService: MigrationService,
+    private dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
     // Validate database configuration on startup
     // This prevents dangerous misconfigurations in production
     DatabaseConfigValidator.validate(this.configService);
+  }
 
-    // Log migration status on startup (migrations run automatically via migrationsRun: true)
-    this.logger.log('Checking migration status after startup...');
-    try {
-      const hasPending = await this.migrationService.hasPendingMigrations();
-      const history = await this.migrationService.getMigrationHistory();
+  async onModuleDestroy() {
+    this.logger.log('Graceful shutdown initiated...');
 
-      if (hasPending) {
-        this.logger.warn('WARNING: There are still pending migrations after startup!');
-      } else {
-        this.logger.log(`All migrations applied. Total migrations in history: ${history.length}`);
-      }
-    } catch (error) {
-      this.logger.error('Failed to check migration status:', error);
+    // Close database connections
+    if (this.dataSource.isInitialized) {
+      this.logger.log('Closing database connections...');
+      await this.dataSource.destroy();
+      this.logger.log('Database connections closed');
     }
+
+    this.logger.log('Graceful shutdown complete');
   }
 
   configure(consumer: MiddlewareConsumer) {

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import Redis from 'ioredis';
 import { Queue, Job } from 'bullmq';
+import { AppConfigType } from '../config/app.config';
 
 /**
  * Enhanced Redis Health Indicator with BullMQ Support
@@ -23,9 +24,11 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
   private readonly logger = new Logger(RedisHealthEnhancedIndicator.name);
   private readonly HEALTH_CHECK_KEY_PREFIX = 'health:check:';
   private readonly HEALTH_CHECK_QUEUE_PREFIX = 'health-bullmq-';
+  private readonly appConfig: AppConfigType;
 
   constructor(private configService: ConfigService) {
     super();
+    this.appConfig = this.configService.get<AppConfigType>('app')!;
   }
 
   /**
@@ -341,9 +344,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * Create Redis connection using same configuration as application
    */
   private createRedisConnection(): Redis {
-    const redisMode = this.configService.get('REDIS_MODE', 'local');
+    const { mode } = this.appConfig.redis;
 
-    if (redisMode === 'managed') {
+    if (mode === 'managed') {
       return this.createManagedRedisConnection();
     }
 
@@ -354,11 +357,12 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * Create local Redis connection
    */
   private createLocalRedisConnection(): Redis {
+    const { host, port, password, db } = this.appConfig.redis;
     return new Redis({
-      host: this.configService.get('REDIS_HOST', 'localhost'),
-      port: this.configService.get('REDIS_PORT', 6379),
-      password: this.configService.get('REDIS_PASSWORD'),
-      db: this.configService.get('REDIS_DB', 0),
+      host,
+      port,
+      password: password || undefined,
+      db,
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true,
@@ -369,10 +373,7 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * Create managed Redis connection (AWS ElastiCache)
    */
   private createManagedRedisConnection(): Redis {
-    const endpoint = this.configService.get('REDIS_HOST');
-    const port = this.configService.get('REDIS_PORT', 6379);
-    const password = this.configService.get('REDIS_PASSWORD');
-    const tlsEnabled = this.configService.get('REDIS_TLS_ENABLED', 'false') === 'true';
+    const { host: endpoint, port, password, db, tlsEnabled } = this.appConfig.redis;
 
     if (!endpoint) {
       throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
@@ -380,9 +381,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
 
     const config: any = {
       host: endpoint,
-      port: parseInt(port.toString(), 10),
+      port,
       password: password || undefined,
-      db: this.configService.get('REDIS_DB', 0),
+      db,
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true,
@@ -392,7 +393,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     if (tlsEnabled) {
       config.tls = {
         servername: endpoint,
-        checkServerIdentity: () => undefined,
+        // Use default Node.js certificate validation
+        // ElastiCache uses AWS-managed certificates validated against system CA store
+        rejectUnauthorized: true,
       };
     }
 
@@ -404,9 +407,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * Routes to local or managed connection based on REDIS_MODE
    */
   private createBullMQRedisConnection(): Redis {
-    const redisMode = this.configService.get('REDIS_MODE', 'local');
+    const { mode } = this.appConfig.redis;
 
-    if (redisMode === 'managed') {
+    if (mode === 'managed') {
       return this.createManagedBullMQRedisConnection();
     }
 
@@ -418,11 +421,12 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * BullMQ requires maxRetriesPerRequest: null
    */
   private createLocalBullMQRedisConnection(): Redis {
+    const { host, port, password, db } = this.appConfig.redis;
     return new Redis({
-      host: this.configService.get('REDIS_HOST', 'localhost'),
-      port: this.configService.get('REDIS_PORT', 6379),
-      password: this.configService.get('REDIS_PASSWORD'),
-      db: this.configService.get('REDIS_DB', 0),
+      host,
+      port,
+      password: password || undefined,
+      db,
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: false,
     });
@@ -433,10 +437,7 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
    * BullMQ requires maxRetriesPerRequest: null
    */
   private createManagedBullMQRedisConnection(): Redis {
-    const endpoint = this.configService.get('REDIS_HOST');
-    const port = this.configService.get('REDIS_PORT', 6379);
-    const password = this.configService.get('REDIS_PASSWORD');
-    const tlsEnabled = this.configService.get('REDIS_TLS_ENABLED', 'false') === 'true';
+    const { host: endpoint, port, password, db, tlsEnabled } = this.appConfig.redis;
 
     if (!endpoint) {
       throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
@@ -444,9 +445,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
 
     const config: any = {
       host: endpoint,
-      port: parseInt(port.toString(), 10),
+      port,
       password: password || undefined,
-      db: this.configService.get('REDIS_DB', 0),
+      db,
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: false,
       connectTimeout: 10000,
@@ -455,7 +456,9 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     if (tlsEnabled) {
       config.tls = {
         servername: endpoint,
-        checkServerIdentity: () => undefined,
+        // Use default Node.js certificate validation
+        // ElastiCache uses AWS-managed certificates validated against system CA store
+        rejectUnauthorized: true,
       };
     }
 

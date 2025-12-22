@@ -2,7 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import { TextractClient, DetectDocumentTextCommand } from '@aws-sdk/client-textract';
-import { BedrockRuntimeClient, ConverseCommand, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { AppConfigType } from '../config/app.config';
+import { BedrockLlmService, ProfileKey, InferenceProfile } from '../services/bedrock/bedrock-llm';
 
 interface ServiceTestResult {
   status: 'up' | 'down';
@@ -12,22 +14,15 @@ interface ServiceTestResult {
   error?: string;
 }
 
-interface ModelTestResult {
-  name: string;
-  modelId: string;
-  modelType: 'nova' | 'claude';
+interface ProfileTestResult {
+  profileKey: string;
+  profileName: string;
+  arn: string;
   status: 'up' | 'down';
   latency: string;
   responseText?: string;
   usage?: { inputTokens: number; outputTokens: number };
   error?: string;
-}
-
-interface BedrockModelConfig {
-  envVar: string;
-  defaultValue: string;
-  modelType: 'nova' | 'claude';
-  description: string;
 }
 
 /**
@@ -39,49 +34,37 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   private readonly logger = new Logger(AwsServicesHealthIndicator.name);
   private textractClient: TextractClient | null = null;
   private bedrockClient: BedrockRuntimeClient | null = null;
+  private readonly appConfig: AppConfigType;
 
   constructor(private configService: ConfigService) {
     super();
+    this.appConfig = this.configService.get<AppConfigType>('app')!;
     this.initializeClients();
   }
 
   /**
    * Initialize AWS SDK clients
-   * Uses same configuration pattern as TextractApiService and BedrockLlmService
+   * Uses AWS SDK default credential chain for authentication:
+   * 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+   * 2. Shared credentials file (~/.aws/credentials)
+   * 3. ECS Container credentials (Task Role)
+   * 4. EC2 Instance metadata (Instance Profile)
    */
   private initializeClients(): void {
     try {
-      // Textract configuration (matches TextractApiService)
-      const textractRegion = this.configService.get<string>('AWS_REGION', 'us-east-1');
-      const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-      const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+      const awsRegion = this.appConfig.aws.region;
 
-      const textractCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
-      // Initialize Textract client (same config as TextractApiService)
+      // Initialize Textract client - uses default credential chain
       this.textractClient = new TextractClient({
-        region: textractRegion,
-        credentials: textractCredentials,
+        region: awsRegion,
       });
 
-      // Bedrock configuration (matches BedrockLlmService)
-      const bedrockRegion = this.configService.get<string>('AWS_REGION', 'eu-west-1');
-
-      const bedrockCredentials =
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined; // Use default credential chain if not provided
-
-      // Initialize Bedrock client (same config as BedrockLlmService)
+      // Initialize Bedrock client - uses default credential chain
       this.bedrockClient = new BedrockRuntimeClient({
-        region: "us-east-1",
-        credentials: bedrockCredentials,
+        region: awsRegion,
       });
 
-      this.logger.log(`AWS clients initialized (Textract: ${textractRegion}, Bedrock: ${bedrockRegion})`);
+      this.logger.log(`AWS clients initialized (Textract: ${awsRegion}, Bedrock: ${awsRegion})`);
     } catch (error) {
       this.logger.error(`Failed to initialize AWS clients: ${error.message}`);
     }
@@ -119,8 +102,8 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         message: 'Textract is operational',
         latency: `${latency}ms`,
         details: {
-          region: this.configService.get('AWS_REGION', 'us-east-1'),
-          credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
+          region: this.appConfig.aws.region,
+          credentialsSource: 'default-chain',
           blocksDetected: response.Blocks?.length || 0,
           documentMetadata: response.DocumentMetadata,
         },
@@ -141,7 +124,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         error: errorMessage,
         details: {
           errorType: error.constructor.name,
-          region: this.configService.get('AWS_REGION', 'us-east-1'),
+          region: this.appConfig.aws.region,
         },
       };
 
@@ -150,111 +133,47 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   }
 
   /**
-   * Derive model type from model ID string at runtime
-   * Works with both regular model IDs and application inference profile ARNs
+   * Get all configured Bedrock profiles to test
+   * Uses BedrockLlmService.getAllProfiles() to get profiles with configured ARNs
    */
-  private deriveModelType(modelId: string): 'nova' | 'claude' {
-    const lowerModelId = modelId.toLowerCase();
-    if (lowerModelId.includes('nova')) {
-      return 'nova';
+  private getProfilesToTest(): Array<{ key: ProfileKey; profile: InferenceProfile }> {
+    const allProfiles = BedrockLlmService.getAllProfiles();
+    const configured: Array<{ key: ProfileKey; profile: InferenceProfile }> = [];
+
+    for (const [key, profile] of Object.entries(allProfiles)) {
+      if (profile !== null) {
+        configured.push({ key: key as ProfileKey, profile });
+      }
     }
-    if (lowerModelId.includes('claude') || lowerModelId.includes('anthropic')) {
-      return 'claude';
-    }
-    // Default to nova for unknown models (BEDROCK_MODEL defaults to Nova)
-    return 'nova';
+
+    return configured;
   }
 
   /**
-   * Get all Bedrock models to test
+   * Test a single Bedrock profile using unified ConverseCommand
+   * Works for both Nova and Claude models via Application Inference Profiles
    */
-  private getModelsToTest(): BedrockModelConfig[] {
-    return [
-      {
-        envVar: 'BEDROCK_MODEL',
-        defaultValue: 'us.amazon.nova-pro-v1:0',
-        modelType: 'nova',
-        description: 'Primary model (extraction, quality, compliance, splitter)',
-      },
-      {
-        envVar: 'CITATION_MODEL',
-        defaultValue: 'us.amazon.nova-micro-v1:0',
-        modelType: 'nova',
-        description: 'Citation generation model',
-      },
-      {
-        envVar: 'BEDROCK_JUDGE_MODEL_1',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-        modelType: 'claude',
-        description: 'Judge model 1 (validation)',
-      },
-      {
-        envVar: 'BEDROCK_JUDGE_MODEL_2',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-        modelType: 'claude',
-        description: 'Judge model 2 (validation)',
-      },
-      {
-        envVar: 'BEDROCK_JUDGE_MODEL_3',
-        defaultValue: 'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
-        modelType: 'claude',
-        description: 'Judge model 3 (validation)',
-      },
-    ];
-  }
-
-  /**
-   * Test a single Bedrock model
-   */
-  private async testSingleModel(config: BedrockModelConfig): Promise<ModelTestResult> {
+  private async testSingleProfile(profileKey: ProfileKey, profile: InferenceProfile): Promise<ProfileTestResult> {
     const startTime = Date.now();
-    const modelId = this.configService.get<string>(config.envVar, config.defaultValue);
-
-    // Determine model type - use config type, but verify with string if using application profiles
-    const usingApplicationProfile = this.configService.get<string>('USING_APPLICATION_PROFILE', 'false').toLowerCase() === 'true';
-    const modelType = usingApplicationProfile ? this.deriveModelType(modelId) : config.modelType;
-    const isNova = modelType === 'nova';
 
     try {
-      let responseText = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
+      // Unified ConverseCommand works for all models (Nova and Claude)
+      const command = new ConverseCommand({
+        modelId: profile.arn,
+        messages: [{ role: 'user', content: [{ text: 'Reply with only the word "OK"' }] }],
+        inferenceConfig: { maxTokens: 10, temperature: 0, topP: 0.9 },
+      });
 
-      if (isNova) {
-        const command = new ConverseCommand({
-          modelId,
-          messages: [{ role: 'user', content: [{ text: 'Reply with only the word "OK"' }] }],
-          inferenceConfig: { maxTokens: 10, temperature: 0, topP: 0.9 },
-        });
-        const response = await this.bedrockClient!.send(command);
-        responseText = response.output?.message?.content?.[0]?.text || '';
-        inputTokens = response.usage?.inputTokens || 0;
-        outputTokens = response.usage?.outputTokens || 0;
-      } else {
-        const requestBody = {
-          anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 10,
-          temperature: 0,
-          messages: [{ role: 'user', content: 'Reply with only the word "OK"' }],
-        };
-        const command = new InvokeModelCommand({
-          modelId,
-          contentType: 'application/json',
-          accept: 'application/json',
-          body: JSON.stringify(requestBody),
-        });
-        const response = await this.bedrockClient!.send(command);
-        const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-        responseText = responseBody.content[0].text;
-        inputTokens = responseBody.usage?.input_tokens || 0;
-        outputTokens = responseBody.usage?.output_tokens || 0;
-      }
+      const response = await this.bedrockClient!.send(command);
+      const responseText = response.output?.message?.content?.[0]?.text || '';
+      const inputTokens = response.usage?.inputTokens || 0;
+      const outputTokens = response.usage?.outputTokens || 0;
 
       const latency = Date.now() - startTime;
       return {
-        name: config.envVar,
-        modelId,
-        modelType,
+        profileKey,
+        profileName: profile.name,
+        arn: profile.arn,
         status: 'up',
         latency: `${latency}ms`,
         responseText,
@@ -263,9 +182,9 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
     } catch (error) {
       const latency = Date.now() - startTime;
       return {
-        name: config.envVar,
-        modelId,
-        modelType,
+        profileKey,
+        profileName: profile.name,
+        arn: profile.arn,
         status: 'down',
         latency: `${latency}ms`,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -274,8 +193,8 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
   }
 
   /**
-   * Test AWS Bedrock connectivity and functionality for all configured models
-   * Tests: BEDROCK_MODEL, CITATION_MODEL, BEDROCK_JUDGE_MODEL_1/2/3
+   * Test AWS Bedrock connectivity and functionality for all configured profiles
+   * Tests all profiles that have ARNs configured (NOVA_MICRO, NOVA_PRO, SONNET_4, SONNET_4_5)
    */
   async checkBedrock(key: string): Promise<HealthIndicatorResult> {
     const startTime = Date.now();
@@ -285,41 +204,45 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         throw new Error('Bedrock client not initialized');
       }
 
-      const modelsToTest = this.getModelsToTest();
-      const modelResults: ModelTestResult[] = [];
+      const profilesToTest = this.getProfilesToTest();
 
-      // Test all models
-      for (const config of modelsToTest) {
-        this.logger.log(`Testing ${config.envVar} (${config.description})...`);
-        const result = await this.testSingleModel(config);
-        modelResults.push(result);
-        this.logger.log(`  ${config.envVar}: ${result.status} (${result.latency})`);
+      if (profilesToTest.length === 0) {
+        throw new Error('No Bedrock profiles configured. Set BEDROCK_*_ARN environment variables.');
+      }
+
+      const profileResults: ProfileTestResult[] = [];
+
+      // Test all configured profiles
+      for (const { key: profileKey, profile } of profilesToTest) {
+        this.logger.log(`Testing ${profileKey} (${profile.name})...`);
+        const result = await this.testSingleProfile(profileKey, profile);
+        profileResults.push(result);
+        this.logger.log(`  ${profileKey}: ${result.status} (${result.latency})`);
       }
 
       const latency = Date.now() - startTime;
-      const allUp = modelResults.every((r) => r.status === 'up');
-      const upCount = modelResults.filter((r) => r.status === 'up').length;
-      const downCount = modelResults.filter((r) => r.status === 'down').length;
+      const allUp = profileResults.every((r) => r.status === 'up');
+      const upCount = profileResults.filter((r) => r.status === 'up').length;
+      const downCount = profileResults.filter((r) => r.status === 'down').length;
 
       const result: ServiceTestResult = {
         status: allUp ? 'up' : 'down',
-        message: allUp ? 'All Bedrock models operational' : `${downCount}/${modelResults.length} models down`,
+        message: allUp ? 'All Bedrock profiles operational' : `${downCount}/${profileResults.length} profiles down`,
         latency: `${latency}ms`,
         details: {
-          region: this.configService.get('AWS_REGION', 'eu-west-1'),
-          credentialsSource: this.configService.get('AWS_ACCESS_KEY_ID') ? 'explicit' : 'default-chain',
-          usingApplicationProfile: this.configService.get<string>('USING_APPLICATION_PROFILE', 'false'),
-          summary: { total: modelResults.length, up: upCount, down: downCount },
-          models: modelResults,
+          region: this.appConfig.aws.region,
+          credentialsSource: 'default-chain',
+          summary: { total: profileResults.length, up: upCount, down: downCount },
+          profiles: profileResults,
         },
       };
 
       if (!allUp) {
-        this.logger.error(`Bedrock health check failed: ${downCount} models down`);
+        this.logger.error(`Bedrock health check failed: ${downCount} profiles down`);
         throw new HealthCheckError('Bedrock health check failed', this.getStatus(key, false, result));
       }
 
-      this.logger.log(`Bedrock health check passed (${latency}ms, ${upCount} models tested)`);
+      this.logger.log(`Bedrock health check passed (${latency}ms, ${upCount} profiles tested)`);
       return this.getStatus(key, true, result);
     } catch (error) {
       if (error instanceof HealthCheckError) {
@@ -337,7 +260,7 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
         error: errorMessage,
         details: {
           errorType: error.constructor.name,
-          region: this.configService.get('AWS_REGION', 'eu-west-1'),
+          region: this.appConfig.aws.region,
         },
       };
 

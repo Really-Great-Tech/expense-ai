@@ -1,8 +1,8 @@
-import { FileClassificationResultSchema, type FileClassificationResult } from '../schemas/expense-schemas';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { FileClassificationResultSchema, type FileClassificationResult } from '../common/schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
-import { MODEL_CONFIG } from './config/models.config';
+import { AGENT_PROFILES } from './config/models.config';
 
 /**
  * Agent responsible for classifying documents to determine if they are expenses
@@ -10,33 +10,23 @@ import { MODEL_CONFIG } from './config/models.config';
  */
 export class FileClassificationAgent extends BaseAgent {
   protected llm: ILLMService;
-  private currentProvider: 'bedrock' | 'anthropic';
-  private modelName: string;
+  protected readonly defaultModelId: string = 'claude-3-5-sonnet';
 
-  constructor(provider: 'bedrock' | 'anthropic' = 'bedrock', modelName?: string) {
+  constructor() {
     super();
-    this.currentProvider = provider;
-    this.modelName = modelName || MODEL_CONFIG.CLASSIFICATION;
-    this.logger.log(`Initializing FileClassificationAgent with provider: ${provider}`);
-
-    this.llm = new BedrockLlmService({ modelType: 'claude' });
+    this.logger.log('Initializing FileClassificationAgent');
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.CLASSIFICATION });
   }
 
   /**
-   * Get the actual model name used, accounting for fallback scenarios
+   * Get the actual model name used
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    if (this.currentProvider === 'bedrock' && this.llm.getCurrentModelName) {
-      // For BedrockLlmService, get the actual model name (handles fallback)
+    if (this.llm?.getCurrentModelName) {
       return this.llm.getCurrentModelName();
-    } else if (this.currentProvider === 'bedrock') {
-      // Fallback for older BedrockLlmService without getCurrentModelName
-      return this.modelName;
-    } else {
-      // Direct Anthropic usage
-      return this.modelName;
     }
+    return this.defaultModelId;
   }
 
   /**

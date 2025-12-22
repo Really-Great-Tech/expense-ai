@@ -36,9 +36,8 @@ lerna-debug.log*
 
 # Environment Variables
 .env
-# Ignore private keys but allow public certs in certs/ directory
+# Ignore private keys and certificates
 *.pem
-!certs/*.pem
 
 # Lock files (only use npm)
 bun.lock
@@ -53,3 +52,9 @@ src/document-splitter/README-FILE-VALIDATION.md
 scripts/test-aws-services.ts
 sample_receipt
 /uploads
+
+/deepwiki
+/expense_files
+/playground_results
+/markdown_extractions
+/temp

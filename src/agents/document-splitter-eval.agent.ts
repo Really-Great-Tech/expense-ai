@@ -15,8 +15,9 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { BedrockLlmService } from '../utils/bedrockLlm';
-import { PageMarkdown } from '../document-splitter/types/document-splitter.types';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { AGENT_PROFILES } from './config/models.config';
+import { PageMarkdown } from '../expense-document/types/upload.types';
 
 // Types
 export interface PageGroup {
@@ -70,6 +71,7 @@ export class DocumentSplitterEvalAgent {
 
   constructor() {
     this.llm = new BedrockLlmService({
+      profile: AGENT_PROFILES.DOCUMENT_SPLITTER,
       temperature: 0.2, // Lower temperature for consistency
     });
   }

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { BedrockLlmService } from '../../bedrockLlm';
+import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
+import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -22,39 +23,20 @@ export class ExpenseComplianceUQLMValidator {
   private bedrockServices: BedrockLlmService[];
   private logger: Logger;
   private validationVersion: string = '1.0.0';
-  private readonly configService: ConfigService;
 
-  constructor(logger?: Logger, configService?: ConfigService) {
+  constructor(logger?: Logger, _configService?: ConfigService) {
     this.logger = logger || new Logger(ExpenseComplianceUQLMValidator.name);
-    this.configService = configService ?? new ConfigService();
-    
+
     // Initialize multiple Bedrock services for judge panel with different temperatures
-    const judgeConfigs = [
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_1', 'eu.anthropic.claude-3-7-sonnet-20250219-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_1_TEMPERATURE', '0.3'))
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_2', 'eu.anthropic.claude-3-haiku-20240307-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_2_TEMPERATURE', '0.7'))
-      },
-      {
-        modelId: this.configService.get<string>('BEDROCK_JUDGE_MODEL_3', 'eu.anthropic.claude-3-5-sonnet-20240620-v1:0'),
-        temperature: parseFloat(this.configService.get<string>('BEDROCK_JUDGE_MODEL_3_TEMPERATURE', '0.5'))
-      }
+    this.bedrockServices = [
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
+      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
     ];
 
-    this.bedrockServices = judgeConfigs.map((config) =>
-      new BedrockLlmService({
-        modelId: config.modelId,
-        temperature: config.temperature,
-        modelType: 'claude',
-      }),
-    );
-    
-    this.logger.log('✅ ExpenseComplianceUQLMValidator initialized with 3 judge models and custom temperatures');
-    judgeConfigs.forEach((config, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${config.modelId} (temp: ${config.temperature})`);
+    this.logger.log('ExpenseComplianceUQLMValidator initialized with 3 judge models');
+    this.bedrockServices.forEach((service, index) => {
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${[0.3, 0.7, 0.5][index]})`);
     });
   }
 
@@ -71,7 +53,7 @@ export class ExpenseComplianceUQLMValidator {
   ): Promise<ValidationSummary> {
     const startTime = Date.now();
     const startTimeISO = new Date(startTime).toISOString();
-    this.logger.log(`🔍 Starting compliance validation for ${country} ${receiptType}`);
+    this.logger.log(`Starting compliance validation for ${country} ${receiptType}`);
 
     try {
       // Parse AI response if it's a JSON string
@@ -95,7 +77,7 @@ export class ExpenseComplianceUQLMValidator {
         const dimensionStartTimeISO = new Date(dimensionStartTime).toISOString();
         
         try {
-          this.logger.log(`📊 Validating dimension: ${ValidationUtils.dimensionToString(dimension)}`);
+          this.logger.log(`Validating dimension: ${ValidationUtils.dimensionToString(dimension)}`);
           
           const validationPrompt = this._createValidationPrompt(
             aiResponse,
@@ -123,7 +105,7 @@ export class ExpenseComplianceUQLMValidator {
           };
           
         } catch (error) {
-          this.logger.error(`❌ Error validating ${dimension}: ${error.message}`);
+          this.logger.error(`Error validating ${dimension}: ${error.message}`);
           validationResults.push(this._createErrorResult(dimension, error.message));
           
           const dimensionEndTime = Date.now();
@@ -155,12 +137,12 @@ export class ExpenseComplianceUQLMValidator {
       );
       
       const processingTime = endTime - startTime;
-      this.logger.log(`✅ Validation completed in ${processingTime}ms`);
+      this.logger.log(`Validation completed in ${processingTime}ms`);
 
       return overallAssessment;
 
     } catch (error) {
-      this.logger.error(`❌ Validation failed: ${error.message}`);
+      this.logger.error(`Validation failed: ${error.message}`);
       throw new ValidationError(
         ValidationErrorType.VALIDATION_TIMEOUT,
         `Validation process failed: ${error.message}`,
@@ -459,7 +441,7 @@ SUMMARY: [Brief assessment]`;
           });
           
         } catch (error) {
-          this.logger.warn(`⚠️ Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
+          this.logger.warn(`Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
           const errorResponse = `Error: ${error.message}`;
           judgeResponses.push(errorResponse);
           confidenceScores.push(0.0);
@@ -507,7 +489,7 @@ SUMMARY: [Brief assessment]`;
       );
 
     } catch (error) {
-      this.logger.error(`❌ Panel validation failed for ${dimension}: ${error.message}`);
+      this.logger.error(`Panel validation failed for ${dimension}: ${error.message}`);
       return this._createErrorResult(dimension, error.message);
     }
   }

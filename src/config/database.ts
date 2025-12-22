@@ -1,14 +1,15 @@
-import { ConfigService } from '@nestjs/config';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { RDSIAMAuthManager } from './database-iam-auth';
+import { getAppConfig } from './app.config';
 
 // Load environment variables from .env file
 dotenv.config();
 
-const configService = new ConfigService();
+// Get centralized config
+const config = getAppConfig();
 
 // Simple logger for database config (before NestJS logger is available)
 const log = (message: string, ...args: any[]) => {
@@ -16,9 +17,9 @@ const log = (message: string, ...args: any[]) => {
   console.log(`[TypeORM Config] ${message}`, ...args);
 };
 
-const mysqlSslEnabled = configService.get<string>('MYSQL_SSL') === 'true';
-const isProduction = configService.get<string>('NODE_ENV') === 'production';
-const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
+const mysqlSslEnabled = config.database.ssl;
+const isProduction = config.isProduction;
+const useIAMAuth = config.database.iamAuthEnabled;
 
 /**
  * Robust path resolution for TypeORM entities and migrations
@@ -39,13 +40,6 @@ const srcMigrations = join(cwd, 'src', 'migrations');
 // Check multiple possible locations for compiled migrations
 const distMigrationsExist = existsSync(distSrcMigrations) || existsSync(distMigrations);
 
-// Log the detected paths for debugging
-log('Working directory:', cwd);
-log('Checking migration paths:');
-log('  - dist/src/migrations:', existsSync(distSrcMigrations));
-log('  - dist/migrations:', existsSync(distMigrations));
-log('  - src/migrations:', existsSync(srcMigrations));
-log('Using compiled migrations:', distMigrationsExist);
 
 // Use dist if it exists and has migrations, otherwise use src
 // Include both possible dist locations for maximum compatibility
@@ -81,7 +75,7 @@ const getPassword = (): string => {
   }
 
   // Traditional password authentication for local MySQL
-  return configService.get<string>('MYSQL_PASSWORD', '');
+  return config.database.password;
 };
 
 /**
@@ -107,15 +101,25 @@ const getSslConfig = () => {
   // Try to load certificate if it exists
   if (existsSync(certPath)) {
     ca = readFileSync(certPath, 'utf8');
+    log('Loaded RDS CA certificate from:', certPath);
   } else if (existsSync(certPathAlt)) {
     ca = readFileSync(certPathAlt, 'utf8');
+    log('Loaded RDS CA certificate from:', certPathAlt);
+  } else {
+    // Certificate not found - will fall back to system CA certificates
+    log(
+      'RDS CA certificate not found at expected paths. ' +
+        'Falling back to system CA certificates. ' +
+        'For local development, download from: ' +
+        'https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
+    );
   }
 
   // For IAM auth, always use SSL even if cert file is missing
   // (will rely on system CA certificates)
   return {
-    rejectUnauthorized: isProduction && useIAMAuth, // Strict verification for IAM auth in production
-    ca: ca, // CA certificate bundle (optional but recommended)
+    rejectUnauthorized: isProduction, // Always enforce SSL validation in production
+    ca, // CA certificate bundle (optional - falls back to system CA if not provided)
   };
 };
 
@@ -128,10 +132,10 @@ const getIAMAuthConfig = () => {
     return {};
   }
 
-  const hostname = configService.get<string>('MYSQL_HOST');
-  const port = parseInt(configService.get<string>('MYSQL_PORT', '3306'), 10);
-  const username = configService.get<string>('MYSQL_USER');
-  const region = configService.get<string>('AWS_REGION', 'us-east-1');
+  const hostname = config.database.host;
+  const port = config.database.port;
+  const username = config.database.user;
+  const region = config.aws.region;
 
   if (!hostname || !username) {
     throw new Error(
@@ -159,11 +163,11 @@ const getIAMAuthConfig = () => {
 // Base DB configuration supporting both local and RDS IAM modes
 const baseDBConfig: DataSourceOptions = {
   type: 'mysql' as const,
-  host: configService.get<string>('MYSQL_HOST'),
-  port: parseInt(configService.get<string>('MYSQL_PORT', '3306'), 10),
-  username: configService.get<string>('MYSQL_USER'),
+  host: config.database.host,
+  port: config.database.port,
+  username: config.database.user,
   password: getPassword(),
-  database: configService.get<string>('MYSQL_DATABASE'),
+  database: config.database.database,
 
   // Dynamically resolved paths based on environment
   entities: entityPaths,
@@ -172,13 +176,14 @@ const baseDBConfig: DataSourceOptions = {
   // Explicitly name migration table for namespace isolation
   migrationsTableName: 'expense_ai_migrations',
 
-  // CRITICAL: Production safeguards - NEVER enable synchronize in production
+  // CRITICAL: Synchronize is ALWAYS disabled - use migrations instead
+  // This prevents accidental schema changes that could cause data loss
   synchronize: false,
 
-  // Automatically run migrations on application startup
-  // Migrations run in transactions (migrationsTransactionMode: 'each') for safety
-  // This ensures database schema is always up-to-date with the application code
-  migrationsRun: true,
+  // DISABLED: Auto-migration causes race conditions in multi-instance deployments
+  // Migrations are run via Docker entrypoint script (TYPEORM_MIGRATIONS_RUN=true)
+  // or manually via: npx typeorm migration:run -d dist/src/config/database.js
+  migrationsRun: config.typeorm.migrationsRun,
 
   // Enable transaction per migration for rollback safety
   migrationsTransactionMode: 'each' as const,
@@ -196,8 +201,8 @@ const baseDBConfig: DataSourceOptions = {
 
   // Connection pool settings optimized for Aurora
   extra: {
-    connectionLimit: parseInt(configService.get<string>('DB_CONNECTION_LIMIT', '20'), 10),
-    queueLimit: parseInt(configService.get<string>('DB_QUEUE_LIMIT', '0'), 10),
+    connectionLimit: config.database.connectionLimit,
+    queueLimit: config.database.queueLimit,
 
     // Add IAM auth plugin if enabled
     ...getIAMAuthConfig(),
@@ -214,7 +219,7 @@ const baseDBConfig: DataSourceOptions = {
 
   // Enhanced logging for migrations - includes schema and migration logs
   logging:
-    configService.get<string>('TYPEORM_LOGGING') === 'all'
+    config.typeorm.logging === 'all'
       ? 'all'
       : ['error', 'warn', 'schema', 'migration'],
   logger: 'advanced-console',

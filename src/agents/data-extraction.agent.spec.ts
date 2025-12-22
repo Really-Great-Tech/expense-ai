@@ -1,7 +1,7 @@
 import { DataExtractionAgent } from './data-extraction.agent';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 
-jest.mock('../utils/bedrockLlm');
+jest.mock('../services/bedrock/bedrock-llm');
 
 describe('DataExtractionAgent', () => {
   let agent: DataExtractionAgent;
@@ -14,7 +14,7 @@ describe('DataExtractionAgent', () => {
       getCurrentModelName: jest.fn().mockReturnValue('eu.amazon.nova-pro-v1:0'),
     } as any;
 
-    agent = new DataExtractionAgent('bedrock');
+    agent = new DataExtractionAgent();
     agent['llm'] = mockLlmService;
   });
 
@@ -211,14 +211,14 @@ describe('DataExtractionAgent', () => {
   describe('constructor', () => {
     it('should initialize with default provider and model', () => {
       const newAgent = new DataExtractionAgent();
-      expect(newAgent['currentProvider']).toBe('bedrock');
       expect(newAgent['defaultModelId']).toBeDefined();
+      expect(newAgent['llm']).toBeDefined();
     });
 
-    it('should accept custom model ID', () => {
-      const customModel = 'custom-model-id';
-      const newAgent = new DataExtractionAgent('bedrock', customModel);
-      expect(newAgent['defaultModelId']).toBe(customModel);
+    it('should use profile-based configuration', () => {
+      const newAgent = new DataExtractionAgent();
+      // Profile configuration is handled internally via AGENT_PROFILES
+      expect(newAgent['llm']).toBeDefined();
     });
   });
 

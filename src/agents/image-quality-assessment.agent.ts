@@ -1,10 +1,9 @@
-import { ImageQualityAssessmentSchema, type ImageQualityAssessment } from '../schemas/expense-schemas';
-import * as fs from 'fs';
-import * as path from 'path';
-import { BedrockLlmService } from '../utils/bedrockLlm';
+import { ImageQualityAssessmentSchema, type ImageQualityAssessment } from '../common/schemas/expense-schemas';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
-import { MODEL_CONFIG } from './config/models.config';
+import { AGENT_PROFILES } from './config/models.config';
+import { pdfToPng } from 'pdf-to-png-converter';
 
 /**
  * Agent responsible for assessing image quality of expense documents
@@ -12,63 +11,134 @@ import { MODEL_CONFIG } from './config/models.config';
  */
 export class ImageQualityAssessmentAgent extends BaseAgent {
   protected llm: ILLMService;
-  private currentProvider: 'bedrock' | 'anthropic';
-  private readonly defaultModelId: string;
 
-  constructor(provider: 'bedrock' | 'anthropic' = 'bedrock', defaultModelId: string = MODEL_CONFIG.QUALITY_ASSESSMENT) {
+  constructor() {
     super();
-    this.currentProvider = provider;
-    this.defaultModelId = defaultModelId;
-    this.llm = new BedrockLlmService({ modelType: 'nova' });
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.QUALITY_ASSESSMENT });
   }
 
   /**
-   * Get the actual model name used, accounting for fallback scenarios
+   * Get the actual model name used
    * @returns The current model identifier
    */
   getActualModelUsed(): string {
-    if (this.currentProvider === 'bedrock' && this.llm.getCurrentModelName) {
-      // For BedrockLlmService, get the actual model name (handles fallback)
-      return this.llm.getCurrentModelName();
-    } else if (this.currentProvider === 'bedrock') {
-      // Fallback for older BedrockLlmService without getCurrentModelName
-      return this.defaultModelId;
-    } else {
-      // Direct Anthropic usage
-      return 'claude-3-5-sonnet';
-    }
+    return this.llm.getCurrentModelName();
   }
 
   /**
-   * Assess the quality of an expense document image
-   * @param imagePath Path to the image file to assess
+   * Create a fallback quality issue object
+   * @param description Description of the fallback issue
+   * @returns Quality issue object
+   * @private
+   */
+  private createFallbackIssue(description: string) {
+    return {
+      detected: false,
+      severity_level: 'low' as const,
+      confidence_score: 0.5,
+      quantitative_measure: 0.0,
+      description,
+      recommendation: 'Manual review recommended due to assessment failure',
+    };
+  }
+
+  /**
+   * Check if buffer is a PDF file
+   * @param buffer File buffer
+   * @returns True if PDF
+   * @private
+   */
+  private isPdf(buffer: Buffer): boolean {
+    // PDF magic bytes: %PDF (25 50 44 46)
+    return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  }
+
+  /**
+   * Convert PDF buffer to PNG image buffer (first page only)
+   * @param pdfBuffer PDF file buffer
+   * @returns PNG image buffer
+   * @private
+   */
+  private async convertPdfToImage(pdfBuffer: Buffer): Promise<Buffer> {
+    const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.length);
+    const pngPages = await pdfToPng(pdfArrayBuffer, {
+      viewportScale: 2.0, // Higher quality for assessment
+      pagesToProcess: [1], // Only first page for quality assessment
+      disableFontFace: true,
+      useSystemFonts: true,
+    });
+
+    if (pngPages.length === 0) {
+      throw new Error('Failed to convert PDF to image');
+    }
+
+    return pngPages[0].content;
+  }
+
+  /**
+   * Detect image media type from buffer magic bytes
+   * @param buffer Image file buffer
+   * @returns Media type string for vision API
+   * @private
+   */
+  private detectMediaType(buffer: Buffer): 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' {
+    // PNG: 89 50 4E 47
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+      return 'image/png';
+    }
+    // JPEG: FF D8 FF
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+      return 'image/jpeg';
+    }
+    // GIF: 47 49 46 38
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+      return 'image/gif';
+    }
+    // WebP: 52 49 46 46 ... 57 45 42 50
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+      return 'image/webp';
+    }
+    // Default to JPEG for unknown formats
+    return 'image/jpeg';
+  }
+
+  /**
+   * Assess the quality of an expense document image from buffer
+   * Uses vision API to analyze the actual image content
+   * Supports both image files and PDFs (converts first page to image)
+   * @param buffer Image or PDF file buffer
+   * @param filename Original filename
    * @returns Quality assessment with scores and recommendations
    * @throws Error if assessment fails critically
    */
-  async assessImageQuality(imagePath: string): Promise<ImageQualityAssessment> {
+  async assessImageQualityFromBuffer(buffer: Buffer, filename: string): Promise<ImageQualityAssessment> {
     const startTime = new Date();
 
-    this.logger.log(`Starting LLM-based quality assessment for: ${path.basename(imagePath)}`);
+    this.logger.log(`Starting vision-based quality assessment for: ${filename}`);
 
     try {
-      // Get image info for context
-      const imageInfo = this.getImageInfo(imagePath);
-
       // Get the assessment prompt from local prompts
       const assessmentPrompt = await this.getPromptTemplate('image-quality-assessment-prompt');
 
       this.logger.debug(`Using prompt: ${this.lastPromptInfo?.name} (version: ${this.lastPromptInfo?.version || 'unknown'})`);
 
-      // Create the full user prompt that will be sent to the LLM
-      const userPrompt = `Simulate a quality assessment for an expense document image. ${imageInfo}\n\n${assessmentPrompt}`;
+      // Convert PDF to image if needed
+      let imageBuffer = buffer;
+      if (this.isPdf(buffer)) {
+        this.logger.log('Detected PDF file, converting first page to image for quality assessment');
+        imageBuffer = await this.convertPdfToImage(buffer);
+      }
 
-      const response = await this.llm.chat({
-        messages: [
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
+      // Convert buffer to base64 for vision API
+      const imageBase64 = imageBuffer.toString('base64');
+      const mediaType = this.detectMediaType(imageBuffer);
+
+      this.logger.log(`Sending image for vision analysis: ${mediaType}, ${Math.round(imageBuffer.length / 1024)}KB`);
+
+      // Use chatWithVision to send actual image for analysis
+      const response = await (this.llm as BedrockLlmService).chatWithVision({
+        prompt: assessmentPrompt,
+        images: [{ data: imageBase64, mediaType }],
       });
 
       // Extract and parse response using BaseAgent utilities
@@ -112,46 +182,15 @@ export class ImageQualityAssessmentAgent extends BaseAgent {
   }
 
   /**
-   * Create a fallback quality issue object
-   * @param description Description of the fallback issue
-   * @returns Quality issue object
-   * @private
-   */
-  private createFallbackIssue(description: string) {
-    return {
-      detected: false,
-      severity_level: 'low' as const,
-      confidence_score: 0.5,
-      quantitative_measure: 0.0,
-      description,
-      recommendation: 'Manual review recommended due to assessment failure',
-    };
-  }
-
-  /**
-   * Get image information for logging purposes
-   * @param imagePath Path to the image file
-   * @returns String with image metadata
-   * @private
-   */
-  private getImageInfo(imagePath: string): string {
-    const stats = fs.statSync(imagePath);
-    const sizeKB = Math.round(stats.size / 1024);
-    const filename = path.basename(imagePath);
-
-    return `Filename: ${filename}, Size: ${sizeKB}KB, Format: ${path.extname(imagePath)}`;
-  }
-
-  /**
    * Format assessment results for workflow processing
    * @param assessment The quality assessment result
-   * @param imagePath Path to the assessed image
+   * @param filename Original filename
    * @returns Formatted assessment object
    */
-  formatAssessmentForWorkflow(assessment: ImageQualityAssessment, imagePath: string) {
+  formatAssessmentForWorkflow(assessment: ImageQualityAssessment, filename: string) {
     return {
-      image_path: imagePath,
-      assessment_method: 'LLM',
+      filename,
+      assessment_method: 'LLM_VISION',
       model_used: this.getActualModelUsed(),
       timestamp: new Date().toISOString(),
       quality_score: assessment.overall_quality_score * 10, // Convert to 0-100 scale
