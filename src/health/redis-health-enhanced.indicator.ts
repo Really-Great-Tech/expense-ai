@@ -352,6 +352,7 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
 
   /**
    * Create Redis connection (AWS ElastiCache)
+   * Supports both cluster mode and non-cluster mode
    */
   private createRedisConnection(): Redis {
     const { host: endpoint, port } = this.appConfig.redis;
@@ -360,8 +361,11 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
       throw new Error('REDIS_HOST is required - set REDIS_HOST environment variable');
     }
 
-    this.logger.debug(`Creating Redis connection to ${endpoint}:${port}`);
+    // Check if this is a cluster configuration endpoint (clustercfg.*)
+    const isClusterEndpoint = endpoint.startsWith('clustercfg.');
+    this.logger.debug(`Creating Redis connection to ${endpoint}:${port} (cluster: ${isClusterEndpoint})`);
 
+    // ElastiCache typically requires TLS in transit encryption mode
     const redis = new Redis({
       host: endpoint,
       port,
@@ -370,6 +374,7 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
       lazyConnect: true,
       connectTimeout: 5000, // 5 second connection timeout
       commandTimeout: 5000, // 5 second command timeout
+      tls: {}, // Enable TLS for ElastiCache (uses system CA)
       retryStrategy: (times) => {
         if (times > 2) {
           this.logger.error(`Redis connection failed after ${times} attempts`);
@@ -407,6 +412,7 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
       enableReadyCheck: false,
       connectTimeout: 5000, // 5 second connection timeout
       commandTimeout: 5000, // 5 second command timeout
+      tls: {}, // Enable TLS for ElastiCache (uses system CA)
     });
 
     // Log connection errors

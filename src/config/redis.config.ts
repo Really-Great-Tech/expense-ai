@@ -55,6 +55,7 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: false,
       connectTimeout: 10000,
+      tls: {}, // Enable TLS for ElastiCache (uses system CA)
     });
   }
 }
