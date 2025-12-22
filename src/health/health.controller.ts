@@ -151,7 +151,7 @@ export class HealthController {
             message: 'Textract is operational',
             latency: '245ms',
             details: {
-              region: 'us-east-1',
+              region: 'eu-west-1',
               blocksDetected: 1,
             },
           },

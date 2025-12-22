@@ -55,7 +55,7 @@ const CONDITIONAL_REQUIREMENTS: EnvRequirement[] = [
  * Variables that should be warned about if missing (but not required)
  */
 const RECOMMENDED_VARIABLES: EnvRequirement[] = [
-  { name: 'AWS_REGION', description: 'AWS region (defaults to us-east-1)' },
+  { name: 'AWS_REGION', description: 'AWS region (defaults to eu-west-1)' },
   { name: 'WORKER_CONCURRENCY', description: 'Worker concurrency (defaults to 5)' },
 ];
 

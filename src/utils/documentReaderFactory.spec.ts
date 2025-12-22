@@ -19,7 +19,7 @@ describe('DocumentReaderFactory', () => {
     it('should create Textract reader with region and upload path', () => {
       mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
         const config: Record<string, string> = {
-          AWS_REGION: 'us-east-1',
+          AWS_REGION: 'eu-west-1',
           UPLOAD_PATH: './uploads',
         };
         return config[key] || defaultValue;
@@ -58,7 +58,7 @@ describe('DocumentReaderFactory', () => {
       mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
         const config: Record<string, string | undefined> = {
           DOCUMENT_READER: undefined,
-          AWS_REGION: 'us-east-1',
+          AWS_REGION: 'eu-west-1',
           UPLOAD_PATH: './uploads',
         };
         return config[key] !== undefined ? config[key] : defaultValue;
@@ -73,7 +73,7 @@ describe('DocumentReaderFactory', () => {
       mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
         const config: Record<string, string> = {
           DOCUMENT_READER: 'textract',
-          AWS_REGION: 'us-east-1',
+          AWS_REGION: 'eu-west-1',
           UPLOAD_PATH: './uploads',
         };
         return config[key] !== undefined ? config[key] : defaultValue;
@@ -88,7 +88,7 @@ describe('DocumentReaderFactory', () => {
     it('should use override type when provided', () => {
       mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
         const config: Record<string, string> = {
-          AWS_REGION: 'us-east-1',
+          AWS_REGION: 'eu-west-1',
           UPLOAD_PATH: './uploads',
         };
         return config[key] !== undefined ? config[key] : defaultValue;
@@ -103,7 +103,7 @@ describe('DocumentReaderFactory', () => {
       mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
         const config: Record<string, string> = {
           DOCUMENT_READER: 'unsupported',
-          AWS_REGION: 'us-east-1',
+          AWS_REGION: 'eu-west-1',
         };
         return config[key] !== undefined ? config[key] : defaultValue;
       });

@@ -170,7 +170,10 @@ async function bootstrap() {
       `Error during application bootstrap: ${error instanceof Error ? error.message : error}`,
       error instanceof Error ? error.stack : undefined,
     );
-    process.exit(1);
+    logger.error('Application failed to start - shutting down');
+
+    // Allow async logger to flush before exit
+    setTimeout(() => process.exit(1), 100);
   }
 }
 

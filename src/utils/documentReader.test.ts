@@ -8,7 +8,7 @@ describe('DocumentReaderFactory', () => {
   describe('createReader', () => {
     it('should create Textract reader', () => {
       const configService = createConfigService({
-        AWS_REGION: 'us-east-1',
+        AWS_REGION: 'eu-west-1',
         UPLOAD_PATH: './uploads',
         // No credentials needed - SDK uses default credential chain
       });
@@ -29,7 +29,7 @@ describe('DocumentReaderFactory', () => {
     it('should return Textract reader when configured', () => {
       const configService = createConfigService({
         DOCUMENT_READER: DocumentReaderType.TEXTRACT,
-        AWS_REGION: 'us-east-1',
+        AWS_REGION: 'eu-west-1',
         UPLOAD_PATH: './uploads',
         // No credentials needed - SDK uses default credential chain
       });
@@ -55,7 +55,7 @@ describe('Document Reader Integration', () => {
   it('should have consistent interface between readers', async () => {
     const configService = createConfigService({
       DOCUMENT_READER: DocumentReaderType.TEXTRACT,
-      AWS_REGION: 'us-east-1',
+      AWS_REGION: 'eu-west-1',
       UPLOAD_PATH: './uploads',
       // No credentials needed - SDK uses default credential chain
     });

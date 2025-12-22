@@ -21,7 +21,7 @@ describe('S3StorageService', () => {
   let mockS3Send: jest.Mock;
 
   const mockAppConfig = {
-    aws: { region: 'us-east-1' },
+    aws: { region: 'eu-west-1' },
     storage: { s3BucketName: 'test-bucket' },
   };
 
@@ -68,7 +68,7 @@ describe('S3StorageService', () => {
     it('should throw error when S3_BUCKET_NAME is not set', async () => {
       const invalidConfig = {
         get: jest.fn((key: string) => {
-          if (key === 'app') return { aws: { region: 'us-east-1' }, storage: { s3BucketName: undefined } };
+          if (key === 'app') return { aws: { region: 'eu-west-1' }, storage: { s3BucketName: undefined } };
           return undefined;
         }),
       };

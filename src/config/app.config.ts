@@ -155,14 +155,14 @@ export default registerAs('app', (): AppConfigType => {
     // AWS
     // ==========================================================================
     aws: {
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env.AWS_REGION || 'eu-west-1',
     },
 
     // ==========================================================================
     // STORAGE
     // ==========================================================================
     storage: {
-      type: (process.env.STORAGE_TYPE || 'local') as 'local' | 's3',
+      type: (process.env.STORAGE_TYPE || 's3') as 'local' | 's3',
       uploadPath: process.env.UPLOAD_PATH || './uploads',
       s3BucketName: process.env.S3_BUCKET_NAME,
     },

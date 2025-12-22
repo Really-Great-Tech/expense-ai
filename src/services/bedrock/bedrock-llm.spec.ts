@@ -4,12 +4,12 @@ import { BedrockLlmService, ChatMessage } from './bedrock-llm';
 // Mock app.config to provide test profile ARNs
 jest.mock('../../config/app.config', () => ({
   getAppConfig: jest.fn(() => ({
-    aws: { region: 'us-east-1' },
+    aws: { region: 'eu-west-1' },
     bedrock: {
-      novaMicroArn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-micro-test',
-      novaProArn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test',
-      sonnet4Arn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test',
-      sonnet45Arn: 'arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-45-test',
+      novaMicroArn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-micro-test',
+      novaProArn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-pro-test',
+      sonnet4Arn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/sonnet-4-test',
+      sonnet45Arn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/sonnet-45-test',
     },
   })),
 }));
@@ -58,13 +58,13 @@ describe('BedrockLlmService', () => {
     });
 
     expect(svc.getCurrentProvider()).toBe('bedrock');
-    expect(svc.getCurrentModelName()).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
+    expect(svc.getCurrentModelName()).toBe('arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-pro-test');
     expect(svc.getProfileName()).toBe('Nova Pro');
     expect(svc.getProfileKey()).toBe('NOVA_PRO');
 
     // Ensure Bedrock client was constructed with region
     expect(mockState.lastConfig).toBeTruthy();
-    expect(mockState.lastConfig!.region).toBe('us-east-1');
+    expect(mockState.lastConfig!.region).toBe('eu-west-1');
   });
 
   it('should chat using unified ConverseCommand for all models', async () => {
@@ -89,13 +89,13 @@ describe('BedrockLlmService', () => {
 
     expect(res.message.content).toBe('Hello from Nova');
     expect(res.usage).toEqual({ input_tokens: 12, output_tokens: 34 });
-    expect(res.modelUsed).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
+    expect(res.modelUsed).toBe('arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-pro-test');
 
     // Verify ConverseCommand input
     const callArg = mockState.sendMock.mock.calls[0][0];
     expect(callArg).toBeDefined();
     expect(callArg.input).toBeDefined();
-    expect(callArg.input.modelId).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/nova-pro-test');
+    expect(callArg.input.modelId).toBe('arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-pro-test');
     // Messages should exclude system role
     expect(callArg.input.messages).toEqual([
       { role: 'user', content: [{ text: 'Hello' }] },
@@ -126,12 +126,12 @@ describe('BedrockLlmService', () => {
 
     expect(res.message.content).toBe('Summary content');
     expect(res.usage).toEqual({ input_tokens: 5, output_tokens: 7 });
-    expect(res.modelUsed).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test');
+    expect(res.modelUsed).toBe('arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/sonnet-4-test');
     expect(svc.getProfileName()).toBe('Claude Sonnet 4');
 
     // Verify ConverseCommand was used (same as Nova)
     const callArg = mockState.sendMock.mock.calls[0][0];
-    expect(callArg.input.modelId).toBe('arn:aws:bedrock:us-east-1:123456789:application-inference-profile/sonnet-4-test');
+    expect(callArg.input.modelId).toBe('arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/sonnet-4-test');
   });
 
   it('should return all configured profiles via getAllProfiles', () => {
