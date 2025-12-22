@@ -6,7 +6,6 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
-import { HealthCheckService } from '@nestjs/terminus';
 import { DatabaseHealthIndicator } from './health/database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
 import { validateEnvironment } from './config/env-validation';
@@ -39,7 +38,9 @@ async function bootstrap() {
   validateEnvironment();
 
   try {
-    const app = await NestFactory.create(AppModule, { bufferLogs: true });
+    logger.log('Creating NestJS application...');
+    const app = await NestFactory.create(AppModule, { bufferLogs: false }); // Disable buffer for verbose logging
+    logger.log('NestJS application created successfully');
     const appLogger = app.get(LoggerService);
     app.useLogger(appLogger);
     const configService = app.get(ConfigService);
@@ -153,23 +154,26 @@ async function bootstrap() {
 
     // Perform startup health checks before accepting traffic
     // This ensures critical dependencies (database, Redis) are available
-    const healthCheckService = app.get(HealthCheckService);
     const dbHealth = app.get(DatabaseHealthIndicator);
     const redisHealth = app.get(RedisHealthEnhancedIndicator);
 
     logger.log('Performing startup health checks...');
 
     try {
-      await healthCheckService.check([
-        () => dbHealth.isHealthy('database', 10000),
-        () => redisHealth.isHealthy('redis-queue', 10000, false), // Skip BullMQ for startup
-      ]);
+      logger.log('Checking database health...');
+      const dbResult = await dbHealth.isHealthy('database', 10000);
+      logger.log('Database health check passed: ' + JSON.stringify(dbResult));
+
+      logger.log('Checking Redis health...');
+      const redisResult = await redisHealth.isHealthy('redis-queue', 10000, false); // Skip BullMQ for startup
+      logger.log('Redis health check passed: ' + JSON.stringify(redisResult));
+
       logger.log('Startup health checks passed');
     } catch (healthError) {
-      logger.error(
-        'Startup health checks failed - dependencies not ready',
-        healthError instanceof Error ? healthError.stack : undefined,
-      );
+      const msg = healthError instanceof Error ? healthError.message : String(healthError);
+      const stack = healthError instanceof Error ? healthError.stack : 'N/A';
+      logger.error('Startup health checks failed - dependencies not ready: ' + msg);
+      logger.error('Stack trace: ' + stack);
       throw healthError;
     }
 
