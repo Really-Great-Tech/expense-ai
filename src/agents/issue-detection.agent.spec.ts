@@ -1,6 +1,5 @@
 import { IssueDetectionAgent } from './issue-detection.agent';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
-import * as fs from 'fs';
 
 // Mock AWS SDK before any imports
 jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
@@ -10,7 +9,6 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
 }));
 
 jest.mock('../services/bedrock/bedrock-llm');
-jest.mock('fs');
 
 describe('IssueDetectionAgent', () => {
   let agent: IssueDetectionAgent;
@@ -22,17 +20,6 @@ describe('IssueDetectionAgent', () => {
       getCurrentProvider: jest.fn().mockReturnValue('bedrock'),
       getCurrentModelName: jest.fn().mockReturnValue('eu.amazon.nova-pro-v1:0'),
     } as any;
-
-    // Mock expense schema loading
-    (fs.readFileSync as jest.Mock).mockReturnValue(
-      JSON.stringify({
-        properties: {
-          vendor_name: { type: 'string', required: true },
-          total_amount: { type: 'number', required: true },
-          tax_id: { type: 'string', required: false },
-        },
-      }),
-    );
 
     agent = new IssueDetectionAgent();
     agent['llm'] = mockLlmService;
@@ -232,21 +219,6 @@ describe('IssueDetectionAgent', () => {
     it('should return model name from Bedrock service', () => {
       const modelName = agent.getActualModelUsed();
       expect(modelName).toBe('eu.amazon.nova-pro-v1:0');
-    });
-  });
-
-  describe('constructor', () => {
-    it('should load expense schema on initialization', () => {
-      expect(fs.readFileSync).toHaveBeenCalled();
-    });
-
-    it('should handle schema loading failure gracefully', () => {
-      (fs.readFileSync as jest.Mock).mockImplementation(() => {
-        throw new Error('File not found');
-      });
-
-      const newAgent = new IssueDetectionAgent();
-      expect(newAgent['expenseSchema']).toBeNull();
     });
   });
 

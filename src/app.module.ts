@@ -4,8 +4,8 @@ import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import configuration from './config';
 import appConfig, { AppConfigType } from './config/app.config';
+import { dataSourceOptions } from './config/database';
 import { ExpenseDocumentModule } from './expense-document/expense-document.module';
 import { WorkersModule } from './workers/workers.module';
 import { ExpenseResultModule } from './expense-result/expense-result.module';
@@ -24,7 +24,7 @@ import { DataSource } from 'typeorm';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [configuration, appConfig],
+      load: [appConfig],
     }),
     // Throttling - uses centralized app config
     ThrottlerModule.forRootAsync({
@@ -49,11 +49,7 @@ import { DataSource } from 'typeorm';
       useClass: RedisConfigService,
     }),
 
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => configService.get('database'),
-      inject: [ConfigService],
-    }),
+    TypeOrmModule.forRoot(dataSourceOptions),
     ScheduleModule.forRoot(),
     ExpenseDocumentModule,
     WorkersModule,

@@ -7,15 +7,12 @@ import { Logger } from '@nestjs/common';
  * Validates critical database configuration settings to prevent
  * dangerous misconfigurations in production environments.
  *
- * SUPPORTED MODES:
- * 1. Local MySQL (AURORA_MYSQL !== 'true'): Password auth on localhost only
- * 2. Aurora MySQL (AURORA_MYSQL === 'true'): IAM auth required, no password allowed
+ * Aurora MySQL only with IAM authentication (no password auth supported).
  *
  * This validator enforces:
- * - SSL enforcement for production databases
+ * - SSL enforcement (required for IAM auth)
  * - Required environment variables validation
  * - IAM authentication configuration validation
- * - Strict mode enforcement (local vs Aurora)
  *
  * Note: Schema synchronization is permanently disabled (synchronize: false)
  * to prevent accidental data loss. Use migrations for all schema changes.
@@ -34,13 +31,12 @@ export class DatabaseConfigValidator {
 
     this.logger.log(`Validating database configuration for environment: ${env}`);
 
-    // Always validate database mode (local vs Aurora) - applies to all environments
-    this.validateDatabaseMode(configService);
+    // Always validate Aurora MySQL configuration
+    this.validateAuroraMySQLConfiguration(configService);
 
     // Critical validations for production/staging
     if (isProduction || isStaging) {
       this.validateProductionSafeguards(configService, env);
-      this.validateSSLConfiguration(configService);
       this.validateRequiredCredentials(configService);
       this.validateIAMAuthConfiguration(configService);
     }
@@ -54,46 +50,21 @@ export class DatabaseConfigValidator {
   }
 
   /**
-   * Validates database mode configuration
-   * Enforces IAM auth for Aurora MySQL
-   */
-  private static validateDatabaseMode(configService: ConfigService): void {
-    const isAuroraMySQL = configService.get<string>('AURORA_MYSQL') === 'true';
-
-    if (isAuroraMySQL) {
-      this.validateAuroraMySQLConfiguration(configService);
-    }
-  }
-
-  /**
-   * Validates Aurora MySQL configuration
-   * Enforces IAM authentication and rejects password-based auth
+   * Validates Aurora MySQL configuration (IAM auth only)
    */
   private static validateAuroraMySQLConfiguration(configService: ConfigService): void {
-    this.logger.log('Validating Aurora MySQL configuration...');
+    this.logger.log('Validating Aurora MySQL configuration (IAM auth)...');
 
-    const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
     const password = configService.get<string>('MYSQL_PASSWORD');
 
-    // Aurora MySQL requires IAM authentication
-    if (!useIAMAuth) {
-      throw new Error(
-        'CRITICAL: Aurora MySQL requires IAM authentication. ' +
-          'Set MYSQL_IAM_AUTH_ENABLED=true when AURORA_MYSQL=true. ' +
-          'Password-based authentication is not supported for Aurora MySQL.',
-      );
-    }
-
-    // Aurora MySQL must not have password set
+    // IAM auth mode - password must not be set
     if (password) {
       throw new Error(
-        'CRITICAL: MYSQL_PASSWORD must not be set for Aurora MySQL. ' +
-          'Remove MYSQL_PASSWORD from environment when AURORA_MYSQL=true. ' +
-          'Use IAM authentication only for Aurora MySQL connections.',
+        'CRITICAL: MYSQL_PASSWORD must not be set. This application only supports IAM authentication. ' +
+          'Remove MYSQL_PASSWORD from your environment.',
       );
     }
-
-    this.logger.log('Aurora MySQL configuration validated (IAM auth enforced)');
+    this.logger.log('Aurora MySQL configuration validated (IAM auth mode)');
   }
 
   /**
@@ -111,99 +82,43 @@ export class DatabaseConfigValidator {
   }
 
   /**
-   * Validates SSL configuration for production databases
-   */
-  private static validateSSLConfiguration(configService: ConfigService): void {
-    const ssl = configService.get<string>('MYSQL_SSL');
-    const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
-
-    // IAM auth requires SSL - it will be auto-enabled
-    if (useIAMAuth) {
-      this.logger.log('SSL automatically enabled for IAM authentication');
-      return;
-    }
-
-    if (ssl !== 'true') {
-      this.logger.warn(
-        'WARNING: MYSQL_SSL is not enabled. ' +
-          'SSL is strongly recommended for production databases to encrypt data in transit.',
-      );
-    } else {
-      this.logger.log('SSL configuration validated');
-    }
-  }
-
-  /**
-   * Validates required database credentials are properly set
+   * Validates required database credentials are properly set (IAM auth only)
    */
   private static validateRequiredCredentials(
     configService: ConfigService,
   ): void {
-    const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
-
-    // Different required vars based on auth method
-    const requiredVars = useIAMAuth
-      ? ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_DATABASE', 'AWS_REGION']
-      : ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'];
+    // Required vars for IAM authentication
+    const requiredVars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_DATABASE', 'AWS_REGION'];
 
     const missingVars: string[] = [];
-    const invalidVars: string[] = [];
 
     for (const varName of requiredVars) {
       const value = configService.get<string>(varName);
-
       if (!value) {
         missingVars.push(varName);
-      } else if (
-        !useIAMAuth && // Only check password placeholders for traditional auth
-        varName === 'MYSQL_PASSWORD' &&
-        (value.includes('your_') ||
-          value.includes('xxxxx') ||
-          value === 'changeme' ||
-          value === 'password')
-      ) {
-        invalidVars.push(varName);
       }
     }
 
     if (missingVars.length > 0) {
-      const authType = useIAMAuth ? 'IAM authentication' : 'traditional authentication';
       throw new Error(
-        `CRITICAL: Missing required database environment variables for ${authType}: ${missingVars.join(', ')}. ` +
+        `CRITICAL: Missing required database environment variables for IAM authentication: ${missingVars.join(', ')}. ` +
           'Please set these variables in your environment or .env file.',
       );
     }
 
-    if (invalidVars.length > 0) {
-      throw new Error(
-        `CRITICAL: Invalid placeholder values detected in: ${invalidVars.join(', ')}. ` +
-          'Please set valid database credentials in environment variables.',
-      );
-    }
-
-    const authType = useIAMAuth ? 'IAM' : 'traditional';
-    this.logger.log(`Database credentials validated (${authType} authentication)`);
+    this.logger.log('Database credentials validated (IAM authentication)');
   }
 
   /**
    * Validates IAM authentication configuration
    */
   private static validateIAMAuthConfiguration(configService: ConfigService): void {
-    const useIAMAuth = configService.get<string>('MYSQL_IAM_AUTH_ENABLED') === 'true';
-
-    if (!useIAMAuth) {
-      return; // Skip validation if IAM auth is not enabled
-    }
-
     this.logger.log('Validating IAM authentication configuration...');
 
     // Validate AWS region is set
     const region = configService.get<string>('AWS_REGION');
     if (!region) {
-      throw new Error(
-        'CRITICAL: AWS_REGION must be set when MYSQL_IAM_AUTH_ENABLED=true. ' +
-          'This is required for generating IAM authentication tokens.',
-      );
+      throw new Error('CRITICAL: AWS_REGION must be set for IAM authentication. ' + 'This is required for generating IAM authentication tokens.');
     }
 
     // Validate database user format (should not have special characters that IAM doesn't support)
@@ -211,16 +126,7 @@ export class DatabaseConfigValidator {
     if (username && username.includes(':')) {
       this.logger.warn(
         'WARNING: Database username contains ":" which may cause issues with IAM authentication. ' +
-          'Consider using a simpler username format (e.g., "iam_db_user").',
-      );
-    }
-
-    // Block password when using IAM auth - this is a security requirement
-    const password = configService.get<string>('MYSQL_PASSWORD');
-    if (password) {
-      throw new Error(
-        'CRITICAL: MYSQL_PASSWORD must not be set when MYSQL_IAM_AUTH_ENABLED=true. ' +
-          'Remove MYSQL_PASSWORD from environment to use IAM authentication.',
+          'Consider using a simpler username format (e.g., "app" or "iam_db_user").',
       );
     }
 

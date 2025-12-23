@@ -6,22 +6,43 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
-import { HealthCheckService } from '@nestjs/terminus';
 import { DatabaseHealthIndicator } from './health/database-health.indicator';
 import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
 import { validateEnvironment } from './config/env-validation';
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
 
-async function bootstrap() {
-  const logger = new Logger('Bootstrap');
+const logger = new Logger('Bootstrap');
 
+function gracefulExit(error: Error | string, exitCode = 1): void {
+  const message = error instanceof Error ? error.message : error;
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  logger.error(`Fatal error: ${message}`, stack);
+  logger.error('Application failed to start - shutting down');
+
+  setTimeout(() => process.exit(exitCode), 100);
+}
+
+process.on('uncaughtException', (error) => {
+  gracefulExit(error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  // Log unhandled rejections but don't exit - they are often non-fatal (e.g., deadlocks in background jobs)
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error(`Unhandled rejection: ${error.message}`, error.stack);
+});
+
+async function bootstrap() {
   // Validate environment variables early, before creating the NestJS app
   logger.log('Validating environment configuration...');
   validateEnvironment();
 
   try {
-    const app = await NestFactory.create(AppModule, { bufferLogs: true });
+    logger.log('Creating NestJS application...');
+    const app = await NestFactory.create(AppModule, { bufferLogs: false }); // Disable buffer for verbose logging
+    logger.log('NestJS application created successfully');
     const appLogger = app.get(LoggerService);
     app.useLogger(appLogger);
     const configService = app.get(ConfigService);
@@ -135,23 +156,26 @@ async function bootstrap() {
 
     // Perform startup health checks before accepting traffic
     // This ensures critical dependencies (database, Redis) are available
-    const healthCheckService = app.get(HealthCheckService);
     const dbHealth = app.get(DatabaseHealthIndicator);
     const redisHealth = app.get(RedisHealthEnhancedIndicator);
 
     logger.log('Performing startup health checks...');
 
     try {
-      await healthCheckService.check([
-        () => dbHealth.isHealthy('database', 10000),
-        () => redisHealth.isHealthy('redis-queue', 10000, false), // Skip BullMQ for startup
-      ]);
+      logger.log('Checking database health...');
+      const dbResult = await dbHealth.isHealthy('database', 10000);
+      logger.log('Database health check passed: ' + JSON.stringify(dbResult));
+
+      logger.log('Checking Redis health...');
+      const redisResult = await redisHealth.isHealthy('redis-queue', 10000, false); // Skip BullMQ for startup
+      logger.log('Redis health check passed: ' + JSON.stringify(redisResult));
+
       logger.log('Startup health checks passed');
     } catch (healthError) {
-      logger.error(
-        'Startup health checks failed - dependencies not ready',
-        healthError instanceof Error ? healthError.stack : undefined,
-      );
+      const msg = healthError instanceof Error ? healthError.message : String(healthError);
+      const stack = healthError instanceof Error ? healthError.stack : 'N/A';
+      logger.error('Startup health checks failed - dependencies not ready: ' + msg);
+      logger.error('Stack trace: ' + stack);
       throw healthError;
     }
 
@@ -166,14 +190,7 @@ async function bootstrap() {
     logger.log(`Application is running on: http://localhost:${port}`);
     logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s');
   } catch (error) {
-    logger.error(
-      `Error during application bootstrap: ${error instanceof Error ? error.message : error}`,
-      error instanceof Error ? error.stack : undefined,
-    );
-    logger.error('Application failed to start - shutting down');
-
-    // Allow async logger to flush before exit
-    setTimeout(() => process.exit(1), 100);
+    gracefulExit(error instanceof Error ? error : new Error(String(error)));
   }
 }
 

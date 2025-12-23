@@ -1,6 +1,5 @@
 import { IssueDetectionResultSchema, type IssueDetectionResult } from '../common/schemas/expense-schemas';
-import * as fs from 'fs';
-import * as path from 'path';
+import { EXPENSE_SCHEMA } from '../common/types';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
@@ -12,15 +11,11 @@ import { AGENT_PROFILES } from './config/models.config';
  */
 export class IssueDetectionAgent extends BaseAgent {
   protected llm: ILLMService;
-  private expenseSchema: any;
 
   constructor() {
     super();
     this.logger.log('Initializing IssueDetectionAgent');
     this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.COMPLIANCE });
-
-    // Load expense schema
-    this.loadExpenseSchema();
   }
 
   /**
@@ -29,22 +24,6 @@ export class IssueDetectionAgent extends BaseAgent {
    */
   getActualModelUsed(): string {
     return this.llm.getCurrentModelName();
-  }
-
-  /**
-   * Load expense schema from file system
-   * @private
-   */
-  private loadExpenseSchema(): void {
-    try {
-      const schemaPath = path.join(process.cwd(), 'expense_file_schema.json');
-      const schemaContent = fs.readFileSync(schemaPath, 'utf8');
-      this.expenseSchema = JSON.parse(schemaContent);
-      this.logger.log('Expense schema loaded successfully');
-    } catch (error) {
-      this.logger.error('Failed to load expense schema:', error);
-      this.expenseSchema = null;
-    }
   }
 
   /**
@@ -65,7 +44,7 @@ export class IssueDetectionAgent extends BaseAgent {
 
       // Get the prompt and compile with variables
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
-        expenseTaxonomyDescription: JSON.stringify(this.expenseSchema?.properties || {}, null, 2),
+        expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,

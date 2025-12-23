@@ -36,7 +36,7 @@ export class ExpenseDocument {
   @Column({ name: 'storage_bucket', default: '' })
   storageBucket: string;
 
-  @Column({ name: 'storage_type', type: 'enum', enum: ['local', 's3'], default: 'local' })
+  @Column({ name: 'storage_type', type: 'enum', enum: ['local', 's3'], default: 's3' })
   storageType: 'local' | 's3';
 
   @Column({ name: 'storage_url', nullable: true })

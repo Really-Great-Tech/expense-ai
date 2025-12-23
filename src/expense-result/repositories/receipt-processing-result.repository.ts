@@ -50,11 +50,9 @@ export class ReceiptProcessingResultRepository {
     }
   }
 
-  async updateStatus(
-    receiptId: string,
-    status: ProcessingStatus,
-    additionalData?: Partial<ReceiptProcessingResult>,
-  ): Promise<void> {
+  async updateStatus(receiptId: string, status: ProcessingStatus, additionalData?: Partial<ReceiptProcessingResult>, retryCount = 0): Promise<void> {
+    const maxRetries = 3;
+
     try {
       // COMPLETED status should only be set via saveResults() to ensure atomicity
       if (status === ProcessingStatus.COMPLETED) {
@@ -90,7 +88,17 @@ export class ReceiptProcessingResultRepository {
       } else {
         this.logger.log(`Updated status for receipt ${receiptId} to ${status}`);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Handle deadlock by retrying
+      const isDeadlock = error?.message?.includes('Deadlock') || error?.code === 'ER_LOCK_DEADLOCK';
+
+      if (isDeadlock && retryCount < maxRetries) {
+        const delay = Math.pow(2, retryCount) * 100; // Exponential backoff: 100ms, 200ms, 400ms
+        this.logger.warn(`Deadlock detected for receipt ${receiptId}, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return this.updateStatus(receiptId, status, additionalData, retryCount + 1);
+      }
+
       this.logger.error(`Failed to update status for receipt ${receiptId}:`, error);
       throw error;
     }

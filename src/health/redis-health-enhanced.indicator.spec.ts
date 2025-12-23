@@ -78,6 +78,7 @@ describe('RedisHealthEnhancedIndicator', () => {
       ),
       quit: jest.fn().mockResolvedValue('OK'),
       disconnect: jest.fn(),
+      on: jest.fn(), // Add event listener mock
     };
   };
 
@@ -87,11 +88,14 @@ describe('RedisHealthEnhancedIndicator', () => {
 
   const buildModule = async (configMap: Record<string, string | undefined>) => {
     // Build app config based on configMap
-    // Don't default host to 'localhost' if not provided - let the service handle validation
+    const mode = configMap['REDIS_MODE'] || 'local';
+    // For local mode, default to 'localhost' if not provided
+    // For managed mode, leave undefined to test validation
+    const defaultHost = mode === 'local' ? 'localhost' : undefined;
     const appConfig = {
       redis: {
-        mode: configMap['REDIS_MODE'] || 'local',
-        host: configMap['REDIS_HOST'], // undefined if not provided (for managed mode validation)
+        mode,
+        host: configMap['REDIS_HOST'] ?? defaultHost,
         port: parseInt(configMap['REDIS_PORT'] || '6379', 10),
         tlsEnabled: configMap['REDIS_TLS_ENABLED'] === 'true',
       },
@@ -290,6 +294,7 @@ describe('RedisHealthEnhancedIndicator', () => {
             connect: jest.fn().mockRejectedValue(new Error('Connection refused')),
             quit: jest.fn().mockResolvedValue('OK'),
             disconnect: jest.fn(),
+            on: jest.fn(),
           }) as unknown as Redis,
       );
 
@@ -326,6 +331,7 @@ describe('RedisHealthEnhancedIndicator', () => {
             del: jest.fn().mockResolvedValue(1),
             quit: jest.fn().mockResolvedValue('OK'),
             disconnect: jest.fn(),
+            on: jest.fn(),
           }) as unknown as Redis,
       );
 
@@ -413,10 +419,11 @@ describe('RedisHealthEnhancedIndicator', () => {
       indicator = moduleRef.get(RedisHealthEnhancedIndicator);
       await indicator.isHealthy('redis-queue');
 
-      // Verify Redis was called with TLS config and maxRetriesPerRequest: null
+      // Verify Redis was called with maxRetriesPerRequest: null for BullMQ
+      // Note: TLS config was removed in the simplified implementation
       const redisCalls = MockedRedis.mock.calls;
       const bullmqCall = redisCalls.find(
-        (call: any[]) => call[0]?.maxRetriesPerRequest === null && call[0]?.tls
+        (call: any[]) => call[0]?.maxRetriesPerRequest === null
       );
       expect(bullmqCall).toBeDefined();
     });

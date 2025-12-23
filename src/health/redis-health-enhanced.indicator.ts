@@ -157,8 +157,18 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
     readLatency: number;
     serverInfo: any;
   }> {
-    // Connect to Redis
-    await redis.connect();
+    // Connect to Redis with logging
+    const { host, port } = this.appConfig.redis;
+    this.logger.log(`Connecting to Redis at ${host}:${port}...`);
+
+    try {
+      await redis.connect();
+      this.logger.log('Redis connection established');
+    } catch (connectError) {
+      const msg = connectError instanceof Error ? connectError.message : String(connectError);
+      this.logger.error(`Redis connection failed: ${msg}`);
+      throw connectError;
+    }
 
     const testKey = `${this.HEALTH_CHECK_KEY_PREFIX}${Date.now()}`;
     const testValue = JSON.stringify({
@@ -341,128 +351,73 @@ export class RedisHealthEnhancedIndicator extends HealthIndicator {
   }
 
   /**
-   * Create Redis connection using same configuration as application
+   * Create Redis connection (AWS ElastiCache)
+   * Supports both cluster mode and non-cluster mode
    */
   private createRedisConnection(): Redis {
-    const { mode } = this.appConfig.redis;
-
-    if (mode === 'managed') {
-      return this.createManagedRedisConnection();
-    }
-
-    return this.createLocalRedisConnection();
-  }
-
-  /**
-   * Create local Redis connection
-   */
-  private createLocalRedisConnection(): Redis {
-    const { host, port, password, db } = this.appConfig.redis;
-    return new Redis({
-      host,
-      port,
-      password: password || undefined,
-      db,
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: false,
-      lazyConnect: true,
-    });
-  }
-
-  /**
-   * Create managed Redis connection (AWS ElastiCache)
-   */
-  private createManagedRedisConnection(): Redis {
-    const { host: endpoint, port, password, db, tlsEnabled } = this.appConfig.redis;
+    const { host: endpoint, port } = this.appConfig.redis;
 
     if (!endpoint) {
-      throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
+      throw new Error('REDIS_HOST is required - set REDIS_HOST environment variable');
     }
 
-    const config: any = {
+    // Check if this is a cluster configuration endpoint (clustercfg.*)
+    const isClusterEndpoint = endpoint.startsWith('clustercfg.');
+    this.logger.debug(`Creating Redis connection to ${endpoint}:${port} (cluster: ${isClusterEndpoint})`);
+
+    const redis = new Redis({
       host: endpoint,
       port,
-      password: password || undefined,
-      db,
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true,
-      connectTimeout: 10000,
-    };
+      connectTimeout: 5000, // 5 second connection timeout
+      commandTimeout: 5000, // 5 second command timeout
+      retryStrategy: (times) => {
+        if (times > 2) {
+          this.logger.error(`Redis connection failed after ${times} attempts`);
+          return null; // Stop retrying
+        }
+        return Math.min(times * 200, 1000); // Retry with backoff
+      },
+    });
 
-    if (tlsEnabled) {
-      config.tls = {
-        servername: endpoint,
-        // Use default Node.js certificate validation
-        // ElastiCache uses AWS-managed certificates validated against system CA store
-        rejectUnauthorized: true,
-      };
-    }
+    // Log connection errors
+    redis.on('error', (err) => {
+      this.logger.error(`Redis error: ${err.message}`);
+    });
 
-    return new Redis(config);
+    return redis;
   }
 
   /**
-   * Create Redis connection for BullMQ
-   * Routes to local or managed connection based on REDIS_MODE
+   * Create Redis connection for BullMQ (AWS ElastiCache)
+   * BullMQ requires maxRetriesPerRequest: null
    */
   private createBullMQRedisConnection(): Redis {
-    const { mode } = this.appConfig.redis;
-
-    if (mode === 'managed') {
-      return this.createManagedBullMQRedisConnection();
-    }
-
-    return this.createLocalBullMQRedisConnection();
-  }
-
-  /**
-   * Create local Redis connection for BullMQ
-   * BullMQ requires maxRetriesPerRequest: null
-   */
-  private createLocalBullMQRedisConnection(): Redis {
-    const { host, port, password, db } = this.appConfig.redis;
-    return new Redis({
-      host,
-      port,
-      password: password || undefined,
-      db,
-      maxRetriesPerRequest: null, // Required by BullMQ
-      enableReadyCheck: false,
-    });
-  }
-
-  /**
-   * Create managed Redis connection for BullMQ (AWS ElastiCache)
-   * BullMQ requires maxRetriesPerRequest: null
-   */
-  private createManagedBullMQRedisConnection(): Redis {
-    const { host: endpoint, port, password, db, tlsEnabled } = this.appConfig.redis;
+    const { host: endpoint, port } = this.appConfig.redis;
 
     if (!endpoint) {
-      throw new Error('REDIS_HOST is required when REDIS_MODE=managed');
+      throw new Error('REDIS_HOST is required - set REDIS_HOST environment variable');
     }
 
-    const config: any = {
+    this.logger.debug(`Creating BullMQ Redis connection to ${endpoint}:${port}`);
+
+    const redis = new Redis({
       host: endpoint,
       port,
-      password: password || undefined,
-      db,
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: false,
-      connectTimeout: 10000,
-    };
+      connectTimeout: 5000, // 5 second connection timeout
+      commandTimeout: 5000, // 5 second command timeout
+    });
 
-    if (tlsEnabled) {
-      config.tls = {
-        servername: endpoint,
-        // Use default Node.js certificate validation
-        // ElastiCache uses AWS-managed certificates validated against system CA store
-        rejectUnauthorized: true,
-      };
-    }
+    // Log connection errors
+    redis.on('error', (err) => {
+      this.logger.error(`BullMQ Redis error: ${err.message}`);
+    });
 
-    return new Redis(config);
+    return redis;
   }
 
   /**

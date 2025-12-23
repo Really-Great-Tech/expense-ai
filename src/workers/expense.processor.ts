@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { DocumentReaderFactory } from '../utils/documentReaderFactory';
-import { DocumentProcessingData, QUEUE_NAMES, JOB_TYPES, JobResult } from '../common/types';
+import { DocumentProcessingData, QUEUE_NAMES, JOB_TYPES, JobResult, EXPENSE_SCHEMA } from '../common/types';
 import { ExpenseProcessingService } from './services/expense-processing.service';
 import { S3StorageService } from '../storage/s3-storage.service';
 import { ReceiptProcessingResultRepository } from '@/expense-result/repositories/receipt-processing-result.repository';
@@ -89,7 +89,7 @@ export class ExpenseProcessor extends WorkerHost {
 
       // Load compliance data and expense schema (placeholder - should be loaded from config/database)
       const complianceData = await this.loadComplianceData(country, icp);
-      const expenseSchema = await this.loadExpenseSchema();
+      const expenseSchema = EXPENSE_SCHEMA;
 
       // Process the document through all agents (always using parallel processing)
       const result = await this.expenseProcessingService.processExpenseDocument(
@@ -282,24 +282,6 @@ export class ExpenseProcessor extends WorkerHost {
 
     } catch (error) {
       this.logger.error(`Failed to load compliance data for ${country}: ${error.message}`);
-      return {};
-    }
-  }
-
-  private async loadExpenseSchema(): Promise<any> {
-    try {
-      const schemaFile = 'expense_file_schema.json';
-      const schemaData = await this.s3Storage.readLocalConfigFile(schemaFile);
-      
-      if (schemaData && typeof schemaData === 'object') {
-        this.logger.log(`Loaded expense schema with ${Object.keys(schemaData.properties || {}).length} fields`);
-        return schemaData;
-      } else {
-        this.logger.warn(`No expense schema found`);
-        return {};
-      }
-    } catch (error) {
-      this.logger.error(`Failed to load expense schema: ${error.message}`);
       return {};
     }
   }

@@ -22,12 +22,28 @@ export class LoggerService implements NestLoggerService {
     this.printJson('verbose', message, context);
   }
 
+  private safeStringify(obj: any): string {
+    const seen = new WeakSet();
+    return JSON.stringify(obj, (_key, value) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular]';
+        }
+        seen.add(value);
+      }
+      if (value instanceof Error) {
+        return { message: value.message, name: value.name, stack: value.stack };
+      }
+      return value;
+    });
+  }
+
   private printJson(level: 'log' | 'error' | 'warn' | 'debug' | 'verbose', message: any, context?: string, stack?: string): void {
     const logEntry: Record<string, any> = {
       timestamp: new Date().toISOString(),
       level,
       context,
-      message: typeof message === 'string' ? message : JSON.stringify(message),
+      message: typeof message === 'string' ? message : this.safeStringify(message),
     };
 
     if (stack) {
@@ -35,6 +51,6 @@ export class LoggerService implements NestLoggerService {
     }
 
     // eslint-disable-next-line no-console
-    console.log(JSON.stringify(logEntry));
+    console.log(this.safeStringify(logEntry));
   }
 }

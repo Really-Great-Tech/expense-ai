@@ -89,6 +89,21 @@ export interface JobResult {
 // Re-export constants for backward compatibility
 export { QUEUE_NAMES, JOB_TYPES } from '../constants/queue.constants';
 
+// Expense schema for field descriptions used in agent prompts
+export const EXPENSE_SCHEMA = {
+  properties: {
+    supplier: { title: 'Supplier', description: 'Entity providing goods/services' },
+    consumerRecipient: { title: 'Consumer', description: 'Person/entity receiving goods/services' },
+    icpRequirements: { title: 'ICP Requirements', description: 'Local employer details for EOR' },
+    transactionAmount: { title: 'Transaction Amount', description: 'Monetary value with currency' },
+    transactionDate: { title: 'Transaction Date', description: 'When expense occurred' },
+    invoiceReceiptNumber: { title: 'Invoice/Receipt Number', description: 'Unique transaction ID' },
+    taxInformation: { title: 'Tax Information', description: 'Tax amounts (VAT, GST, Sales Tax)' },
+    paymentMethod: { title: 'Payment Method', description: 'How expense was paid' },
+    itemDescriptionLineItems: { title: 'Line Items', description: 'Breakdown of goods/services' },
+  },
+};
+
 export interface ProcessingMetrics {
   totalJobs: number;
   completedJobs: number;

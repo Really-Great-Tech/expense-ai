@@ -22,9 +22,8 @@ export interface AppConfigType {
   nodeEnv: string;
   isProduction: boolean;
 
-  // Database
+  // Database (Aurora MySQL only)
   database: {
-    auroraMySQL: boolean;
     host: string;
     port: number;
     user: string;
@@ -36,15 +35,10 @@ export interface AppConfigType {
     queueLimit: number;
   };
 
-  // Redis
+  // Redis (Managed/ElastiCache only)
   redis: {
     host: string;
     port: number;
-    password: string | undefined;
-    db: number;
-    mode: 'local' | 'managed';
-    tlsEnabled: boolean;
-    clusterEnabled: boolean;
   };
 
   // AWS
@@ -52,10 +46,8 @@ export interface AppConfigType {
     region: string;
   };
 
-  // Storage
+  // Storage (S3 only)
   storage: {
-    type: 'local' | 's3';
-    uploadPath: string;
     s3BucketName: string | undefined;
   };
 
@@ -90,12 +82,6 @@ export interface AppConfigType {
   // Document processing
   documentReader: string;
 
-  // Security
-  security: {
-    privateKey: string | undefined;
-    publicKey: string | undefined;
-  };
-
   // TypeORM
   typeorm: {
     migrationsRun: boolean;
@@ -120,35 +106,26 @@ export default registerAs('app', (): AppConfigType => {
     isProduction: nodeEnv === 'production',
 
     // ==========================================================================
-    // DATABASE (MySQL/Aurora)
-    // Supported modes:
-    // - Local MySQL (AURORA_MYSQL !== 'true'): localhost only, password auth
-    // - Aurora MySQL (AURORA_MYSQL === 'true'): IAM auth required, no password
+    // DATABASE (Aurora MySQL only with IAM authentication)
     // ==========================================================================
     database: {
-      auroraMySQL: process.env.AURORA_MYSQL === 'true',
-      host: process.env.MYSQL_HOST || 'localhost',
+      host: process.env.MYSQL_HOST || '',
       port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'expense_ai',
-      ssl: process.env.MYSQL_SSL === 'true',
-      iamAuthEnabled: process.env.MYSQL_IAM_AUTH_ENABLED === 'true',
+      user: process.env.MYSQL_USER || '',
+      password: '', // Not used - IAM auth only
+      database: process.env.MYSQL_DATABASE || '',
+      ssl: true, // Always required for IAM auth
+      iamAuthEnabled: true, // Always true - app only supports RDS IAM auth
       connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '20', 10),
       queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '100', 10),
     },
 
     // ==========================================================================
-    // REDIS
+    // REDIS (Managed/ElastiCache only - no localhost support)
     // ==========================================================================
     redis: {
-      host: process.env.REDIS_HOST || 'localhost',
+      host: process.env.REDIS_HOST || '',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.REDIS_DB || '0', 10),
-      mode: (process.env.REDIS_MODE || 'local') as 'local' | 'managed',
-      tlsEnabled: process.env.REDIS_TLS_ENABLED === 'true',
-      clusterEnabled: process.env.REDIS_CLUSTER_ENABLED === 'true',
     },
 
     // ==========================================================================
@@ -159,11 +136,9 @@ export default registerAs('app', (): AppConfigType => {
     },
 
     // ==========================================================================
-    // STORAGE
+    // STORAGE (S3 only - no local storage support)
     // ==========================================================================
     storage: {
-      type: (process.env.STORAGE_TYPE || 's3') as 'local' | 's3',
-      uploadPath: process.env.UPLOAD_PATH || './uploads',
       s3BucketName: process.env.S3_BUCKET_NAME,
     },
 
@@ -207,14 +182,6 @@ export default registerAs('app', (): AppConfigType => {
     // DOCUMENT PROCESSING
     // ==========================================================================
     documentReader: process.env.DOCUMENT_READER || 'textract',
-
-    // ==========================================================================
-    // SECURITY
-    // ==========================================================================
-    security: {
-      privateKey: process.env.PRIVATE_KEY,
-      publicKey: process.env.PUBLIC_KEY,
-    },
 
     // ==========================================================================
     // TYPEORM
