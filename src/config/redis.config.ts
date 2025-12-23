@@ -1,12 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SharedBullConfigurationFactory, BullRootModuleOptions } from '@nestjs/bullmq';
 import Redis from 'ioredis';
 import { AppConfigType } from './app.config';
+import { LoggerService } from '../tools/logger/logger.service';
+
+const CONTEXT = 'RedisConfigService';
 
 @Injectable()
 export class RedisConfigService implements SharedBullConfigurationFactory {
-  private readonly logger = new Logger(RedisConfigService.name);
+  private readonly logger = new LoggerService();
   private readonly appConfig: AppConfigType;
 
   constructor(private configService: ConfigService) {
@@ -47,7 +50,7 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
       throw new Error('REDIS_HOST is required');
     }
 
-    this.logger.log(`Creating BullMQ Redis connection to ${endpoint}:${port}`);
+    this.logger.log(`Creating BullMQ Redis connection to ${endpoint}:${port}`, CONTEXT);
 
     return new Redis({
       host: endpoint,

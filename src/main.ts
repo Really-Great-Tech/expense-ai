@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
@@ -12,14 +12,16 @@ import { validateEnvironment } from './config/env-validation';
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
 
-const logger = new Logger('Bootstrap');
+const logger = new LoggerService();
+
+const BOOTSTRAP_CONTEXT = 'Bootstrap';
 
 function gracefulExit(error: Error | string, exitCode = 1): void {
   const message = error instanceof Error ? error.message : error;
   const stack = error instanceof Error ? error.stack : undefined;
 
-  logger.error(`Fatal error: ${message}`, stack);
-  logger.error('Application failed to start - shutting down');
+  logger.error(`Fatal error: ${message}`, stack, BOOTSTRAP_CONTEXT);
+  logger.error('Application failed to start - shutting down', undefined, BOOTSTRAP_CONTEXT);
 
   setTimeout(() => process.exit(exitCode), 100);
 }
@@ -31,20 +33,21 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason) => {
   // Log unhandled rejections but don't exit - they are often non-fatal (e.g., deadlocks in background jobs)
   const error = reason instanceof Error ? reason : new Error(String(reason));
-  logger.error(`Unhandled rejection: ${error.message}`, error.stack);
+  logger.error(`Unhandled rejection: ${error.message}`, error.stack, BOOTSTRAP_CONTEXT);
 });
 
 async function bootstrap() {
   // Validate environment variables early, before creating the NestJS app
-  logger.log('Validating environment configuration...');
+  logger.log('Validating environment configuration...', BOOTSTRAP_CONTEXT);
   validateEnvironment();
 
   try {
-    logger.log('Creating NestJS application...');
-    const app = await NestFactory.create(AppModule, { bufferLogs: false }); // Disable buffer for verbose logging
-    logger.log('NestJS application created successfully');
-    const appLogger = app.get(LoggerService);
-    app.useLogger(appLogger);
+    logger.log('Creating NestJS application...', BOOTSTRAP_CONTEXT);
+    const app = await NestFactory.create(AppModule, {
+      bufferLogs: false,
+      logger, // Use JSON logger from the start to avoid [Nest] console logs
+    });
+    logger.log('NestJS application created successfully', BOOTSTRAP_CONTEXT);
     const configService = app.get(ConfigService);
 
     // Enable class-validator to use NestJS's DI container for custom validators
@@ -61,7 +64,7 @@ async function bootstrap() {
     app.use(express.urlencoded({ limit: urlEncodedLimit, extended: true }));
     app.use(express.raw({ limit: bodyLimit, type: 'application/octet-stream' }));
 
-    logger.log(`Request body size limits configured: JSON=${bodyLimit}, URL-encoded=${urlEncodedLimit}`);
+    logger.log(`Request body size limits configured: JSON=${bodyLimit}, URL-encoded=${urlEncodedLimit}`, BOOTSTRAP_CONTEXT);
 
     // Request size monitoring middleware
     app.use((req: Request, res: Response, next: NextFunction) => {
@@ -72,7 +75,7 @@ async function bootstrap() {
 
         // Log large requests for monitoring (> 100KB)
         if (sizeInBytes > 100 * 1024) {
-          logger.warn(`Large request detected: ${sizeInMB}MB on ${req.method} ${req.path}`);
+          logger.warn(`Large request detected: ${sizeInMB}MB on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
         }
       }
       next();
@@ -159,23 +162,23 @@ async function bootstrap() {
     const dbHealth = app.get(DatabaseHealthIndicator);
     const redisHealth = app.get(RedisHealthEnhancedIndicator);
 
-    logger.log('Performing startup health checks...');
+    logger.log('Performing startup health checks...', BOOTSTRAP_CONTEXT);
 
     try {
-      logger.log('Checking database health...');
+      logger.log('Checking database health...', BOOTSTRAP_CONTEXT);
       const dbResult = await dbHealth.isHealthy('database', 10000);
-      logger.log('Database health check passed: ' + JSON.stringify(dbResult));
+      logger.log('Database health check passed: ' + JSON.stringify(dbResult), BOOTSTRAP_CONTEXT);
 
-      logger.log('Checking Redis health...');
+      logger.log('Checking Redis health...', BOOTSTRAP_CONTEXT);
       const redisResult = await redisHealth.isHealthy('redis-queue', 10000, false); // Skip BullMQ for startup
-      logger.log('Redis health check passed: ' + JSON.stringify(redisResult));
+      logger.log('Redis health check passed: ' + JSON.stringify(redisResult), BOOTSTRAP_CONTEXT);
 
-      logger.log('Startup health checks passed');
+      logger.log('Startup health checks passed', BOOTSTRAP_CONTEXT);
     } catch (healthError) {
       const msg = healthError instanceof Error ? healthError.message : String(healthError);
       const stack = healthError instanceof Error ? healthError.stack : 'N/A';
-      logger.error('Startup health checks failed - dependencies not ready: ' + msg);
-      logger.error('Stack trace: ' + stack);
+      logger.error('Startup health checks failed - dependencies not ready: ' + msg, undefined, BOOTSTRAP_CONTEXT);
+      logger.error('Stack trace: ' + stack, undefined, BOOTSTRAP_CONTEXT);
       throw healthError;
     }
 
@@ -187,8 +190,8 @@ async function bootstrap() {
     server.keepAliveTimeout = 65000; // 65 seconds - slightly higher than ALB's 60s default
     server.headersTimeout = 66000; // 66 seconds - must be > keepAliveTimeout
 
-    logger.log(`Application is running on: http://localhost:${port}`);
-    logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s');
+    logger.log(`Application is running on: http://localhost:${port}`, BOOTSTRAP_CONTEXT);
+    logger.log('HTTP server timeouts configured: request=300s, keepAlive=65s, headers=66s', BOOTSTRAP_CONTEXT);
   } catch (error) {
     gracefulExit(error instanceof Error ? error : new Error(String(error)));
   }

@@ -11,10 +11,17 @@ dotenv.config();
 // Get centralized config
 const config = getAppConfig();
 
-// Simple logger for database config (before NestJS logger is available)
-const log = (message: string, ...args: any[]) => {
+// JSON logger for database config (before NestJS logger is available)
+const log = (message: string, data?: any) => {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: 'log',
+    context: 'TypeORMConfig',
+    message,
+    ...(data && { data }),
+  };
   // eslint-disable-next-line no-console
-  console.log(`[TypeORM Config] ${message}`, ...args);
+  console.log(JSON.stringify(logEntry));
 };
 
 const isProduction = config.isProduction;
@@ -49,8 +56,8 @@ const migrationPaths = distMigrationsExist
   ? ['dist/src/migrations/*.js', 'dist/migrations/*.js']
   : ['src/migrations/*.ts'];
 
-log('Entity paths:', entityPaths);
-log('Migration paths:', migrationPaths);
+log('Entity paths configured', { paths: entityPaths });
+log('Migration paths configured', { paths: migrationPaths });
 
 /**
  * SSL Configuration for Aurora MySQL
@@ -67,18 +74,16 @@ const getSslConfig = () => {
   // Try to load certificate if it exists
   if (existsSync(certPath)) {
     ca = readFileSync(certPath, 'utf8');
-    log('Loaded RDS CA certificate from:', certPath);
+    log('Loaded RDS CA certificate', { path: certPath });
   } else if (existsSync(certPathAlt)) {
     ca = readFileSync(certPathAlt, 'utf8');
-    log('Loaded RDS CA certificate from:', certPathAlt);
+    log('Loaded RDS CA certificate', { path: certPathAlt });
   } else {
     // Certificate not found - will fall back to system CA certificates
-    log(
-      'RDS CA certificate not found at expected paths. ' +
-        'Falling back to system CA certificates. ' +
-        'For local development, download from: ' +
-        'https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
-    );
+    log('RDS CA certificate not found, using system CA certificates', {
+      checkedPaths: [certPath, certPathAlt],
+      downloadUrl: 'https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
+    });
   }
 
   return {
@@ -105,14 +110,14 @@ const getIAMAuthConfig = () => {
     throw new Error('Missing required IAM authentication configuration: MYSQL_HOST and MYSQL_USER must be set.');
   }
 
-  log('Configuring IAM auth for:', { hostname, port, username, region });
+  log('Configuring IAM authentication', { hostname, port, username, region });
 
   return {
     // mysql2 authPlugins for IAM authentication
     authPlugins: {
       // This plugin is called when server requests mysql_clear_password auth
       mysql_clear_password: () => () => {
-        log('mysql_clear_password plugin invoked, generating IAM token...');
+        log('mysql_clear_password plugin invoked, generating IAM token');
         return RDSIAMAuthManager.getAuthToken({
           hostname,
           port,

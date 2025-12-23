@@ -1,6 +1,7 @@
-import { Logger } from '@nestjs/common';
+import { LoggerService } from '../tools/logger/logger.service';
 
-const logger = new Logger('EnvironmentValidation');
+const logger = new LoggerService();
+const CONTEXT = 'EnvironmentValidation';
 
 /**
  * Environment Variable Requirement Definition
@@ -85,28 +86,26 @@ export function validateEnvironment(): void {
       `\n\nPlease set these variables or check your deployment configuration.`;
 
     if (isProduction) {
-      logger.error(`ERROR: ${message}`);
+      logger.error(`ERROR: ${message}`, undefined, CONTEXT);
       throw new Error(message);
     } else {
       logger.warn(
         `WARNING (development mode - using defaults):\n${message}\n\n` +
-          `The application will start with development defaults. ` +
-          `These variables MUST be set in production.`,
+          'The application will start with development defaults. ' +
+          'These variables MUST be set in production.',
+        CONTEXT,
       );
     }
   }
 
   // Warn about missing recommended variables
   if (missingRecommended.length > 0 && !isProduction) {
-    logger.log(
-      `Missing recommended variables (using defaults):\n` +
-        missingRecommended.join('\n'),
-    );
+    logger.log('Missing recommended variables (using defaults):\n' + missingRecommended.join('\n'), CONTEXT);
   }
 
   // Log successful validation
   const mode = isProduction ? 'production' : 'development';
-  logger.log(`Environment validation passed (${mode} mode)`);
+  logger.log(`Environment validation passed (${mode} mode)`, CONTEXT);
 }
 
 /**
@@ -163,8 +162,8 @@ export function getConfigSummary(redactSecrets = true): Record<string, string | 
  */
 export function logConfigSummary(): void {
   const summary = getConfigSummary(true);
-  logger.log('Configuration Summary:');
+  logger.log('Configuration Summary:', CONTEXT);
   for (const [key, value] of Object.entries(summary)) {
-    logger.log(`  ${key}: ${value}`);
+    logger.log(`  ${key}: ${value}`, CONTEXT);
   }
 }
