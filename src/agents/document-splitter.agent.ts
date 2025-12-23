@@ -24,6 +24,31 @@ interface ExpensifyDetectionResult {
 }
 
 /**
+ * Page classification for expense cover detection
+ */
+type PageClassification =
+  | 'EXPENSE_COVER' // Expense report summary page (Expensify, Concur, etc.)
+  | 'RECEIPT_THUMBNAIL' // Small receipt preview/thumbnail
+  | 'ACTUAL_RECEIPT' // Real merchant receipt/invoice
+  | 'UNKNOWN'; // Cannot determine
+
+/**
+ * Result of classifying a page
+ */
+interface PageClassificationResult {
+  classification: PageClassification;
+  indicators: string[];
+}
+
+/**
+ * Result of blank/error page detection
+ */
+interface BlankErrorResult {
+  isErrorOrBlank: boolean;
+  reason?: string;
+}
+
+/**
  * Agent responsible for analyzing multi-page PDF documents to identify separate receipts/invoices
  * Detects invoice boundaries and distinguishes between document containers and individual transactions
  *
@@ -85,7 +110,7 @@ export class DocumentSplitterAgent extends BaseAgent {
   }
 
   /**
-   * Vision-based page analysis using pairwise comparison
+   * Vision-based page analysis using pairwise comparison with fallback boundary injection
    */
   private async analyzePagesWithVision(pageMarkdowns: PageMarkdown[]): Promise<PageAnalysisResult> {
     if (pageMarkdowns.length === 0) {
@@ -94,6 +119,9 @@ export class DocumentSplitterAgent extends BaseAgent {
 
     if (pageMarkdowns.length === 1) {
       const expensify = this.detectExpensifyFromText(pageMarkdowns[0].content);
+      const blankCheck = this.isErrorOrBlankPage([pageMarkdowns[0].content]);
+      const classification = this.classifyPageType(pageMarkdowns[0].content, pageMarkdowns[0].content.length);
+
       return {
         totalInvoices: 1,
         pageGroups: [
@@ -103,10 +131,21 @@ export class DocumentSplitterAgent extends BaseAgent {
             confidence: 1.0,
             reasoning: 'Single page document',
             ...expensify,
+            isBlankOrError: blankCheck.isErrorOrBlank,
+            blankErrorReason: blankCheck.reason,
+            pageClassification: classification.classification,
           },
         ],
       };
     }
+
+    // Pre-classify all pages for expense cover detection and fallback injection
+    const pageClassifications = pageMarkdowns.map((p) => ({
+      pageNumber: p.pageNumber,
+      ...this.classifyPageType(p.content, p.content.length),
+    }));
+
+    this.logger.log(`Page classifications: ${pageClassifications.map((c) => `P${c.pageNumber}:${c.classification}`).join(', ')}`);
 
     // Detect boundaries using pairwise vision comparison
     const boundaries: number[] = [0]; // First page is always a boundary
@@ -114,8 +153,10 @@ export class DocumentSplitterAgent extends BaseAgent {
     for (let i = 0; i < pageMarkdowns.length - 1; i++) {
       const pageA = pageMarkdowns[i];
       const pageB = pageMarkdowns[i + 1];
+      const classA = pageClassifications[i].classification;
+      const classB = pageClassifications[i + 1].classification;
 
-      const comparison = await this.comparePagesWithVision(pageA, pageB);
+      const comparison = await this.comparePagesWithVision(pageA, pageB, classA, classB);
 
       if (!comparison.sameDocument && comparison.confidence >= 0.6) {
         boundaries.push(i + 1);
@@ -123,7 +164,44 @@ export class DocumentSplitterAgent extends BaseAgent {
       }
     }
 
-    // Convert boundaries to page groups with Expensify detection
+    // FALLBACK: Inject boundaries for expense->receipt transitions that LLM missed
+    // Only inject when we have STRONG indicators of expense cover pages
+    this.logger.log('Checking for fallback boundary injection...');
+    for (let i = 0; i < pageClassifications.length - 1; i++) {
+      const currentClass = pageClassifications[i].classification;
+      const nextClass = pageClassifications[i + 1].classification;
+      const currentIndicators = pageClassifications[i].indicators;
+
+      // Only inject if current page has STRONG expense cover indicators
+      // (not just a weak classification that could be a forwarded email)
+      const hasStrongExpenseIndicator = currentIndicators.some(
+        (ind) =>
+          ind.includes('Expense Report') ||
+          ind.includes('Expense management system') ||
+          ind.includes('Approval status') ||
+          ind.includes('Receipt thumbnails'),
+      );
+
+      // If transitioning from expense cover/thumbnail to actual receipt or unknown
+      // AND we have strong indicators (not just weak pattern matches)
+      if (
+        (currentClass === 'EXPENSE_COVER' || currentClass === 'RECEIPT_THUMBNAIL') &&
+        (nextClass === 'ACTUAL_RECEIPT' || nextClass === 'UNKNOWN') &&
+        hasStrongExpenseIndicator
+      ) {
+        const boundaryIndex = i + 1;
+        if (!boundaries.includes(boundaryIndex)) {
+          this.logger.log(`Fallback: Injecting boundary at index ${boundaryIndex} (${currentClass} -> ${nextClass})`);
+          this.logger.log(`  Indicators: ${currentIndicators.join(', ')}`);
+          boundaries.push(boundaryIndex);
+        }
+      }
+    }
+
+    // Sort boundaries to ensure correct order after fallback injection
+    boundaries.sort((a, b) => a - b);
+
+    // Convert boundaries to page groups with enhanced detection
     const pageGroups: PageGroup[] = [];
     for (let i = 0; i < boundaries.length; i++) {
       const startIdx = boundaries[i];
@@ -131,9 +209,18 @@ export class DocumentSplitterAgent extends BaseAgent {
       const groupPages = pageMarkdowns.slice(startIdx, endIdx);
       const pages = groupPages.map((p) => p.pageNumber);
 
-      // Detect Expensify for this group
-      const combinedText = groupPages.map((p) => p.content).join('\n');
+      // Get page contents for this group
+      const groupContents = groupPages.map((p) => p.content);
+
+      // Detect Expensify/expense systems for this group
+      const combinedText = groupContents.join('\n');
       const expensify = this.detectExpensifyFromText(combinedText);
+
+      // Detect blank/error pages
+      const blankCheck = this.isErrorOrBlankPage(groupContents);
+
+      // Get dominant classification for this group (first page's classification)
+      const dominantClassification = pageClassifications.find((c) => c.pageNumber === groupPages[0].pageNumber)?.classification || 'UNKNOWN';
 
       pageGroups.push({
         invoiceNumber: i + 1,
@@ -141,6 +228,9 @@ export class DocumentSplitterAgent extends BaseAgent {
         confidence: 0.8,
         reasoning: i === 0 ? 'First document in PDF' : 'Boundary detected via vision analysis',
         ...expensify,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        blankErrorReason: blankCheck.reason,
+        pageClassification: dominantClassification,
       });
     }
 
@@ -152,15 +242,37 @@ export class DocumentSplitterAgent extends BaseAgent {
 
   /**
    * Compare two adjacent pages using vision to determine if they're from the same document
+   * @param pageA First page
+   * @param pageB Second page
+   * @param classificationA Optional pre-computed classification for page A
+   * @param classificationB Optional pre-computed classification for page B
    */
-  private async comparePagesWithVision(pageA: PageMarkdown, pageB: PageMarkdown): Promise<PageComparisonResult> {
+  private async comparePagesWithVision(
+    pageA: PageMarkdown,
+    pageB: PageMarkdown,
+    classificationA?: PageClassification,
+    classificationB?: PageClassification,
+  ): Promise<PageComparisonResult> {
+    const classHintA = classificationA ? `[CLASSIFICATION HINT: ${classificationA}]` : '';
+    const classHintB = classificationB ? `[CLASSIFICATION HINT: ${classificationB}]` : '';
+
     const prompt = `Analyze these two consecutive pages. Are they from the SAME document or DIFFERENT documents?
 
-PAGE ${pageA.pageNumber} TEXT (first 1500 chars):
+PAGE ${pageA.pageNumber} ${classHintA} TEXT (first 1500 chars):
 ${pageA.content.substring(0, 1500)}
 
-PAGE ${pageB.pageNumber} TEXT (first 1500 chars):
+PAGE ${pageB.pageNumber} ${classHintB} TEXT (first 1500 chars):
 ${pageB.content.substring(0, 1500)}
+
+CRITICAL RULE - EXPENSE MANAGEMENT SYSTEM SEPARATION:
+Expense management systems (Expensify, SAP Concur, Zoho, Ramp) create PDFs that bundle:
+1. Cover/summary pages (showing "Approved", "Reimbursed", expense lists, thumbnails)
+2. Actual receipts/invoices from merchants
+
+These MUST be treated as DIFFERENT documents because:
+- They come from DIFFERENT sources (expense system vs. merchant)
+- Cover pages are GENERATED by the expense system
+- Receipts are ORIGINAL documents from vendors
 
 DIFFERENT DOCUMENT indicators:
 - Different logos/headers/branding
@@ -168,12 +280,16 @@ DIFFERENT DOCUMENT indicators:
 - New transaction ID or reference number
 - Completely different layout/style
 - Different merchant/company
+- One page is expense summary, other is actual receipt
 
 SAME DOCUMENT indicators:
 - Continuing page numbers ("Page 2 of 3" follows "Page 1 of 3")
 - Same header/footer pattern
 - Content continuation
 - Same merchant/company throughout
+
+IMPORTANT: If classification hints suggest EXPENSE_COVER or RECEIPT_THUMBNAIL followed by ACTUAL_RECEIPT,
+these are almost certainly DIFFERENT documents even if they reference the same transaction.
 
 Respond with JSON only:
 {"sameDocument": true/false, "confidence": 0.0-1.0, "reasoning": "brief explanation"}`;
@@ -246,12 +362,25 @@ Respond with JSON only:
       throw new Error('Invalid response structure from LLM');
     }
 
-    // Add Expensify detection to each page group
+    // Add Expensify detection, blank check, and classification to each page group
     for (const group of parsedResult.pageGroups) {
       const groupPages = pageMarkdowns.filter((p) => group.pages.includes(p.pageNumber));
-      const combinedText = groupPages.map((p) => p.content).join('\n');
+      const groupContents = groupPages.map((p) => p.content);
+      const combinedText = groupContents.join('\n');
+
       const expensify = this.detectExpensifyFromText(combinedText);
-      Object.assign(group, expensify);
+      const blankCheck = this.isErrorOrBlankPage(groupContents);
+
+      // Get classification of first page in group
+      const firstPageContent = groupPages[0]?.content || '';
+      const classification = this.classifyPageType(firstPageContent, firstPageContent.length);
+
+      Object.assign(group, {
+        ...expensify,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        blankErrorReason: blankCheck.reason,
+        pageClassification: classification.classification,
+      });
     }
 
     this.logger.log(`Invoice analysis completed: ${parsedResult.totalInvoices} invoices detected`);
@@ -259,22 +388,201 @@ Respond with JSON only:
   }
 
   /**
-   * Detect Expensify export from text content
+   * Check if page content contains blank or error pages
+   * Rule-based detection (no LLM calls)
+   * @param pageContents Array of page content strings
+   * @returns Detection result with reason if applicable
+   */
+  private isErrorOrBlankPage(pageContents: string[]): BlankErrorResult {
+    const combinedText = pageContents.join(' ').trim();
+    const textLen = combinedText.length;
+
+    // 1. Blank page: very little or no text (< 50 chars)
+    if (textLen < 50) {
+      return { isErrorOrBlank: true, reason: 'Blank or nearly blank page' };
+    }
+
+    // 2. Error patterns from OCR/Textract
+    const errorPatterns = [
+      /no text (extracted|found|detected)/i,
+      /ocr (failed|error)/i,
+      /extraction (failed|error)/i,
+      /unable to (read|extract|process)/i,
+      /empty page/i,
+      /blank page/i,
+    ];
+
+    for (const pattern of errorPatterns) {
+      if (pattern.test(combinedText)) {
+        return { isErrorOrBlank: true, reason: `OCR error detected: ${combinedText.substring(0, 100)}` };
+      }
+    }
+
+    // 3. Page with only whitespace/special characters
+    if (/^[\s\n\r\t.,;:!?-]*$/.test(combinedText)) {
+      return { isErrorOrBlank: true, reason: 'Page contains only whitespace or punctuation' };
+    }
+
+    return { isErrorOrBlank: false };
+  }
+
+  /**
+   * Classify a page as expense cover, receipt thumbnail, actual receipt, or unknown
+   * Used to provide hints for boundary detection and fallback injection
+   * @param pageContent Text content of the page
+   * @param pageLength Length of the page content
+   * @returns Classification with supporting indicators
+   */
+  private classifyPageType(pageContent: string, pageLength: number): PageClassificationResult {
+    const textLower = pageContent.toLowerCase();
+    const indicators: string[] = [];
+
+    // === EXPENSE_COVER detection ===
+    // Check for approval/status headers at start of page
+    if (/^(approved|reimbursed|submitted|pending|rejected)/im.test(pageContent)) {
+      indicators.push('Approval status header');
+    }
+    // Multi-language approval status
+    if (/^(genehmigt|approvato|aprobado|approuvé|godkänd)/im.test(pageContent)) {
+      indicators.push('Approval status (non-English)');
+    }
+    // Expense Report title with date
+    if (/expense\s*report.*\d{4}/i.test(pageContent)) {
+      indicators.push('Expense Report with date');
+    }
+
+    // Expense management system detection - use STRONG positive indicators only
+    // Don't just check for "expensify" word alone - require combination patterns
+    // that indicate this is an actual Expensify-generated page, not just a mention
+
+    // Strong Expensify indicators (actual Expensify pages have these)
+    const hasExpensifyBranding = textLower.includes('powered by expensify');
+    const hasExpensifyExportFormat = textLower.includes('expensify') && (textLower.includes('expense report') || textLower.includes('report id'));
+
+    // Strong Concur indicators
+    const hasConcurBranding = textLower.includes('sap concur') || (textLower.includes('concur') && textLower.includes('expense report'));
+
+    // Generic expense system indicators (need multiple signals)
+    const hasExpenseClaimFormat = textLower.includes('expense claim') || textLower.includes('expense summary');
+
+    if (hasExpensifyBranding || hasExpensifyExportFormat || hasConcurBranding || hasExpenseClaimFormat) {
+      indicators.push('Expense management system');
+    }
+
+    // Expense list format (From/To headers typical in Expensify)
+    if (/from\s+to\s+.*@/i.test(pageContent)) {
+      indicators.push('Expense email format');
+    }
+    // Receipt Thumbnails section
+    if (textLower.includes('receipt thumbnail') || textLower.includes('attached receipt')) {
+      indicators.push('Receipt thumbnails section');
+    }
+
+    // If we have expense cover indicators, classify as EXPENSE_COVER
+    if (indicators.length >= 2 || indicators.some((i) => i.includes('Expense Report') || i.includes('Expense management'))) {
+      return { classification: 'EXPENSE_COVER', indicators };
+    }
+
+    // === RECEIPT_THUMBNAIL detection ===
+    // Short text with receipt metadata format
+    if (pageLength < 400) {
+      if (/date:\s*\w+\s+\d+/i.test(pageContent) && /merchant:/i.test(pageContent) && /total:/i.test(pageContent)) {
+        indicators.push('Receipt thumbnail metadata format');
+        return { classification: 'RECEIPT_THUMBNAIL', indicators };
+      }
+      // Very short with just basic receipt info
+      if (textLower.includes('receipt') && /€|\$|£|usd|eur/i.test(pageContent)) {
+        indicators.push('Short receipt reference');
+        return { classification: 'RECEIPT_THUMBNAIL', indicators };
+      }
+    }
+
+    // === ACTUAL_RECEIPT detection ===
+    // Page numbering patterns (indicates multi-page document)
+    if (/page\s*\d+\s*(of|\/)\s*\d+/i.test(pageContent) || /pagina\s*\d+\s*\/\s*\d+/i.test(pageContent)) {
+      indicators.push('Page numbering');
+    }
+    // Invoice/receipt number patterns (multi-language)
+    if (
+      /invoice\s*(no|number|#|n\.)?\s*:?\s*[A-Z0-9-]+/i.test(pageContent) ||
+      /fattura\s*(n\.|numero)?\s*:?\s*[A-Z0-9-]+/i.test(pageContent) ||
+      /rechnung\s*(nr|nummer)?\s*:?\s*[A-Z0-9-]+/i.test(pageContent) ||
+      /factura\s*(n\.|numero)?\s*:?\s*[A-Z0-9-]+/i.test(pageContent)
+    ) {
+      indicators.push('Invoice/receipt number');
+    }
+    // VAT/Tax ID patterns
+    if (/vat\s*(id|number)?|tax\s*id|p\.?\s*iva|ust-?id|mwst/i.test(pageContent)) {
+      indicators.push('VAT/Tax ID');
+    }
+    // Company registration/address
+    if (/sede\s*legale|registered\s*office|company\s*reg/i.test(pageContent)) {
+      indicators.push('Company registration');
+    }
+    // Detailed billing/payment info
+    if (/total\s*(amount|due|payable)|importo\s*totale|gesamtbetrag|total\s*a\s*pagar/i.test(pageContent)) {
+      indicators.push('Billing details');
+    }
+
+    // Longer text content with business document patterns
+    if (pageLength > 800 && indicators.length > 0) {
+      return { classification: 'ACTUAL_RECEIPT', indicators };
+    }
+
+    // If we have some receipt indicators
+    if (indicators.length >= 2) {
+      return { classification: 'ACTUAL_RECEIPT', indicators };
+    }
+
+    // === UNKNOWN ===
+    return { classification: 'UNKNOWN', indicators };
+  }
+
+  /**
+   * Detect expense management system export from text content
+   * Supports: Expensify, SAP Concur, Zoho Expense, Ramp, and generic expense reports
    */
   private detectExpensifyFromText(text: string): ExpensifyDetectionResult {
     const lower = text.toLowerCase();
     const indicators: string[] = [];
 
-    // Check for Expensify indicators
+    // Expensify-specific indicators
     if (lower.includes('expensify')) indicators.push('Contains "Expensify"');
     if (lower.includes('expensify.com')) indicators.push('Contains expensify.com');
+    if (/r00[a-z0-9]{8,}/i.test(text)) indicators.push('Has Expensify Report ID');
+    if (lower.includes('powered by expensify')) indicators.push('Powered by Expensify');
+
+    // SAP Concur indicators
+    if (lower.includes('concur') || lower.includes('sap concur')) indicators.push('Contains SAP Concur');
+    if (/concur\.com/i.test(text)) indicators.push('Contains concur.com');
+
+    // Zoho Expense indicators
+    if (lower.includes('zoho expense') || lower.includes('zoho.com/expense')) {
+      indicators.push('Contains Zoho Expense');
+    }
+
+    // Ramp indicators
+    if (lower.includes('ramp') && lower.includes('expense')) indicators.push('Contains Ramp expense');
+
+    // Generic expense report indicators
     if (/created:\s*\d{4}-\d{2}-\d{2}.*utc/i.test(text)) indicators.push('Has Created timestamp');
     if (/submitted:\s*\d{4}-\d{2}-\d{2}.*utc/i.test(text)) indicators.push('Has Submitted timestamp');
     if (/approved.*utc|approved by/i.test(text)) indicators.push('Has Approved info');
     if (/exported to netsuite|exported to/i.test(text)) indicators.push('Has Export info');
-    if (/r00[a-z0-9]{8,}/i.test(text)) indicators.push('Has Expensify Report ID');
     if (lower.includes('expense report')) indicators.push('Contains "expense report"');
-    if (lower.includes('receipt thumbnail') || lower.includes('preview image')) indicators.push('Has receipt thumbnails');
+    if (lower.includes('receipt thumbnail') || lower.includes('preview image')) {
+      indicators.push('Has receipt thumbnails');
+    }
+
+    // Multi-language approval patterns
+    if (/^(approved|genehmigt|approvato|aprobado|approuvé|godkänd)/im.test(text)) {
+      indicators.push('Approval status header (multi-language)');
+    }
+
+    // Aggregate page detection (multiple receipts on single page)
+    if ((lower.includes('receipt') || lower.includes('expense')) && (lower.match(/total/gi) || []).length > 2) {
+      indicators.push('Aggregate expense page');
+    }
 
     const isExpensify = indicators.length >= 2;
     const confidence = Math.min(indicators.length / 5, 1.0);
@@ -282,7 +590,7 @@ Respond with JSON only:
     return {
       isExpensifyExport: isExpensify,
       expensifyConfidence: isExpensify ? confidence : 0.1,
-      expensifyReason: isExpensify ? `Detected ${indicators.length} Expensify indicators` : undefined,
+      expensifyReason: isExpensify ? `Detected ${indicators.length} expense system indicators` : undefined,
       expensifyIndicators: indicators,
     };
   }

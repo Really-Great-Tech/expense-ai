@@ -70,7 +70,7 @@ export class CircuitBreakerService {
    */
   private readonly defaultConfigs: Record<string, CircuitBreakerConfig> = {
     // LLM calls are slow, need longer recovery time
-    bedrock: { threshold: 3, halfOpenAfter: 30_000 },
+    bedrock: { threshold: 30, halfOpenAfter: 10_000 },
     // Textract can be rate-limited
     textract: { threshold: 3, halfOpenAfter: 20_000 },
     // S3 is usually reliable, higher threshold

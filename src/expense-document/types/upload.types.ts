@@ -19,6 +19,12 @@ export interface PageGroup {
   expensifyReason?: string;
   /** Detected Expensify indicators */
   expensifyIndicators?: string[];
+  /** Whether this group contains blank or error pages */
+  isBlankOrError?: boolean;
+  /** Reason for blank/error classification */
+  blankErrorReason?: string;
+  /** Page classification for boundary detection */
+  pageClassification?: 'EXPENSE_COVER' | 'RECEIPT_THUMBNAIL' | 'ACTUAL_RECEIPT' | 'UNKNOWN';
 }
 
 export interface PageAnalysisResult {
@@ -54,6 +60,11 @@ export interface InvoiceGroup {
   expensifyConfidence?: number;
   expensifyReason?: string;
   expensifyIndicators?: string[];
+  // Blank/error page detection
+  isBlankOrError?: boolean;
+  blankErrorReason?: string;
+  // Page classification
+  pageClassification?: 'EXPENSE_COVER' | 'RECEIPT_THUMBNAIL' | 'ACTUAL_RECEIPT' | 'UNKNOWN';
 }
 
 export interface DuplicateChoice {
