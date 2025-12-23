@@ -1,12 +1,14 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
-import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Block, FeatureType } from '@aws-sdk/client-textract';
+import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Block, Relationship, FeatureType } from '@aws-sdk/client-textract';
 import { BrokenCircuitError } from 'cockatiel';
 import { DocumentReader, TextractConfig, ApiResponse } from '../../utils/types';
 import { getGlobalCircuitBreakerService } from '../../resilience';
 
 export interface TextractApiServiceOptions {
   region?: string;
+  uploadPath?: string;
 }
 
 /**
@@ -14,10 +16,15 @@ export interface TextractApiServiceOptions {
  */
 export class TextractApiService implements DocumentReader {
   private textractClient: TextractClient;
+  private parseCache = new Map<string, { result: Promise<ApiResponse<string>>; timestamp: number }>();
+  private cacheTimeout = 10 * 60 * 1000; // 10 minutes cache
+
+  private readonly uploadPath: string;
   private readonly logger = new Logger(TextractApiService.name);
 
   constructor(options: TextractApiServiceOptions = {}) {
     const awsRegion = options.region || 'eu-west-1';
+    this.uploadPath = options.uploadPath || './uploads';
     this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
 
     // Initialize Textract client - uses AWS SDK default credential chain:
@@ -33,7 +40,90 @@ export class TextractApiService implements DocumentReader {
   }
 
   /**
+   * Validate and sanitize file path for security
+   */
+  private validateFilePath(filePath: string): { isValid: boolean; error?: string; sanitizedPath?: string } {
+    try {
+      // Check for null, undefined, or empty paths
+      if (!filePath || typeof filePath !== 'string') {
+        return { isValid: false, error: 'Invalid file path: path must be a non-empty string' };
+      }
+
+      // Remove any null bytes (potential security issue)
+      if (filePath.includes('\0')) {
+        return { isValid: false, error: 'Invalid file path: contains null bytes' };
+      }
+
+      // Resolve to absolute path and normalize
+      const resolvedPath = path.resolve(filePath);
+      const normalizedPath = path.normalize(resolvedPath);
+
+      // Check for path traversal attempts
+      if (normalizedPath !== resolvedPath) {
+        return { isValid: false, error: 'Invalid file path: path traversal detected' };
+      }
+
+      // Check if path contains dangerous characters or patterns
+      const dangerousPatterns = [
+        /\.\./,           // Parent directory traversal
+        /[<>:"|?*]/,      // Windows invalid characters
+        /[\x00-\x1f]/,    // Control characters
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(filePath)) {
+          return { isValid: false, error: 'Invalid file path: contains dangerous characters' };
+        }
+      }
+
+      // Define allowed directories (adjust based on your application needs)
+      const allowedDirectories = [
+        path.resolve('./uploads'),
+        path.resolve('./temp'),
+        path.resolve('./documents'),
+        path.resolve(this.uploadPath),
+      ];
+
+      // Check if the file is within allowed directories
+      const isWithinAllowedDir = allowedDirectories.some((allowedDir) => {
+        try {
+          const relativePath = path.relative(allowedDir, normalizedPath);
+          return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+        } catch {
+          return false;
+        }
+      });
+
+      if (!isWithinAllowedDir) {
+        return { 
+          isValid: false, 
+          error: `File path not within allowed directories. Allowed: ${allowedDirectories.join(', ')}` 
+        };
+      }
+
+      // Check file extension is allowed
+      const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.tif'];
+      const fileExtension = path.extname(normalizedPath).toLowerCase();
+      
+      if (!allowedExtensions.includes(fileExtension)) {
+        return { 
+          isValid: false, 
+          error: `Unsupported file extension: ${fileExtension}. Allowed: ${allowedExtensions.join(', ')}` 
+        };
+      }
+
+      return { isValid: true, sanitizedPath: normalizedPath };
+    } catch (error) {
+      return { 
+        isValid: false, 
+        error: `Path validation error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  }
+
+  /**
    * Parse document from buffer using AWS Textract
+   * This is the preferred method - avoids writing to disk
    */
   async parseDocumentFromBuffer(buffer: Buffer, fileName: string, config: TextractConfig = {}): Promise<ApiResponse<string>> {
     try {
@@ -112,6 +202,244 @@ export class TextractApiService implements DocumentReader {
       return {
         success: false,
         error: `Buffer parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+  }
+
+  /**
+   * Parse document using AWS Textract (file path version - legacy)
+   * @deprecated Use parseDocumentFromBuffer instead
+   */
+  async parseDocument(filePath: string, config: TextractConfig = {}): Promise<ApiResponse<string>> {
+    // Validate file path for security
+    const pathValidation = this.validateFilePath(filePath);
+    if (!pathValidation.isValid) {
+      this.logger.error(` Security: ${pathValidation.error}`);
+      return {
+        success: false,
+        error: `Security validation failed: ${pathValidation.error}`,
+      };
+    }
+
+    // Use sanitized path for all operations
+    const sanitizedPath = pathValidation.sanitizedPath!;
+    
+    // Create cache key based on sanitized file path and config
+    const cacheKey = `${sanitizedPath}_${JSON.stringify(config)}`;
+    const now = Date.now();
+
+    // Clean expired cache entries
+    for (const [key, entry] of this.parseCache.entries()) {
+      if (now - entry.timestamp > this.cacheTimeout) {
+        this.parseCache.delete(key);
+      }
+    }
+
+    // Check if we have a cached result for this file
+    const cachedEntry = this.parseCache.get(cacheKey);
+    if (cachedEntry) {
+      this.logger.log(`Using cached result for document: ${sanitizedPath}`);
+      return await cachedEntry.result;
+    }
+
+    // Create the parsing promise using sanitized path
+    const parsePromise = this.performTextractParsing(sanitizedPath, config);
+
+    // Cache the promise immediately to prevent duplicate calls
+    this.parseCache.set(cacheKey, {
+      result: parsePromise,
+      timestamp: now,
+    });
+
+    return await parsePromise;
+  }
+
+  /**
+   * Perform the actual document parsing using Textract
+   */
+  private async performTextractParsing(filePath: string, config: TextractConfig): Promise<ApiResponse<string>> {
+    try {
+      // Re-validate file path for additional security
+      const pathValidation = this.validateFilePath(filePath);
+      if (!pathValidation.isValid) {
+        this.logger.error(` Security: ${pathValidation.error}`);
+        return {
+          success: false,
+          error: `Security validation failed: ${pathValidation.error}`,
+        };
+      }
+
+      // Use only the sanitized path for all operations
+      const sanitizedPath = pathValidation.sanitizedPath!;
+      this.logger.log(`Parsing document with Textract: ${sanitizedPath}`);
+
+      // Check if file exists using sanitized path
+      if (!fs.existsSync(sanitizedPath)) {
+        return {
+          success: false,
+          error: `File not found: ${sanitizedPath}`,
+        };
+      }
+
+      // Get file stats first to validate size before reading into memory
+      const fileStats = fs.statSync(sanitizedPath);
+
+      // Check file size limits BEFORE reading (Textract limit is 10MB for synchronous)
+      // This prevents loading excessively large files into memory
+      const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+      if (fileStats.size > maxSizeBytes) {
+        return {
+          success: false,
+          error: `File too large for Textract: ${(fileStats.size / 1024 / 1024).toFixed(2)}MB (max: 10MB)`,
+        };
+      }
+
+      // Validate file size is within reasonable bounds (additional safety check)
+      if (fileStats.size <= 0) {
+        return {
+          success: false,
+          error: `Invalid file size: ${fileStats.size} bytes`,
+        };
+      }
+
+      // Read file after size validation using sanitized path
+      const fileBuffer = fs.readFileSync(sanitizedPath);
+
+      // Validate buffer length matches expected file size (prevents truncation attacks)
+      if (fileBuffer.length !== fileStats.size) {
+        return {
+          success: false,
+          error: `File read mismatch: expected ${fileStats.size} bytes, got ${fileBuffer.length} bytes`,
+        };
+      }
+
+      // Log diagnostic information
+      this.logger.log(` File diagnostics for ${filePath}:`);
+      this.logger.log(`   Size: ${fileStats.size} bytes (${(fileStats.size / 1024 / 1024).toFixed(2)} MB)`);
+      this.logger.log(`   Buffer length: ${fileBuffer.length}`);
+      this.logger.log(`   File extension: ${filePath.split('.').pop()}`);
+
+      // Detect file type by header
+      const fileHeader = fileBuffer.slice(0, 8);
+      const headerString = fileHeader.toString('binary');
+      const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
+
+      let fileType = 'unknown';
+      let isValidFormat = false;
+
+      // Check for PDF
+      if (headerString.startsWith('%PDF')) {
+        fileType = 'pdf';
+        isValidFormat = true;
+        const pdfVersion = fileBuffer.slice(0, 8).toString();
+        this.logger.log(`   File type: PDF`);
+        this.logger.log(`   PDF version: ${pdfVersion}`);
+      }
+      // Check for PNG
+      else if (fileHeader[0] === 0x89 && fileHeader[1] === 0x50 && fileHeader[2] === 0x4e && fileHeader[3] === 0x47) {
+        fileType = 'png';
+        isValidFormat = true;
+        this.logger.log(`   File type: PNG image`);
+      }
+      // Check for JPEG
+      else if (fileHeader[0] === 0xff && fileHeader[1] === 0xd8 && fileHeader[2] === 0xff) {
+        fileType = 'jpeg';
+        isValidFormat = true;
+        this.logger.log(`   File type: JPEG image`);
+      }
+      // Check for TIFF
+      else if (
+        (fileHeader[0] === 0x49 && fileHeader[1] === 0x49 && fileHeader[2] === 0x2a && fileHeader[3] === 0x00) ||
+        (fileHeader[0] === 0x4d && fileHeader[1] === 0x4d && fileHeader[2] === 0x00 && fileHeader[3] === 0x2a)
+      ) {
+        fileType = 'tiff';
+        isValidFormat = true;
+        this.logger.log(`   File type: TIFF image`);
+      } else {
+        this.logger.log(
+          `   File type: Unknown (header: ${Array.from(fileHeader.slice(0, 4))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join(' ')})`,
+        );
+      }
+
+      if (!isValidFormat) {
+        return {
+          success: false,
+          error: `Unsupported file format: Expected PDF, PNG, JPEG, or TIFF. Detected: ${fileType}`,
+        };
+      }
+
+      // Estimate page count based on file type
+      let estimatedPages = 1;
+      let isMultiPage = false;
+      const maxAllowedPages = 500; // Safety limit for page count
+
+      if (fileType === 'pdf') {
+        // For PDFs, estimate page count from content
+        // Limit string conversion to prevent memory issues with large files
+        const content = fileBuffer.toString('binary');
+        const pageMatches = content.match(/\/Type\s*\/Page[^s]/g);
+        estimatedPages = pageMatches ? Math.min(pageMatches.length, maxAllowedPages) : 1;
+        isMultiPage = estimatedPages > 1;
+
+        this.logger.log(`   Estimated pages: ${estimatedPages}`);
+
+        if (estimatedPages >= maxAllowedPages) {
+          this.logger.warn(`   Page count capped at ${maxAllowedPages} for safety`);
+        } else if (estimatedPages > 100) {
+          this.logger.log(`   High page count detected (${estimatedPages} pages)`);
+        }
+      } else {
+        // Images are always single page
+        this.logger.log(`   Pages: 1 (image file)`);
+      }
+
+      this.logger.log(`   Processing method: ${isMultiPage ? 'SPLIT (multi-page PDF)' : 'DIRECT (single-page)'}`);
+
+      // Route to appropriate processing method
+      if (isMultiPage) {
+        return await this.processMultiPageDocumentBySplitting(fileBuffer, filePath, config, estimatedPages);
+      } else {
+        return await this.processSinglePageDocument(fileBuffer, config);
+      }
+    } catch (error) {
+      this.logger.error(
+        ` Error parsing document with Textract: ${error instanceof Error ? error.message : error}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      // Enhanced error reporting
+      let errorMessage = 'Unknown error occurred';
+      let errorCode = 'UNKNOWN';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Check for specific AWS Textract error types
+        if (error.message.includes('unsupported document format')) {
+          errorCode = 'UNSUPPORTED_FORMAT';
+          this.logger.error(` UNSUPPORTED_FORMAT: The PDF format is not supported by Textract`);
+          this.logger.error(`   Common causes:`);
+          this.logger.error(`   - Encrypted or password-protected PDF`);
+          this.logger.error(`   - Corrupted PDF file`);
+          this.logger.error(`   - Non-standard PDF structure`);
+          this.logger.error(`   - PDF version incompatibility`);
+        } else if (error.message.includes('InvalidParameterException')) {
+          errorCode = 'INVALID_PARAMETER';
+          this.logger.error(` INVALID_PARAMETER: Invalid request parameters`);
+        } else if (error.message.includes('ProvisionedThroughputExceededException')) {
+          errorCode = 'THROTTLED';
+          this.logger.error(` THROTTLED: Textract rate limit exceeded`);
+        } else if (error.message.includes('InternalServerError')) {
+          errorCode = 'INTERNAL_ERROR';
+          this.logger.error(` INTERNAL_ERROR: AWS Textract internal error`);
+        }
+      }
+
+      return {
+        success: false,
+        error: `${errorCode}: ${errorMessage}`,
       };
     }
   }
