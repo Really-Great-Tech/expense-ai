@@ -348,7 +348,7 @@ export class DocumentSplitterService {
 
   /**
    * Create invoice groups from page analysis (no PDF splitting)
-   * Filters out Expensify cover pages and blank/error pages
+   * Filters out Expensify cover pages and blank/error pages using both rule-based and LLM-enhanced detection
    */
   private createInvoiceGroupsFromAnalysis(
     pageMarkdowns: PageMarkdown[],
@@ -357,9 +357,15 @@ export class DocumentSplitterService {
   ): InvoiceGroup[] {
     // Filter out Expensify cover pages and blank/error pages
     const filteredGroups = analysis.pageGroups.filter((group) => {
-      // Skip Expensify export/cover pages
+      // Skip Expensify export/cover pages (rule-based)
       if (group.isExpensifyExport && group.expensifyConfidence && group.expensifyConfidence >= 0.5) {
-        this.logger.log(`Skipping Expensify cover page group ${group.invoiceNumber} (confidence: ${group.expensifyConfidence})`);
+        this.logger.log(`Skipping Expensify cover page group ${group.invoiceNumber} (rule-based confidence: ${group.expensifyConfidence})`);
+        return false;
+      }
+
+      // Skip Expensify (LLM-enhanced via metadata)
+      if (group.metadata?.isExpensifyPage && (group.metadata.expensifyConfidenceLlm || 0) >= 0.5) {
+        this.logger.log(`Skipping Expensify cover page group ${group.invoiceNumber} (LLM confidence: ${group.metadata.expensifyConfidenceLlm})`);
         return false;
       }
 
@@ -369,9 +375,15 @@ export class DocumentSplitterService {
         return false;
       }
 
-      // Skip blank/error pages
+      // Skip blank/error pages (rule-based)
       if (group.isBlankOrError) {
         this.logger.log(`Skipping blank/error page group ${group.invoiceNumber}: ${group.blankErrorReason}`);
+        return false;
+      }
+
+      // Skip blank (LLM-enhanced via metadata)
+      if (group.metadata?.isBlankLlm) {
+        this.logger.log(`Skipping blank page group ${group.invoiceNumber} (LLM detected)`);
         return false;
       }
 
@@ -403,6 +415,13 @@ export class DocumentSplitterService {
         isBlankOrError: group.isBlankOrError,
         blankErrorReason: group.blankErrorReason,
         pageClassification: group.pageClassification,
+        // Rich metadata from LLM extraction
+        merchantName: group.metadata?.merchantName,
+        totalAmount: group.metadata?.totalAmount,
+        currency: group.metadata?.currency,
+        documentType: group.metadata?.documentType,
+        transactionId: group.metadata?.transactionId,
+        datePeriod: group.metadata?.datePeriod,
       };
     });
   }

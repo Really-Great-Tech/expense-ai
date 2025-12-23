@@ -6,6 +6,49 @@ export interface PageMarkdown {
   imageBase64?: string;
 }
 
+/**
+ * Rich metadata extracted from a document group using LLM + vision analysis
+ * Used for document classification, filtering, and downstream processing
+ */
+export interface DocumentMetadata {
+  /** Type of document (e.g., Invoice, Receipt, Statement, Contract, Form, Report, Letter) */
+  documentType: string;
+  /** More specific type if applicable (e.g., Hotel Receipt, Flight Itinerary, Bank Statement) */
+  documentSubtype?: string;
+  /** Confidence score for the metadata extraction (0-1) */
+  confidence: number;
+  /** Header text or title visible on the document */
+  headerInfo: string;
+  /** Footer text visible on the document */
+  footerInfo: string;
+  /** Brief 1-2 sentence summary of document content */
+  mainContent: string;
+  /** Key names or entities found in the document */
+  keyEntities: string[];
+  /** Company or merchant name if applicable */
+  merchantName?: string;
+  /** Transaction or reference ID if found */
+  transactionId?: string;
+  /** Date or date range mentioned */
+  datePeriod?: string;
+  /** Total amount if this is a financial document */
+  totalAmount?: string;
+  /** Currency code if amount found (e.g., USD, EUR) */
+  currency?: string;
+  /** Whether the document has a visible logo */
+  hasLogo: boolean;
+  /** Brief description of logo if present */
+  logoDescription?: string;
+  /** LLM-detected Expensify/expense system page */
+  isExpensifyPage?: boolean;
+  /** LLM confidence for Expensify detection (0-1) */
+  expensifyConfidenceLlm?: number;
+  /** LLM reason for Expensify classification */
+  expensifyReasonLlm?: string;
+  /** LLM-detected blank or empty page */
+  isBlankLlm?: boolean;
+}
+
 export interface PageGroup {
   invoiceNumber: number;
   pages: number[];
@@ -25,6 +68,8 @@ export interface PageGroup {
   blankErrorReason?: string;
   /** Page classification for boundary detection */
   pageClassification?: 'EXPENSE_COVER' | 'RECEIPT_THUMBNAIL' | 'ACTUAL_RECEIPT' | 'UNKNOWN';
+  /** Rich metadata extracted via LLM+vision */
+  metadata?: DocumentMetadata;
 }
 
 export interface PageAnalysisResult {
@@ -65,6 +110,13 @@ export interface InvoiceGroup {
   blankErrorReason?: string;
   // Page classification
   pageClassification?: 'EXPENSE_COVER' | 'RECEIPT_THUMBNAIL' | 'ACTUAL_RECEIPT' | 'UNKNOWN';
+  // Rich metadata from LLM extraction
+  merchantName?: string;
+  totalAmount?: string;
+  currency?: string;
+  documentType?: string;
+  transactionId?: string;
+  datePeriod?: string;
 }
 
 export interface DuplicateChoice {
