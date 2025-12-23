@@ -1,6 +1,6 @@
 import { Signer } from '@aws-sdk/rds-signer';
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LoggerService } from '../tools/logger/logger.service';
 
 /**
  * RDS IAM Authentication Token Manager
@@ -35,8 +35,10 @@ interface TokenCache {
   expiresAt: number;
 }
 
+const CONTEXT = 'RDSIAMAuthManager';
+
 export class RDSIAMAuthManager {
-  private static readonly logger = new Logger('RDSIAMAuthManager');
+  private static readonly logger = new LoggerService();
 
   // Token cache - tokens expire after 15 minutes, we refresh at 10 minutes
   private static tokenCache: Map<string, TokenCache> = new Map();
@@ -64,14 +66,14 @@ export class RDSIAMAuthManager {
     // Check if we have a valid cached token
     const cachedToken = this.getCachedToken(cacheKey);
     if (cachedToken) {
-      this.logger.debug(`Using cached IAM token for ${config.hostname}`);
+      this.logger.debug(`Using cached IAM token for ${config.hostname}`, CONTEXT);
       return cachedToken;
     }
 
     // Check if token generation is already in progress for this config
     const existingRequest = this.tokenGenerationLocks.get(cacheKey);
     if (existingRequest) {
-      this.logger.debug(`Waiting for in-progress token generation for ${config.hostname}`);
+      this.logger.debug(`Waiting for in-progress token generation for ${config.hostname}`, CONTEXT);
       return existingRequest;
     }
 
@@ -97,9 +99,7 @@ export class RDSIAMAuthManager {
     attempt: number = 1,
   ): Promise<string> {
     try {
-      this.logger.log(
-        `Generating new IAM auth token for ${config.hostname} (attempt ${attempt}/${this.MAX_RETRIES})`,
-      );
+      this.logger.log(`Generating new IAM auth token for ${config.hostname} (attempt ${attempt}/${this.MAX_RETRIES})`, CONTEXT);
 
       const signer = new Signer({
         hostname: config.hostname,
@@ -114,10 +114,7 @@ export class RDSIAMAuthManager {
       const expiresAt = Date.now() + this.TOKEN_REFRESH_INTERVAL;
       this.tokenCache.set(cacheKey, { token, expiresAt });
 
-      this.logger.log(
-        `Successfully generated IAM token for ${config.hostname}. ` +
-        `Token cached until ${new Date(expiresAt).toISOString()}`,
-      );
+      this.logger.log(`Successfully generated IAM token for ${config.hostname}. Token cached until ${new Date(expiresAt).toISOString()}`, CONTEXT);
 
       return token;
     } catch (error) {
@@ -127,28 +124,24 @@ export class RDSIAMAuthManager {
       if (attempt < this.MAX_RETRIES) {
         const delayMs = this.INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1);
 
-        this.logger.warn(
-          `Failed to generate IAM token (attempt ${attempt}/${this.MAX_RETRIES}): ${errorMessage}. ` +
-          `Retrying in ${delayMs}ms...`,
-        );
+        const msg = `Failed to generate IAM token (attempt ${attempt}/${this.MAX_RETRIES}): ${errorMessage}. Retrying in ${delayMs}ms...`;
+        this.logger.warn(msg, CONTEXT);
 
         await this.sleep(delayMs);
         return this.generateTokenWithRetry(config, cacheKey, attempt + 1);
       }
 
       // All retries exhausted
-      this.logger.error(
-        `Failed to generate IAM token after ${this.MAX_RETRIES} attempts: ${errorMessage}`,
-      );
+      this.logger.error(`Failed to generate IAM token after ${this.MAX_RETRIES} attempts: ${errorMessage}`, undefined, CONTEXT);
 
       throw new Error(
         `Failed to generate RDS IAM authentication token: ${errorMessage}. ` +
-        'Please verify:\n' +
-        '1. IAM authentication is enabled on the Aurora cluster\n' +
-        '2. The database user exists and has rds_iam role granted\n' +
-        '3. IAM policy allows rds-db:connect for this resource\n' +
-        '4. AWS credentials are properly configured\n' +
-        '5. Network connectivity to RDS endpoint',
+          'Please verify:\n' +
+          '1. IAM authentication is enabled on the Aurora cluster\n' +
+          '2. The database user exists and has rds_iam role granted\n' +
+          '3. IAM policy allows rds-db:connect for this resource\n' +
+          '4. AWS credentials are properly configured\n' +
+          '5. Network connectivity to RDS endpoint',
       );
     }
   }
@@ -170,15 +163,13 @@ export class RDSIAMAuthManager {
       const remainingMs = cached.expiresAt - now;
       const remainingMinutes = Math.floor(remainingMs / 60000);
 
-      this.logger.debug(
-        `Token is valid for ${remainingMinutes} more minutes`,
-      );
+      this.logger.debug(`Token is valid for ${remainingMinutes} more minutes`, CONTEXT);
 
       return cached.token;
     }
 
     // Token expired, remove from cache
-    this.logger.debug('Cached token expired, generating new token');
+    this.logger.debug('Cached token expired, generating new token', CONTEXT);
     this.tokenCache.delete(cacheKey);
     return null;
   }
@@ -202,7 +193,7 @@ export class RDSIAMAuthManager {
    */
   static clearCache(): void {
     this.tokenCache.clear();
-    this.logger.log('Token cache cleared');
+    this.logger.log('Token cache cleared', CONTEXT);
   }
 
   /**

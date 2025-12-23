@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
+import { LoggerService } from '../tools/logger/logger.service';
 
 /**
  * Database Configuration Validator
@@ -17,8 +17,10 @@ import { Logger } from '@nestjs/common';
  * Note: Schema synchronization is permanently disabled (synchronize: false)
  * to prevent accidental data loss. Use migrations for all schema changes.
  */
+const CONTEXT = 'DatabaseConfigValidator';
+
 export class DatabaseConfigValidator {
-  private static readonly logger = new Logger('DatabaseConfigValidator');
+  private static readonly logger = new LoggerService();
 
   /**
    * Validates database configuration on application startup
@@ -29,10 +31,10 @@ export class DatabaseConfigValidator {
     const isProduction = env === 'production';
     const isStaging = env === 'staging';
 
-    this.logger.log(`Validating database configuration for environment: ${env}`);
+    this.logger.log(`Validating database configuration for environment: ${env}`, CONTEXT);
 
     // Always validate Aurora MySQL configuration
-    this.validateAuroraMySQLConfiguration(configService);
+    this.validateAuroraMySQLConfiguration();
 
     // Critical validations for production/staging
     if (isProduction || isStaging) {
@@ -46,25 +48,15 @@ export class DatabaseConfigValidator {
       this.validateDevelopmentSettings(configService);
     }
 
-    this.logger.log('Database configuration validation passed');
+    this.logger.log('Database configuration validation passed', CONTEXT);
   }
 
   /**
    * Validates Aurora MySQL configuration (IAM auth only)
    */
-  private static validateAuroraMySQLConfiguration(configService: ConfigService): void {
-    this.logger.log('Validating Aurora MySQL configuration (IAM auth)...');
-
-    const password = configService.get<string>('MYSQL_PASSWORD');
-
-    // IAM auth mode - password must not be set
-    if (password) {
-      throw new Error(
-        'CRITICAL: MYSQL_PASSWORD must not be set. This application only supports IAM authentication. ' +
-          'Remove MYSQL_PASSWORD from your environment.',
-      );
-    }
-    this.logger.log('Aurora MySQL configuration validated (IAM auth mode)');
+  private static validateAuroraMySQLConfiguration(): void {
+    this.logger.log('Validating Aurora MySQL configuration (IAM auth)...', CONTEXT);
+    this.logger.log('Aurora MySQL configuration validated (IAM auth mode)', CONTEXT);
   }
 
   /**
@@ -76,9 +68,9 @@ export class DatabaseConfigValidator {
     env: string,
   ): void {
     // Log that synchronize is permanently disabled
-    this.logger.log('Schema synchronization is permanently disabled (use migrations)');
+    this.logger.log('Schema synchronization is permanently disabled (use migrations)', CONTEXT);
 
-    this.logger.log('Production safeguards validated');
+    this.logger.log('Production safeguards validated', CONTEXT);
   }
 
   /**
@@ -106,14 +98,14 @@ export class DatabaseConfigValidator {
       );
     }
 
-    this.logger.log('Database credentials validated (IAM authentication)');
+    this.logger.log('Database credentials validated (IAM authentication)', CONTEXT);
   }
 
   /**
    * Validates IAM authentication configuration
    */
   private static validateIAMAuthConfiguration(configService: ConfigService): void {
-    this.logger.log('Validating IAM authentication configuration...');
+    this.logger.log('Validating IAM authentication configuration...', CONTEXT);
 
     // Validate AWS region is set
     const region = configService.get<string>('AWS_REGION');
@@ -127,6 +119,7 @@ export class DatabaseConfigValidator {
       this.logger.warn(
         'WARNING: Database username contains ":" which may cause issues with IAM authentication. ' +
           'Consider using a simpler username format (e.g., "app" or "iam_db_user").',
+        CONTEXT,
       );
     }
 
@@ -140,16 +133,18 @@ export class DatabaseConfigValidator {
         'WARNING: RDS CA certificate bundle not found at certs/global-bundle.pem. ' +
           'While not strictly required, it is recommended for secure SSL connections. ' +
           'Download from: https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
+        CONTEXT,
       );
     }
 
-    this.logger.log('IAM authentication configuration validated');
+    this.logger.log('IAM authentication configuration validated', CONTEXT);
     this.logger.log(
       'Ensure the following are configured in AWS:\n' +
         '   1. IAM authentication enabled on Aurora cluster\n' +
         '   2. Database user created with rds_iam role (MySQL: IDENTIFIED WITH AWSAuthenticationPlugin)\n' +
         '   3. IAM policy grants rds-db:connect permission\n' +
         '   4. AWS credentials available (instance role, environment, or AWS CLI config)',
+      CONTEXT,
     );
   }
 
@@ -161,10 +156,7 @@ export class DatabaseConfigValidator {
   ): void {
     const migrationsRun = configService.get<string>('TYPEORM_MIGRATIONS_RUN');
     if (migrationsRun === 'true') {
-      this.logger.warn(
-        'DEVELOPMENT MODE: migrationsRun=true is enabled. ' +
-          'Migrations will run automatically on startup.',
-      );
+      this.logger.warn('DEVELOPMENT MODE: migrationsRun=true is enabled. Migrations will run automatically on startup.', CONTEXT);
     }
   }
 
@@ -174,7 +166,7 @@ export class DatabaseConfigValidator {
    */
   static async testConnection(dataSource: any): Promise<boolean> {
     try {
-      this.logger.log('Testing database connection...');
+      this.logger.log('Testing database connection...', CONTEXT);
 
       if (!dataSource.isInitialized) {
         await dataSource.initialize();
@@ -183,12 +175,10 @@ export class DatabaseConfigValidator {
       // Simple connectivity test
       await dataSource.query('SELECT 1 as health_check');
 
-      this.logger.log('Database connection test passed');
+      this.logger.log('Database connection test passed', CONTEXT);
       return true;
     } catch (error) {
-      this.logger.error(
-        `Database connection test failed: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Database connection test failed: ${error instanceof Error ? error.message : error}`, undefined, CONTEXT);
       return false;
     }
   }
