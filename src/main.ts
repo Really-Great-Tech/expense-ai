@@ -43,10 +43,11 @@ async function bootstrap() {
 
   try {
     logger.log('Creating NestJS application...', BOOTSTRAP_CONTEXT);
-    const app = await NestFactory.create(AppModule, { bufferLogs: false }); // Disable buffer for verbose logging
+    const app = await NestFactory.create(AppModule, {
+      bufferLogs: false,
+      logger, // Use JSON logger from the start to avoid [Nest] console logs
+    });
     logger.log('NestJS application created successfully', BOOTSTRAP_CONTEXT);
-    const appLogger = app.get(LoggerService);
-    app.useLogger(appLogger);
     const configService = app.get(ConfigService);
 
     // Enable class-validator to use NestJS's DI container for custom validators
