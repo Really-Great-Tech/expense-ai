@@ -348,26 +348,80 @@ export class DocumentSplitterService {
 
   /**
    * Create invoice groups from page analysis (no PDF splitting)
+   * Filters out Expensify cover pages and blank/error pages using both rule-based and LLM-enhanced detection
    */
   private createInvoiceGroupsFromAnalysis(
     pageMarkdowns: PageMarkdown[],
     analysis: PageAnalysisResult,
     file: Express.Multer.File,
   ): InvoiceGroup[] {
-    return analysis.pageGroups.map((group) => {
+    // Filter out Expensify cover pages and blank/error pages
+    const filteredGroups = analysis.pageGroups.filter((group) => {
+      // Skip Expensify export/cover pages (rule-based)
+      if (group.isExpensifyExport && group.expensifyConfidence && group.expensifyConfidence >= 0.5) {
+        this.logger.log(`Skipping Expensify cover page group ${group.invoiceNumber} (rule-based confidence: ${group.expensifyConfidence})`);
+        return false;
+      }
+
+      // Skip Expensify (LLM-enhanced via metadata)
+      if (group.metadata?.isExpensifyPage && (group.metadata.expensifyConfidenceLlm || 0) >= 0.5) {
+        this.logger.log(`Skipping Expensify cover page group ${group.invoiceNumber} (LLM confidence: ${group.metadata.expensifyConfidenceLlm})`);
+        return false;
+      }
+
+      // Skip EXPENSE_COVER classified pages
+      if (group.pageClassification === 'EXPENSE_COVER') {
+        this.logger.log(`Skipping EXPENSE_COVER page group ${group.invoiceNumber}`);
+        return false;
+      }
+
+      // Skip blank/error pages (rule-based)
+      if (group.isBlankOrError) {
+        this.logger.log(`Skipping blank/error page group ${group.invoiceNumber}: ${group.blankErrorReason}`);
+        return false;
+      }
+
+      // Skip blank (LLM-enhanced via metadata)
+      if (group.metadata?.isBlankLlm) {
+        this.logger.log(`Skipping blank page group ${group.invoiceNumber} (LLM detected)`);
+        return false;
+      }
+
+      return true;
+    });
+
+    this.logger.log(`Filtered ${analysis.pageGroups.length - filteredGroups.length} groups (Expensify/blank), keeping ${filteredGroups.length}`);
+
+    // Re-number invoice groups after filtering
+    return filteredGroups.map((group, index) => {
       const combinedMarkdown = this.parsingService.combinePageMarkdown(pageMarkdowns, group.pages);
-      const estimatedFileSize = Math.round(file.size / analysis.totalInvoices);
+      const estimatedFileSize = Math.round(file.size / Math.max(filteredGroups.length, 1));
 
       return {
-        invoiceNumber: group.invoiceNumber,
+        invoiceNumber: index + 1, // Re-number after filtering
         pages: group.pages,
         content: combinedMarkdown,
         confidence: group.confidence,
         reasoning: group.reasoning,
         totalPages: group.pages.length,
         pdfPath: null, // No split PDF created
-        fileName: `invoice_${group.invoiceNumber}_${file.originalname}`,
+        fileName: `invoice_${index + 1}_${file.originalname}`,
         fileSize: estimatedFileSize,
+        // Preserve classification info
+        isExpensifyExport: group.isExpensifyExport,
+        expensifyConfidence: group.expensifyConfidence,
+        expensifyReason: group.expensifyReason,
+        expensifyIndicators: group.expensifyIndicators,
+        isBlankOrError: group.isBlankOrError,
+        blankErrorReason: group.blankErrorReason,
+        pageClassification: group.pageClassification,
+        // Rich metadata from LLM extraction
+        merchantName: group.metadata?.merchantName,
+        totalAmount: group.metadata?.totalAmount,
+        currency: group.metadata?.currency,
+        documentType: group.metadata?.documentType,
+        transactionId: group.metadata?.transactionId,
+        datePeriod: group.metadata?.datePeriod,
       };
     });
   }

@@ -10,7 +10,7 @@ export interface PageCountResult {
 @Injectable()
 export class FileValidationService {
   private readonly logger = new Logger(FileValidationService.name);
-  private readonly MAX_PAGES = 20;
+  private readonly MAX_PAGES = 50;
 
   async validatePageCount(file: Express.Multer.File): Promise<PageCountResult> {
     const result: PageCountResult = {
