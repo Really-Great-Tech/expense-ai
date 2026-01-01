@@ -13,7 +13,7 @@ updates:
   - package-ecosystem: npm
     directory: "/"
     registries: "*"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 300
     schedule:
       interval: "weekly"
     cooldown:
