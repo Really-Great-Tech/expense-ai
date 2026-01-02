@@ -25,7 +25,8 @@ import { ExpenseProcessor } from './processors/expense.processor';
     CountryPolicyModule, // Import for CountryPolicyService
     StorageModule,
   ],
-  providers: [ExpenseProcessingService, ExpenseProcessor],
+  controllers: [ExpenseProcessor], // Register as controller for @EventPattern handlers
+  providers: [ExpenseProcessingService, ExpenseProcessor], // Also keep as provider for BullMQ @Processor
   exports: [ExpenseProcessingService, DocumentModule],
 })
 export class ProcessingModule {}

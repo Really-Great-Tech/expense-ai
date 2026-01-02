@@ -66,11 +66,13 @@ export class AwsServicesHealthIndicator extends HealthIndicator {
       this.textractClient = new TextractClient(textractConfig);
 
       // Bedrock configuration (matches BedrockLlmService)
-      const bedrockRegion = this.configService.get<string>('AWS_REGION', 'eu-west-1');
+      // Use BEDROCK_REGION if available, fallback to AWS_REGION, then default
+      const bedrockRegion = this.configService.get<string>('BEDROCK_REGION') || 
+                            this.configService.get<string>('AWS_REGION', 'eu-west-1');
 
       // Initialize Bedrock client (same config as BedrockLlmService)
       const bedrockConfig: any = {
-        region: "us-east-1",
+        region: bedrockRegion,
       };
       if (accessKeyId && secretAccessKey) {
         bedrockConfig.credentials = { accessKeyId, secretAccessKey };

@@ -107,3 +107,4 @@ In RabbitMQ Management UI:
 
 The routing key should match your event pattern exactly.
 
+

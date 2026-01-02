@@ -1,6 +1,8 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageService } from '../interfaces/file-storage.interface';
+import { LocalStorageService } from './local-storage.service';
+import { S3StorageService } from './s3-storage.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -26,55 +28,98 @@ export interface StorageMetadata {
 @Injectable()
 export class StorageResolverService {
   private readonly logger = new Logger(StorageResolverService.name);
+  private s3StorageService: S3StorageService | null = null;
 
   constructor(
     @Inject('FILE_STORAGE_SERVICE')
     private readonly storageService: FileStorageService,
+    private readonly localStorageService: LocalStorageService,
     private readonly configService: ConfigService,
   ) {}
 
   /**
    * Get file buffer from storage (works for both local and S3)
-   * @param storageKey - Logical storage key (e.g., "splits/user_123/doc-id/file.pdf")
+   * @param storageKey - Logical storage key (may be full S3 URL like s3://bucket/key)
+   * @param storageType - Optional storage type override (uses config if not provided)
    * @returns File buffer
    */
-  async getFile(storageKey: string): Promise<Buffer> {
-    const storageType = this.getStorageType();
-
-    this.logger.debug(`Getting file from ${storageType} storage: ${storageKey}`);
-
-    if (storageType === 'local') {
-      // For local, prepend UPLOAD_PATH to get full path
-      const uploadPath = this.configService.get('UPLOAD_PATH', 'uploads');
-      const fullPath = path.join(uploadPath, storageKey);
-
-      if (!fs.existsSync(fullPath)) {
-        throw new Error(`File not found in local storage: ${fullPath}`);
-      }
-
-      return fs.readFileSync(fullPath);
-    } else {
-      // For S3, download using storage service
-      return await this.storageService.downloadFile(storageKey);
+  async getFile(storageKey: string, storageType?: 'local' | 's3'): Promise<Buffer> {
+    // Use provided storageType or fall back to config
+    const resolvedStorageType = storageType || this.getStorageType();
+    
+    // Extract actual key if it's a full S3 URL
+    let actualStorageKey = storageKey;
+    if (resolvedStorageType === 's3' || storageKey.startsWith('s3://')) {
+      const bucket = storageType === 's3' ? this.getStorageBucket() : undefined;
+      actualStorageKey = this.extractStorageKey(storageKey, bucket);
     }
+
+    this.logger.debug(`Getting file from ${resolvedStorageType} storage: ${actualStorageKey}`);
+
+    const service = this.getStorageService(resolvedStorageType);
+    return await service.downloadFile(actualStorageKey);
+  }
+
+  /**
+   * Get the appropriate storage service based on storage type
+   * @param storageType - Storage type ('local' or 's3')
+   * @returns The appropriate FileStorageService instance
+   */
+  private getStorageService(storageType: 'local' | 's3'): FileStorageService {
+    if (storageType === 's3') {
+      // Lazily create S3StorageService if needed (even if config says local)
+      if (!this.s3StorageService) {
+        this.logger.debug('Creating S3StorageService instance for runtime S3 access');
+        this.s3StorageService = new S3StorageService(this.configService);
+      }
+      return this.s3StorageService;
+    }
+    return this.localStorageService;
+  }
+
+  /**
+   * Extract the actual storage key from an S3 URL if it's a full URL
+   * @param storageKey - Storage key (may be full S3 URL or just key)
+   * @param bucket - Bucket name to extract from URL
+   * @returns The actual storage key without the s3://bucket/ prefix
+   */
+  private extractStorageKey(storageKey: string, bucket?: string): string {
+    // Check if it's a full S3 URL (s3://bucket/key)
+    const s3UrlMatch = storageKey.match(/^s3:\/\/([^\/]+)\/(.+)$/);
+    if (s3UrlMatch) {
+      const urlBucket = s3UrlMatch[1];
+      const actualKey = s3UrlMatch[2];
+      this.logger.debug(`Extracted storage key from S3 URL: ${actualKey} (bucket: ${urlBucket})`);
+      return actualKey;
+    }
+    return storageKey;
   }
 
   /**
    * Get physical file path for document readers and processors
    * Downloads S3 files to temp location if needed
    *
-   * @param storageKey - Logical storage key
+   * @param storageKey - Logical storage key (may be full S3 URL like s3://bucket/key)
+   * @param storageType - Optional storage type override (uses config if not provided)
    * @returns Object with file path and flag indicating if it's temporary
    */
-  async getPhysicalPath(storageKey: string): Promise<PhysicalPathResult> {
-    const storageType = this.getStorageType();
+  async getPhysicalPath(storageKey: string, storageType?: 'local' | 's3'): Promise<PhysicalPathResult> {
+    // Use provided storageType or fall back to config
+    const resolvedStorageType = storageType || this.getStorageType();
+    
+    // Extract actual key if it's a full S3 URL
+    let actualStorageKey = storageKey;
+    if (resolvedStorageType === 's3' || storageKey.startsWith('s3://')) {
+      const bucket = storageType === 's3' ? this.getStorageBucket() : undefined;
+      actualStorageKey = this.extractStorageKey(storageKey, bucket);
+    }
 
-    this.logger.debug(`Resolving physical path for ${storageType} storage: ${storageKey}`);
+    this.logger.debug(`Resolving physical path for ${resolvedStorageType} storage: ${actualStorageKey}`);
 
-    if (storageType === 'local') {
+    if (resolvedStorageType === 'local') {
       // Return actual file path - no download needed
       const uploadPath = this.configService.get('UPLOAD_PATH', 'uploads');
-      const fullPath = path.join(uploadPath, storageKey);
+      const fullPath = path.join(uploadPath, actualStorageKey);
 
       if (!fs.existsSync(fullPath)) {
         throw new Error(`File not found in local storage: ${fullPath}`);
@@ -84,9 +129,10 @@ export class StorageResolverService {
       return { path: fullPath, isTemp: false };
     } else {
       // Download from S3 to temp location
-      this.logger.log(`Downloading S3 file to temp location: ${storageKey}`);
+      this.logger.log(`Downloading S3 file to temp location: ${actualStorageKey}`);
 
-      const fileBuffer = await this.storageService.downloadFile(storageKey);
+      const service = this.getStorageService(resolvedStorageType);
+      const fileBuffer = await service.downloadFile(actualStorageKey);
       const tempDir = this.configService.get('UPLOAD_PATH', './uploads');
 
       // Ensure temp directory exists
@@ -94,7 +140,7 @@ export class StorageResolverService {
         fs.mkdirSync(tempDir, { recursive: true });
       }
 
-      const tempPath = path.join(tempDir, `temp_${Date.now()}_${path.basename(storageKey)}`);
+      const tempPath = path.join(tempDir, `temp_${Date.now()}_${path.basename(actualStorageKey)}`);
       fs.writeFileSync(tempPath, fileBuffer);
 
       this.logger.debug(`Downloaded to temp file: ${tempPath}`);
@@ -178,15 +224,16 @@ export class StorageResolverService {
    * @param storageKey - Logical storage key
    * @returns True if file exists
    */
-  async fileExists(storageKey: string): Promise<boolean> {
-    const storageType = this.getStorageType();
+  async fileExists(storageKey: string, storageType?: 'local' | 's3'): Promise<boolean> {
+    const resolvedStorageType = storageType || this.getStorageType();
 
-    if (storageType === 'local') {
+    if (resolvedStorageType === 'local') {
       const uploadPath = this.configService.get('UPLOAD_PATH', 'uploads');
       const fullPath = path.join(uploadPath, storageKey);
       return fs.existsSync(fullPath);
     } else {
-      return await this.storageService.fileExists(storageKey);
+      const service = this.getStorageService(resolvedStorageType);
+      return await service.fileExists(storageKey);
     }
   }
 }

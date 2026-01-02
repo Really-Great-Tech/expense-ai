@@ -89,8 +89,9 @@ export class DataExtractionAgent extends BaseAgent {
     } catch (error) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
+      const modelUsed = this.getActualModelUsed();
 
-      this.logger.error(`Data extraction failed after ${duration}ms:`, error);
+      this.logger.error(`Data extraction failed after ${duration}ms (model: ${modelUsed}):`, error);
 
       // Return minimal fallback result
       return {

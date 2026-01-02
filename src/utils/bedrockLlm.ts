@@ -53,12 +53,14 @@ export class BedrockLlmService {
   constructor(config?: BedrockConfig) {
     // Initialize Bedrock client with service-specific credentials
     try {
-      const fallbackRegion = BedrockLlmService.configService.get<string>('AWS_REGION', 'eu-west-1');
+      // Use BEDROCK_REGION if available, fallback to AWS_REGION, then default
+      const bedrockRegion = BedrockLlmService.configService.get<string>('BEDROCK_REGION') || 
+                            BedrockLlmService.configService.get<string>('AWS_REGION', 'eu-west-1');
       const fallbackAccessKeyId = BedrockLlmService.configService.get<string>('AWS_ACCESS_KEY_ID');
       const fallbackSecretAccessKey = BedrockLlmService.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
       const bedrockConfig = {
-        region: config?.region || fallbackRegion,
+        region: config?.region || bedrockRegion,
         credentials:
           config?.accessKeyId && config?.secretAccessKey
             ? {

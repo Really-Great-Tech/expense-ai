@@ -92,8 +92,9 @@ export class ImageQualityAssessmentAgent extends BaseAgent {
     } catch (error) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
+      const modelUsed = this.getActualModelUsed();
 
-      this.logger.error(`Image quality assessment failed after ${duration}ms: ${error.message}`);
+      this.logger.error(`Image quality assessment failed after ${duration}ms (model: ${modelUsed}): ${error.message}`);
 
       // Return fallback result
       return {

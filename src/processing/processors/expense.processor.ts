@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger, Inject } from '@nestjs/common';
+import { Logger, Inject, Controller } from '@nestjs/common';
 import { EventPattern, Payload, Ctx, RmqContext } from '@nestjs/microservices';
 import { ClientProxy } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
@@ -24,7 +24,11 @@ import * as fs from 'fs';
  * Processes expense documents through the BullMQ queue.
  * Concurrency is configured via WORKER_CONCURRENCY env var.
  * By default, processes 5 receipts concurrently.
+ * 
+ * Also handles RabbitMQ events via @EventPattern decorators.
+ * Note: Must be registered as a Controller for @EventPattern to work.
  */
+@Controller()
 @Processor(QUEUE_NAMES.EXPENSE_PROCESSING, {
   concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
 })
@@ -44,6 +48,29 @@ export class ExpenseProcessor extends WorkerHost {
     private readonly countryPolicyService: CountryPolicyService,
   ) {
     super();
+    // Log that event handlers are registered
+    this.logger.log(`[INIT] ExpenseProcessor initialized - Listening for RabbitMQ events: ${ReceiptEventPattern.PROCESSING_REQUESTED}, ${ReceiptEventPattern.EXTRACTED}`);
+  }
+
+  /**
+   * Safely emit RabbitMQ events with error handling
+   */
+  private async safeEmit(pattern: string, data: any): Promise<void> {
+    try {
+      if (!this.rabbitClient) {
+        this.logger.error(`❌ RabbitMQ client not available - cannot emit ${pattern}`);
+        return;
+      }
+
+      this.rabbitClient.emit(pattern, data);
+      this.logger.log(`✅ Emitted ${pattern} event`);
+      this.logger.debug(`Event payload: ${JSON.stringify(data, null, 2)}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to emit ${pattern} event:`, error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        this.logger.error(`Error stack:`, error.stack);
+      }
+    }
   }
 
   /**
@@ -89,23 +116,28 @@ export class ExpenseProcessor extends WorkerHost {
         completedAt: new Date(),
       };
       
-      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
-      this.logger.log(`Published ${ReceiptEventPattern.PROCESSING_COMPLETED} for receipt ${data.receiptId}`);
+      await this.safeEmit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
 
       // Acknowledge message
       channel.ack(originalMsg);
     } catch (error) {
-      this.logger.error(`Failed to process receipt.processing.requested event for ${data.receiptId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      this.logger.error(`Failed to process receipt.processing.requested event for ${data.receiptId}:`, errorMessage);
+      if (errorStack) {
+        this.logger.error(`Error stack:`, errorStack);
+      }
       
       // Publish failure event
       const failedEvent: ReceiptProcessingFailedEvent = {
         receiptId: data.receiptId,
         documentId: data.documentId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
         failedAt: new Date(),
       };
       
-      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
+      await this.safeEmit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
       
       // Reject message (will go to DLQ if configured)
       channel.nack(originalMsg, false, false);
@@ -156,23 +188,28 @@ export class ExpenseProcessor extends WorkerHost {
         completedAt: new Date(),
       };
       
-      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
-      this.logger.log(`Published ${ReceiptEventPattern.PROCESSING_COMPLETED} for receipt ${data.receiptId}`);
+      await this.safeEmit(ReceiptEventPattern.PROCESSING_COMPLETED, completedEvent);
 
       // Acknowledge message
       channel.ack(originalMsg);
     } catch (error) {
-      this.logger.error(`Failed to process receipt.extracted event for ${data.receiptId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      this.logger.error(`Failed to process receipt.extracted event for ${data.receiptId}:`, errorMessage);
+      if (errorStack) {
+        this.logger.error(`Error stack:`, errorStack);
+      }
       
       // Publish failure event
       const failedEvent: ReceiptProcessingFailedEvent = {
         receiptId: data.receiptId,
         documentId: data.documentId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
         failedAt: new Date(),
       };
       
-      this.rabbitClient.emit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
+      await this.safeEmit(ReceiptEventPattern.PROCESSING_FAILED, failedEvent);
       
       // Reject message (will go to DLQ if configured)
       channel.nack(originalMsg, false, false);
@@ -197,7 +234,8 @@ export class ExpenseProcessor extends WorkerHost {
       }
 
       // Get physical file path (handles both local and S3 automatically)
-      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey);
+      // Pass storageType from event to override config-based detection
+      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey, storageType);
       this.logger.log(`Resolved physical path: ${filePath} (temp: ${isTemp})`);
 
       try {
@@ -284,7 +322,8 @@ export class ExpenseProcessor extends WorkerHost {
       }
 
       // Get physical file path (handles both local and S3 automatically)
-      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey);
+      // Pass storageType from event to override config-based detection
+      const { path: filePath, isTemp } = await this.storageResolver.getPhysicalPath(storageKey, storageType);
       this.logger.log(`Resolved physical path: ${filePath} (temp: ${isTemp})`);
 
       try {

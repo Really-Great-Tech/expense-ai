@@ -46,10 +46,10 @@ import { DocumentReference } from '../document/entities/document-reference.entit
       name: QUEUE_NAMES.EXPENSE_PROCESSING,
     }),
   ],
-  controllers: [DocumentSplitterController, SingleReceiptController, CleanupController],
+  controllers: [DocumentSplitterController, SingleReceiptController, CleanupController, DocumentSplitterConsumer], // Register DocumentSplitterConsumer as controller for @EventPattern
   providers: [
     DocumentSplitterService,
-    DocumentSplitterConsumer,
+    DocumentSplitterConsumer, // Also keep as provider for dependency injection
     FileValidationService,
     DuplicateDetectionService,
     DocumentParsingService,

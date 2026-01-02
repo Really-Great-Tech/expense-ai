@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, Controller } from '@nestjs/common';
 import { EventPattern, Payload, Ctx, RmqContext } from '@nestjs/microservices';
 import { ClientProxy } from '@nestjs/microservices';
 import { DocumentEventPattern, DocumentUploadedEvent, DocumentSplitCompletedEvent, DocumentSplitFailedEvent } from '@/shared/events/document.events';
@@ -8,6 +8,7 @@ import { DocumentPersistenceService } from './document-persistence.service';
 import { StorageResolverService } from '@/storage/services/storage-resolver.service';
 import * as fs from 'fs';
 
+@Controller()
 @Injectable()
 export class DocumentSplitterConsumer {
   private readonly logger = new Logger(DocumentSplitterConsumer.name);
