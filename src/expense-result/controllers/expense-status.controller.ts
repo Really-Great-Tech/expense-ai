@@ -131,6 +131,7 @@ This endpoint returns:
 **Each receipt includes:**
 - Basic info (receiptId, fileName, fileSize, storageKey, status)
 - Processing status and progress
+- **Page boundaries** (pageNumbers, receiptNumber, totalPages) - shows which pages from the original document belong to this receipt
 - **results** object (only for completed receipts) containing:
   - extraction: All extracted receipt data
   - meta: Metadata (receiptId, timestamps, processing info)
@@ -180,6 +181,9 @@ This endpoint returns:
             processingCompletedAt: '2025-03-15T10:03:30Z',
             hasResults: true,
             hasErrors: false,
+            pageNumbers: [1, 2],
+            receiptNumber: 1,
+            totalPages: 2,
             results: {
               extraction: {
                 merchant_name: 'Restaurant ABC',
@@ -217,6 +221,9 @@ This endpoint returns:
             processingCompletedAt: null,
             hasResults: false,
             hasErrors: false,
+            pageNumbers: [3, 4, 5],
+            receiptNumber: 2,
+            totalPages: 3,
             results: null,
           },
         ],

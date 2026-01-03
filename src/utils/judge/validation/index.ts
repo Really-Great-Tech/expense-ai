@@ -16,8 +16,6 @@ import {
   ComplianceValidationResultImpl,
   type ValidationSummary,
   type ValidationMetadata,
-  type ValidationUQResult,
-  type ValidationJudgeResponse,
   type ValidationConfig,
   ValidationErrorType,
   ValidationError,
@@ -42,8 +40,6 @@ export {
   ComplianceValidationResultImpl,
   type ValidationSummary,
   type ValidationMetadata,
-  type ValidationUQResult,
-  type ValidationJudgeResponse,
   type ValidationConfig,
   ValidationErrorType,
   ValidationError,
@@ -59,17 +55,6 @@ export {
   ValidationJob
 };
 
-// Re-export relevant types from the main judge types for convenience
-export type {
-  UQResult,
-  JudgeResponse,
-  ScoringTemplate,
-  EnsembleConfig,
-  TuningResult,
-  GraderFunction,
-  ScorerComponent,
-  ProgressCallback
-} from '../types';
 
 /**
  * Default validation configuration

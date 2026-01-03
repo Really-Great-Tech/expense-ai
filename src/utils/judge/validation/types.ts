@@ -1,5 +1,3 @@
-import { UQResult, JudgeResponse } from '../types';
-
 /**
  * Validation dimensions for expense compliance validation
  * Matches the Python UQLM validation functionality
@@ -212,41 +210,6 @@ export interface ValidationMetadata {
   
   /** Additional context or configuration */
   context?: Record<string, any>;
-}
-
-/**
- * Extended UQResult that includes validation-specific data
- */
-export interface ValidationUQResult extends UQResult {
-  data: UQResult['data'] & {
-    /** Validation results for each dimension */
-    validation_results?: ComplianceValidationResult[];
-    
-    /** Validation summary */
-    validation_summary?: ValidationSummary;
-    
-    /** Dimension-specific scores */
-    dimension_scores?: Record<ValidationDimension, number>;
-  };
-  
-  metadata: UQResult['metadata'] & {
-    /** Validation-specific metadata */
-    validation_metadata?: ValidationMetadata;
-  };
-}
-
-/**
- * Extended JudgeResponse for validation-specific judging
- */
-export interface ValidationJudgeResponse extends JudgeResponse {
-  /** Validation dimension being judged */
-  validation_dimension?: ValidationDimension;
-  
-  /** Detailed validation results */
-  validation_results?: ComplianceValidationResult[];
-  
-  /** Issues identified during validation */
-  identified_issues?: string[];
 }
 
 /**

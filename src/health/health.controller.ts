@@ -27,8 +27,8 @@ export class HealthController {
   ) {}
 
   /**
-   * Complete health check - checks all dependencies with full details
-   * Returns connection pool utilization, Redis stats, and BullMQ queue info
+   * Complete health check - checks all dependencies
+   * Returns database and Redis connection status
    */
   @Get('health')
   @HealthCheck()
@@ -40,8 +40,8 @@ export class HealthController {
       // Check database connection with pool utilization metrics
       () => this.dbEnhanced.isHealthy('database'),
 
-      // Check Redis connection (BullMQ job queue) - uses enhanced indicator with proper TLS
-      () => this.redisEnhanced.isHealthy('redis-queue'),
+      // Check Redis connection
+      () => this.redisEnhanced.isHealthy('redis'),
     ]);
   }
 
@@ -56,10 +56,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Application is ready' })
   @ApiResponse({ status: 503, description: 'Application is not ready' })
   ready() {
-    return this.health.check([
-      () => this.db.pingCheck('database'),
-      () => this.redisEnhanced.isHealthy('redis-queue', 5000, false), // Skip BullMQ for faster readiness
-    ]);
+    return this.health.check([() => this.db.pingCheck('database'), () => this.redisEnhanced.isHealthy('redis')]);
   }
 
   /**
@@ -67,11 +64,11 @@ export class HealthController {
    */
   @Get('health/redis')
   @HealthCheck()
-  @ApiOperation({ summary: 'Check Redis/Queue health only' })
+  @ApiOperation({ summary: 'Check Redis health only' })
   @ApiResponse({ status: 200, description: 'Redis is healthy' })
   @ApiResponse({ status: 503, description: 'Redis is unhealthy' })
   checkRedis() {
-    return this.health.check([() => this.redisEnhanced.isHealthy('redis-queue')]);
+    return this.health.check([() => this.redisEnhanced.isHealthy('redis')]);
   }
 
   /**
@@ -83,9 +80,7 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Database is healthy' })
   @ApiResponse({ status: 503, description: 'Database is unhealthy' })
   checkDatabase() {
-    return this.health.check([
-      () => this.db.pingCheck('database'),
-    ]);
+    return this.health.check([() => this.db.pingCheck('database')]);
   }
 
   /**

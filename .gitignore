@@ -58,3 +58,6 @@ sample_receipt
 /playground_results
 /markdown_extractions
 /temp
+/specs
+/.claude
+/.specify
