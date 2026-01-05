@@ -9,13 +9,11 @@ import { CircuitBreakerHealthIndicator } from './circuit-breaker-health.indicato
 /**
  * Health Module
  *
- * Provides comprehensive health check endpoints for system monitoring.
- * Uses enhanced health indicators for meaningful operational tests.
+ * Provides health check endpoints for system monitoring.
  *
  * Features:
- * - Redis health checks: Read/write operations with proper TLS validation
+ * - Redis health checks: Simple ping-based connectivity check
  * - Database health checks: Query execution and connection pool monitoring
- * - Migration status checks: Database schema validation
  * - AWS services health: Textract and Bedrock connectivity
  */
 @Module({

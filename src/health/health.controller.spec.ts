@@ -39,7 +39,7 @@ describe('HealthController', () => {
     } as any;
 
     mockRedisHealthEnhancedIndicator = {
-      isHealthy: jest.fn().mockResolvedValue({ 'redis-queue': { status: 'up' } }),
+      isHealthy: jest.fn().mockResolvedValue({ redis: { status: 'up' } }),
     } as any;
 
     mockAwsServicesHealthIndicator = {
@@ -86,7 +86,7 @@ describe('HealthController', () => {
       await controller.check();
 
       expect(mockDatabaseHealthIndicator.isHealthy).toHaveBeenCalledWith('database');
-      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis-queue');
+      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis');
     });
   });
 
@@ -98,7 +98,7 @@ describe('HealthController', () => {
       expect(result.status).toBe('ok');
       expect(mockHealthCheckService.check).toHaveBeenCalled();
       expect(mockTypeOrmHealthIndicator.pingCheck).toHaveBeenCalledWith('database');
-      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis-queue', 5000, false);
+      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis');
     });
   });
 
@@ -107,7 +107,7 @@ describe('HealthController', () => {
       const result = await controller.checkRedis();
 
       expect(result).toBeDefined();
-      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis-queue');
+      expect(mockRedisHealthEnhancedIndicator.isHealthy).toHaveBeenCalledWith('redis');
     });
   });
 

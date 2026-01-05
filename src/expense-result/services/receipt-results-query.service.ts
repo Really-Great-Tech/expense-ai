@@ -155,6 +155,10 @@ export class ReceiptResultsQueryService {
           processingCompletedAt: result?.processingCompletedAt,
           hasResults: !!result && result.status === ProcessingStatus.COMPLETED,
           hasErrors: !!result?.errorMessage,
+          // Page boundary information from receipt metadata
+          pageNumbers: receipt.metadata?.pageNumbers ?? [],
+          receiptNumber: receipt.metadata?.receiptNumber ?? undefined,
+          totalPages: receipt.metadata?.totalPages ?? 1,
           results: complianceResults,
         };
       }),

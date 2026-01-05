@@ -170,7 +170,7 @@ async function bootstrap() {
       logger.log('Database health check passed: ' + JSON.stringify(dbResult), BOOTSTRAP_CONTEXT);
 
       logger.log('Checking Redis health...', BOOTSTRAP_CONTEXT);
-      const redisResult = await redisHealth.isHealthy('redis-queue', 10000, false); // Skip BullMQ for startup
+      const redisResult = await redisHealth.isHealthy('redis-queue', 10000);
       logger.log('Redis health check passed: ' + JSON.stringify(redisResult), BOOTSTRAP_CONTEXT);
 
       logger.log('Startup health checks passed', BOOTSTRAP_CONTEXT);

@@ -1,0 +1,24 @@
+# expenses-ai-file Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-12-30
+
+## Active Technologies
+- TypeScript with Node.js (NestJS framework) + NestJS 11.x, @nestjs/terminus (health checks), ioredis (Redis client), BullMQ (job queue) (001-reduce-redis-health-logging)
+
+## Project Structure
+```
+src/
+tests/
+```
+
+## Commands
+npm test && npm run lint
+
+## Code Style
+TypeScript with Node.js (NestJS framework): Follow standard conventions
+
+## Recent Changes
+- 001-reduce-redis-health-logging: Added TypeScript with Node.js (NestJS framework) + NestJS 11.x, @nestjs/terminus (health checks), ioredis (Redis client), BullMQ (job queue)
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
