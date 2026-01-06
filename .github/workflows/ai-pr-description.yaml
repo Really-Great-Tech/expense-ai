@@ -1,0 +1,10 @@
+name: Generate PR Description
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+
+jobs:
+  generate-description:
+    uses: papayaglobal/workflows/.github/workflows/ai-pr-description.yaml@main
+    secrets: inherit
