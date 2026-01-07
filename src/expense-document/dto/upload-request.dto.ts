@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsIn } from 'class-validator';
 import { IsValidCountry } from '../../common/validators/is-valid-country.validator';
+import { IsValidIcp } from '../../common/validators/is-valid-icp.validator';
 
 export class SplitRequestDto {
   @ApiProperty({
@@ -24,8 +25,11 @@ export class SplitRequestDto {
 
   @ApiProperty({
     description: 'ICP (Internal Control Procedure) or policy context for downstream processing',
-    example: 'DEFAULT',
+    example: 'Atlas',
     required: true,
+  })
+  @IsValidIcp({
+    message: 'Please provide a valid ICP name for the specified country',
   })
   @IsString()
   icp: string;
