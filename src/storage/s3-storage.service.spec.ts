@@ -10,7 +10,6 @@ jest.mock('@aws-sdk/client-s3', () => ({
   })),
   PutObjectCommand: jest.fn().mockImplementation((params) => ({ ...params, _type: 'PutObject' })),
   GetObjectCommand: jest.fn().mockImplementation((params) => ({ ...params, _type: 'GetObject' })),
-  DeleteObjectCommand: jest.fn().mockImplementation((params) => ({ ...params, _type: 'DeleteObject' })),
   HeadObjectCommand: jest.fn().mockImplementation((params) => ({ ...params, _type: 'HeadObject' })),
 }));
 
@@ -144,42 +143,6 @@ describe('S3StorageService', () => {
     });
   });
 
-  describe('getFile', () => {
-    it('should be an alias for downloadFile', async () => {
-      const mockContent = Buffer.from('test content');
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield mockContent;
-        },
-      };
-      mockS3Send.mockResolvedValue({ Body: mockStream });
-
-      const result = await service.getFile('test/file.txt');
-
-      expect(result).toEqual(mockContent);
-    });
-  });
-
-  describe('fileExists', () => {
-    it('should return true when file exists', async () => {
-      mockS3Send.mockResolvedValue({ ContentLength: 100 });
-
-      const result = await service.fileExists('test/file.txt');
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false when file does not exist', async () => {
-      const error = new Error('Not Found');
-      (error as any).name = 'NotFound';
-      mockS3Send.mockRejectedValue(error);
-
-      const result = await service.fileExists('test/file.txt');
-
-      expect(result).toBe(false);
-    });
-  });
-
   describe('getFileInfo', () => {
     it('should return file info when file exists', async () => {
       mockS3Send.mockResolvedValue({ ContentLength: 1024 });
@@ -205,20 +168,6 @@ describe('S3StorageService', () => {
       const result = await service.getFileInfo('test/file.txt');
 
       expect(result).toEqual({ size: 0, exists: false });
-    });
-  });
-
-  describe('deleteFile', () => {
-    it('should delete file from S3', async () => {
-      mockS3Send.mockResolvedValue({});
-
-      await expect(service.deleteFile('test/file.txt')).resolves.not.toThrow();
-    });
-
-    it('should throw error on delete failure', async () => {
-      mockS3Send.mockRejectedValue(new Error('Delete failed'));
-
-      await expect(service.deleteFile('test/file.txt')).rejects.toThrow('Delete failed');
     });
   });
 
@@ -267,22 +216,6 @@ describe('S3StorageService', () => {
     });
   });
 
-  describe('loadResult', () => {
-    it('should load and parse JSON result from S3', async () => {
-      const mockData = { foo: 'bar' };
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield Buffer.from(JSON.stringify(mockData));
-        },
-      };
-      mockS3Send.mockResolvedValue({ Body: mockStream });
-
-      const result = await service.loadResult('test-key');
-
-      expect(result).toEqual(mockData);
-    });
-  });
-
   describe('saveValidationResult', () => {
     it('should save validation result with validation_results/ prefix', async () => {
       mockS3Send.mockResolvedValue({});
@@ -305,66 +238,6 @@ describe('S3StorageService', () => {
     });
   });
 
-  describe('readFile', () => {
-    it('should be an alias for downloadFile', async () => {
-      const mockContent = Buffer.from('test content');
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield mockContent;
-        },
-      };
-      mockS3Send.mockResolvedValue({ Body: mockStream });
-
-      const result = await service.readFile('test/file.txt');
-
-      expect(result).toEqual(mockContent);
-    });
-  });
-
-  describe('readFileAsString', () => {
-    it('should read file and return as UTF-8 string', async () => {
-      const mockContent = 'test string content';
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield Buffer.from(mockContent);
-        },
-      };
-      mockS3Send.mockResolvedValue({ Body: mockStream });
-
-      const result = await service.readFileAsString('test/file.txt');
-
-      expect(result).toBe(mockContent);
-    });
-
-    it('should throw error on read failure', async () => {
-      mockS3Send.mockRejectedValue(new Error('Read failed'));
-
-      await expect(service.readFileAsString('test/file.txt')).rejects.toThrow('Read failed');
-    });
-  });
-
-  describe('readLocalConfigFile', () => {
-    it('should read and parse JSON config from S3', async () => {
-      const mockConfig = { setting: 'value' };
-      const mockStream = {
-        [Symbol.asyncIterator]: async function* () {
-          yield Buffer.from(JSON.stringify(mockConfig));
-        },
-      };
-      mockS3Send.mockResolvedValue({ Body: mockStream });
-
-      const result = await service.readLocalConfigFile('settings.json');
-
-      expect(result).toEqual(mockConfig);
-    });
-
-    it('should throw error when config not found', async () => {
-      mockS3Send.mockRejectedValue(new Error('Not found'));
-
-      await expect(service.readLocalConfigFile('missing.json')).rejects.toThrow();
-    });
-  });
-
   describe('buildStorageMetadata', () => {
     it('should build correct storage metadata', () => {
       const result = service.buildStorageMetadata('test/key.txt');
@@ -375,36 +248,6 @@ describe('S3StorageService', () => {
         storageType: 's3',
         storageUrl: 's3://test-bucket/test/key.txt',
       });
-    });
-  });
-
-  describe('getStorageBucket', () => {
-    it('should return bucket name', () => {
-      const result = service.getStorageBucket();
-
-      expect(result).toBe('test-bucket');
-    });
-  });
-
-  describe('getS3Url', () => {
-    it('should return correct S3 URL', () => {
-      const result = service.getS3Url('test/key.txt');
-
-      expect(result).toBe('s3://test-bucket/test/key.txt');
-    });
-  });
-
-  describe('extractKeyFromUrl', () => {
-    it('should extract key from S3 URL', () => {
-      const result = service.extractKeyFromUrl('s3://test-bucket/test/key.txt');
-
-      expect(result).toBe('test/key.txt');
-    });
-
-    it('should return input if not S3 URL', () => {
-      const result = service.extractKeyFromUrl('test/key.txt');
-
-      expect(result).toBe('test/key.txt');
     });
   });
 

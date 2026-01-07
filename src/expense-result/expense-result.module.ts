@@ -11,11 +11,9 @@ import { Receipt } from '@/expense-document/entities/receipt.entity';
 import { ReceiptProcessingResultRepository } from './repositories/receipt-processing-result.repository';
 
 // Controllers
-import { ReceiptResultsController } from './controllers/receipt-results.controller';
 import { ExpenseStatusController } from './controllers/expense-status.controller';
 
 // Services
-import { ReceiptResultsQueryService } from './services/receipt-results-query.service';
 import { ExpenseStatusService } from './services/expense-status.service';
 import { QueueManagementService } from './services/queue-management.service';
 
@@ -29,8 +27,8 @@ import { QUEUE_NAMES } from '../common/types';
       name: QUEUE_NAMES.EXPENSE_PROCESSING,
     }),
   ],
-  controllers: [ReceiptResultsController, ExpenseStatusController],
-  providers: [ReceiptResultsQueryService, ExpenseStatusService, QueueManagementService, ReceiptProcessingResultRepository],
-  exports: [ReceiptResultsQueryService, ExpenseStatusService, QueueManagementService, ReceiptProcessingResultRepository, TypeOrmModule],
+  controllers: [ExpenseStatusController],
+  providers: [ExpenseStatusService, QueueManagementService, ReceiptProcessingResultRepository],
+  exports: [ExpenseStatusService, QueueManagementService, ReceiptProcessingResultRepository, TypeOrmModule],
 })
 export class ExpenseResultModule {}

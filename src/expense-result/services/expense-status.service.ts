@@ -66,6 +66,63 @@ export interface ExpenseStatusResponse {
   };
 }
 
+export interface DocumentResultsResponse {
+  document: {
+    id: string;
+    originalFileName: string;
+    status: DocumentStatus;
+    totalReceipts: number;
+    country: string;
+    icp: string;
+    uploadedBy: string;
+    createdAt: Date;
+  };
+  overallStatus: OverallExpenseStatus;
+  receipts: Array<{
+    receiptId: string;
+    fileName: string;
+    fileSize: number;
+    storageKey: string;
+    status: ReceiptStatus;
+    processingStatus?: ProcessingStatus;
+    processingProgress: number;
+    processingCompletedAt?: Date;
+    hasResults: boolean;
+    hasErrors: boolean;
+    pages: number[];
+    receiptNumber: number;
+    totalPages: number;
+    results: {
+      extraction: Record<string, unknown>;
+      meta: {
+        receiptId: string;
+        sourceDocumentId: string;
+        processingCompletedAt?: Date;
+        processingTime?: number;
+        processed_at?: string;
+      };
+      issues: Array<{
+        index: number;
+        issue_type: string;
+        field: string;
+        description: string;
+        recommendation: string;
+        knowledge_base_reference: string;
+        severity: string;
+        confidence: number;
+      }>;
+    } | null;
+  }>;
+  overallProgress: number;
+  stats: {
+    total: number;
+    completed: number;
+    failed: number;
+    processing: number;
+    queued: number;
+  };
+}
+
 @Injectable()
 export class ExpenseStatusService {
   private readonly logger = new Logger(ExpenseStatusService.name);
@@ -356,5 +413,258 @@ export class ExpenseStatusService {
     }
 
     return timestamps;
+  }
+
+  /**
+   * Get all receipt processing results for a document
+   * Returns document info, receipts with their processing status and compliance results
+   */
+  async getDocumentResults(documentId: string): Promise<DocumentResultsResponse> {
+    const document = await this.expenseDocumentRepo.findOne({
+      where: { id: documentId }
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document ${documentId} not found`);
+    }
+
+    const receipts = await this.receiptRepo.find({
+      where: { sourceDocumentId: documentId }
+    });
+    const results = await this.receiptProcessingResultRepo.find({
+      where: { sourceDocumentId: documentId }
+    });
+
+    // Calculate overall status
+    const overallStatus = this.deriveOverallStatus(document, receipts, results);
+
+    return {
+      document: {
+        id: document.id,
+        originalFileName: document.originalFileName,
+        status: document.status,
+        totalReceipts: receipts.length,
+        country: document.country,
+        icp: document.icp,
+        uploadedBy: document.uploadedBy,
+        createdAt: document.createdAt,
+      },
+      overallStatus,
+      receipts: receipts.map((receipt, index) => {
+        const result = results.find((r) => r.receiptId === receipt.id);
+
+        // Build compliance-style results if processing is completed
+        let complianceResults = null;
+        if (result && result.status === ProcessingStatus.COMPLETED) {
+          // Extract image quality issues
+          const imageQualityIssues = this.extractImageQualityIssues(result.qualityAssessment);
+
+          // Merge all issues
+          const mergedIssues = this.mergeComplianceIssues(
+            result.complianceValidation?.validation_result?.issues || [],
+            imageQualityIssues
+          );
+
+          complianceResults = {
+            extraction: result.extractedData || {},
+            meta: {
+              receiptId: result.receiptId,
+              sourceDocumentId: result.sourceDocumentId,
+              processingCompletedAt: result.processingCompletedAt,
+              processingTime: result.processingMetadata?.processingTime,
+              processed_at: result.processingMetadata?.processedAt,
+            },
+            issues: mergedIssues,
+          };
+        }
+
+        // Derive page numbers for legacy receipts without metadata
+        const pages = this.derivePageNumbers(receipt, index, receipts.length, document.totalPages);
+
+        return {
+          receiptId: receipt.id,
+          fileName: receipt.fileName,
+          fileSize: receipt.fileSize,
+          storageKey: receipt.storageKey,
+          status: receipt.status,
+          processingStatus: result?.status,
+          processingProgress: result ? this.getProcessingStatusProgress(result.status) : 0,
+          processingCompletedAt: result?.processingCompletedAt,
+          hasResults: !!result && result.status === ProcessingStatus.COMPLETED,
+          hasErrors: !!result?.errorMessage,
+          // Page boundary information from receipt metadata
+          pages,
+          receiptNumber: receipt.metadata?.receiptNumber ?? index + 1,
+          totalPages: receipt.metadata?.totalPages ?? pages.length,
+          results: complianceResults,
+        };
+      }),
+      overallProgress: this.calculateOverallProgress(results),
+      stats: {
+        total: receipts.length,
+        completed: results.filter((r) => r.status === ProcessingStatus.COMPLETED).length,
+        failed: results.filter((r) => r.status === ProcessingStatus.FAILED).length,
+        processing: results.filter(
+          (r) =>
+            r.status !== ProcessingStatus.COMPLETED &&
+            r.status !== ProcessingStatus.FAILED &&
+            r.status !== ProcessingStatus.QUEUED,
+        ).length,
+        queued: results.filter((r) => r.status === ProcessingStatus.QUEUED).length,
+      },
+    };
+  }
+
+  /**
+   * Calculate overall progress from processing results
+   */
+  private calculateOverallProgress(results: ReceiptProcessingResult[]): number {
+    if (results.length === 0) return 0;
+
+    const totalProgress = results.reduce((sum, result) => {
+      return sum + this.getProcessingStatusProgress(result.status);
+    }, 0);
+
+    return Math.round(totalProgress / results.length);
+  }
+
+  /**
+   * Extract image quality issues from quality assessment
+   * Converts quality problems into compliance issue format
+   */
+  private extractImageQualityIssues(qualityAssessment: any): Array<any> {
+    if (!qualityAssessment) return [];
+
+    const issues: Array<any> = [];
+
+    // Check blur detection
+    if (qualityAssessment.blur_detection?.detected) {
+      issues.push({
+        issue_type: 'Image related | Blur Detection',
+        field: 'image_quality',
+        description: qualityAssessment.blur_detection.description || 'Document shows blur affecting readability',
+        recommendation: qualityAssessment.blur_detection.recommendation || 'Rescan document with better focus',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.blur_detection.severity_level || 'medium',
+        confidence: qualityAssessment.blur_detection.confidence_score || 0.5,
+      });
+    }
+
+    // Check glare
+    if (qualityAssessment.glare_identification?.detected) {
+      issues.push({
+        issue_type: 'Image related | Glare Detection',
+        field: 'image_quality',
+        description: qualityAssessment.glare_identification.description || 'Document has glare affecting visibility',
+        recommendation: qualityAssessment.glare_identification.recommendation || 'Rescan without glare or reflection',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.glare_identification.severity_level || 'medium',
+        confidence: qualityAssessment.glare_identification.confidence_score || 0.5,
+      });
+    }
+
+    // Check water stains
+    if (qualityAssessment.water_stains?.detected) {
+      issues.push({
+        issue_type: 'Image related | Water Damage',
+        field: 'image_quality',
+        description: qualityAssessment.water_stains.description || 'Document shows water stains',
+        recommendation: qualityAssessment.water_stains.recommendation || 'Request original or undamaged copy',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.water_stains.severity_level || 'high',
+        confidence: qualityAssessment.water_stains.confidence_score || 0.5,
+      });
+    }
+
+    // Check tears or folds
+    if (qualityAssessment.tears_or_folds?.detected) {
+      issues.push({
+        issue_type: 'Image related | Physical Damage',
+        field: 'image_quality',
+        description: qualityAssessment.tears_or_folds.description || 'Document has tears or folds',
+        recommendation: qualityAssessment.tears_or_folds.recommendation || 'Request undamaged copy or flatten document',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.tears_or_folds.severity_level || 'medium',
+        confidence: qualityAssessment.tears_or_folds.confidence_score || 0.5,
+      });
+    }
+
+    // Check cut-off sections
+    if (qualityAssessment.cut_off_detection?.detected) {
+      issues.push({
+        issue_type: 'Image related | Incomplete Scan',
+        field: 'image_quality',
+        description: qualityAssessment.cut_off_detection.description || 'Parts of document are cut off',
+        recommendation: qualityAssessment.cut_off_detection.recommendation || 'Rescan complete document',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.cut_off_detection.severity_level || 'high',
+        confidence: qualityAssessment.cut_off_detection.confidence_score || 0.5,
+      });
+    }
+
+    // Check missing sections
+    if (qualityAssessment.missing_sections?.detected) {
+      issues.push({
+        issue_type: 'Image related | Missing Content',
+        field: 'image_quality',
+        description: qualityAssessment.missing_sections.description || 'Document appears incomplete',
+        recommendation: qualityAssessment.missing_sections.recommendation || 'Provide complete document',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.missing_sections.severity_level || 'high',
+        confidence: qualityAssessment.missing_sections.confidence_score || 0.5,
+      });
+    }
+
+    // Check obstructions
+    if (qualityAssessment.obstructions?.detected) {
+      issues.push({
+        issue_type: 'Image related | Obstruction',
+        field: 'image_quality',
+        description: qualityAssessment.obstructions.description || 'Document has obstructions covering content',
+        recommendation: qualityAssessment.obstructions.recommendation || 'Remove obstructions and rescan',
+        knowledge_base_reference: 'Image Quality Standards',
+        severity: qualityAssessment.obstructions.severity_level || 'high',
+        confidence: qualityAssessment.obstructions.confidence_score || 0.5,
+      });
+    }
+
+    return issues;
+  }
+
+  /**
+   * Merge compliance issues with image quality issues
+   * Adds index numbers to all issues for consistent display
+   */
+  private mergeComplianceIssues(complianceIssues: Array<any>, imageQualityIssues: Array<any>): Array<any> {
+    const allIssues = [...complianceIssues, ...imageQualityIssues];
+
+    // Add index to each issue for easy reference
+    return allIssues.map((issue, index) => ({
+      index: index + 1,
+      ...issue,
+    }));
+  }
+
+  /**
+   * Derive page numbers for receipts, handling legacy receipts without metadata
+   * For new receipts: uses metadata.pageNumbers from splitting
+   * For legacy receipts: estimates based on receipt position and document total pages
+   */
+  private derivePageNumbers(receipt: Receipt, index: number, totalReceipts: number, documentTotalPages: number): number[] {
+    // If receipt has page numbers in metadata, use them
+    if (receipt.metadata?.pageNumbers && Array.isArray(receipt.metadata.pageNumbers) && receipt.metadata.pageNumbers.length > 0) {
+      return receipt.metadata.pageNumbers;
+    }
+
+    // For legacy receipts without metadata, estimate page numbers
+    // If single receipt document, assume all pages belong to it
+    if (totalReceipts === 1) {
+      const totalPages = documentTotalPages || 1;
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    // For multi-receipt documents without metadata, return receipt number as single page
+    // This is a fallback - ideally all receipts should have proper metadata
+    return [index + 1];
   }
 }

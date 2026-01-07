@@ -22,8 +22,9 @@ export interface AppConfigType {
   nodeEnv: string;
   isProduction: boolean;
 
-  // Database (Aurora MySQL only)
+  // Database (Aurora MySQL or local)
   database: {
+    mode: 'local' | 'iam'; // 'local' for local MySQL, 'iam' for Aurora IAM auth
     host: string;
     port: number;
     user: string;
@@ -92,6 +93,12 @@ export interface AppConfigType {
   cors: {
     allowedOrigins: string | boolean;
   };
+
+  // Validation (Judge configuration)
+  validation: {
+    judgeCount: number;
+    judgeTemperatures: number[];
+  };
 }
 
 export default registerAs('app', (): AppConfigType => {
@@ -106,16 +113,17 @@ export default registerAs('app', (): AppConfigType => {
     isProduction: nodeEnv === 'production',
 
     // ==========================================================================
-    // DATABASE (Aurora MySQL only with IAM authentication)
+    // DATABASE (Aurora MySQL with IAM auth OR local MySQL)
     // ==========================================================================
     database: {
+      mode: (process.env.DB_MODE as 'local' | 'iam') || 'iam',
       host: process.env.MYSQL_HOST || '',
       port: parseInt(process.env.MYSQL_PORT || '3306', 10),
       user: process.env.MYSQL_USER || '',
-      password: '', // Not used - IAM auth only
+      password: process.env.MYSQL_PASSWORD || '',
       database: process.env.MYSQL_DATABASE || '',
-      ssl: true, // Always required for IAM auth
-      iamAuthEnabled: true, // Always true - app only supports RDS IAM auth
+      ssl: process.env.DB_MODE === 'local' ? false : true,
+      iamAuthEnabled: process.env.DB_MODE !== 'local',
       connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '20', 10),
       queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '100', 10),
     },
@@ -196,6 +204,14 @@ export default registerAs('app', (): AppConfigType => {
     // ==========================================================================
     cors: {
       allowedOrigins: process.env.ALLOWED_ORIGINS || false,
+    },
+
+    // ==========================================================================
+    // VALIDATION (Judge configuration)
+    // ==========================================================================
+    validation: {
+      judgeCount: parseInt(process.env.VALIDATION_JUDGE_COUNT || '1', 10),
+      judgeTemperatures: (process.env.VALIDATION_JUDGE_TEMPERATURES || '0.3,0.7,0.5').split(',').map((t) => parseFloat(t.trim())),
     },
   };
 });

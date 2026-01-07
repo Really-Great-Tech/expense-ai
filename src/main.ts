@@ -6,8 +6,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerService } from './tools/logger/logger.service';
 import { useContainer } from 'class-validator';
-import { DatabaseHealthIndicator } from './health/database-health.indicator';
-import { RedisHealthEnhancedIndicator } from './health/redis-health-enhanced.indicator';
+import { MySqlHealthIndicator } from './health/indicators/mysql.health';
+import { RedisHealthIndicator } from './health/indicators/redis.health';
 import { validateEnvironment } from './config/env-validation';
 import * as express from 'express';
 import { Request, Response, NextFunction } from 'express';
@@ -140,7 +140,16 @@ async function bootstrap() {
 
     // Set global API prefix for all routes except health endpoints
     app.setGlobalPrefix('expenses-ai/api', {
-      exclude: ['expenses-ai/health', 'expenses-ai/ready', 'expenses-ai/health/redis', 'expenses-ai/health/database', 'health-check'],
+      exclude: [
+        'expenses-ai/health',
+        'expenses-ai/ready',
+        'expenses-ai/live',
+        'expenses-ai/health/aws/textract',
+        'expenses-ai/health/aws/bedrock',
+        'expenses-ai/health/circuit-breakers',
+        'expenses-ai/admin/queues',
+        'expenses-ai/admin/queues/(.*)',
+      ],
     });
 
     // Swagger configuration
@@ -159,18 +168,18 @@ async function bootstrap() {
 
     // Perform startup health checks before accepting traffic
     // This ensures critical dependencies (database, Redis) are available
-    const dbHealth = app.get(DatabaseHealthIndicator);
-    const redisHealth = app.get(RedisHealthEnhancedIndicator);
+    const dbHealth = app.get(MySqlHealthIndicator);
+    const redisHealth = app.get(RedisHealthIndicator);
 
     logger.log('Performing startup health checks...', BOOTSTRAP_CONTEXT);
 
     try {
       logger.log('Checking database health...', BOOTSTRAP_CONTEXT);
-      const dbResult = await dbHealth.isHealthy('database', 10000);
+      const dbResult = await dbHealth.isHealthy('database');
       logger.log('Database health check passed: ' + JSON.stringify(dbResult), BOOTSTRAP_CONTEXT);
 
       logger.log('Checking Redis health...', BOOTSTRAP_CONTEXT);
-      const redisResult = await redisHealth.isHealthy('redis-queue', 10000);
+      const redisResult = await redisHealth.isHealthy('redis');
       logger.log('Redis health check passed: ' + JSON.stringify(redisResult), BOOTSTRAP_CONTEXT);
 
       logger.log('Startup health checks passed', BOOTSTRAP_CONTEXT);

@@ -1,18 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExpenseStatusController } from './expense-status.controller';
 import { ExpenseStatusService } from '../services/expense-status.service';
-import { ReceiptResultsQueryService } from '../services/receipt-results-query.service';
 
 describe('ExpenseStatusController', () => {
   let controller: ExpenseStatusController;
   let expenseStatusService: ExpenseStatusService;
-  let receiptResultsQuery: ReceiptResultsQueryService;
 
   const mockExpenseStatusService = {
     getExpenseStatus: jest.fn(),
-  };
-
-  const mockReceiptResultsQueryService = {
     getDocumentResults: jest.fn(),
   };
 
@@ -24,16 +19,11 @@ describe('ExpenseStatusController', () => {
           provide: ExpenseStatusService,
           useValue: mockExpenseStatusService,
         },
-        {
-          provide: ReceiptResultsQueryService,
-          useValue: mockReceiptResultsQueryService,
-        },
       ],
     }).compile();
 
     controller = module.get<ExpenseStatusController>(ExpenseStatusController);
     expenseStatusService = module.get<ExpenseStatusService>(ExpenseStatusService);
-    receiptResultsQuery = module.get<ReceiptResultsQueryService>(ReceiptResultsQueryService);
   });
 
   afterEach(() => {
@@ -117,11 +107,11 @@ describe('ExpenseStatusController', () => {
         },
       };
 
-      mockReceiptResultsQueryService.getDocumentResults.mockResolvedValue(mockResults);
+      mockExpenseStatusService.getDocumentResults.mockResolvedValue(mockResults);
 
       const result = await controller.getExpenseResults(expenseId);
 
-      expect(receiptResultsQuery.getDocumentResults).toHaveBeenCalledWith(expenseId);
+      expect(expenseStatusService.getDocumentResults).toHaveBeenCalledWith(expenseId);
       expect(result).toEqual(mockResults);
     });
 
@@ -129,10 +119,10 @@ describe('ExpenseStatusController', () => {
       const expenseId = 'test-expense-123';
       const error = new Error('Service error');
 
-      mockReceiptResultsQueryService.getDocumentResults.mockRejectedValue(error);
+      mockExpenseStatusService.getDocumentResults.mockRejectedValue(error);
 
       await expect(controller.getExpenseResults(expenseId)).rejects.toThrow(error);
-      expect(receiptResultsQuery.getDocumentResults).toHaveBeenCalledWith(expenseId);
+      expect(expenseStatusService.getDocumentResults).toHaveBeenCalledWith(expenseId);
     });
   });
 });

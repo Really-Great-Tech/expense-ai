@@ -76,7 +76,7 @@ export class ExpenseProcessor extends WorkerHost {
       if (!markdownContent) {
         markdownSource = 'extracted';
         this.logger.log(`No stored extractedText found, falling back to Textract extraction`);
-        const fileBuffer = await this.s3Storage.getFile(storageKey);
+        const fileBuffer = await this.s3Storage.downloadFile(storageKey);
         markdownContent = await this.readDocumentContentFromBuffer(fileBuffer, fileName, documentReader);
       }
 

@@ -142,7 +142,6 @@ export interface SplitAnalysisResponse {
     hasMultipleInvoices?: boolean;
     totalInvoices?: number;
     invoices?: InvoiceGroup[];
-    tempDirectory?: string;
     expenseDocumentId: string;
     receiptIds?: string[];
     // Duplicate detection fields

@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import { JUDGE_PROFILE } from '../../../agents/config/models.config';
+import { getAppConfig } from '../../../config/app.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -27,16 +28,15 @@ export class ExpenseComplianceUQLMValidator {
   constructor(logger?: Logger, _configService?: ConfigService) {
     this.logger = logger || new Logger(ExpenseComplianceUQLMValidator.name);
 
-    // Initialize multiple Bedrock services for judge panel with different temperatures
-    this.bedrockServices = [
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
-    ];
+    // Initialize Bedrock services for judge panel with configurable count and temperatures
+    const config = getAppConfig();
+    const judgeCount = Math.min(Math.max(config.validation.judgeCount, 1), 3);
+    const temperatures = config.validation.judgeTemperatures.slice(0, judgeCount);
+    this.bedrockServices = temperatures.map((temp) => new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: temp }));
 
-    this.logger.log('ExpenseComplianceUQLMValidator initialized with 3 judge models');
+    this.logger.log(`ExpenseComplianceUQLMValidator initialized with ${this.bedrockServices.length} judge models`);
     this.bedrockServices.forEach((service, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${[0.3, 0.7, 0.5][index]})`);
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${temperatures[index]})`);
     });
   }
 

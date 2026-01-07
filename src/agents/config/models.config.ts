@@ -26,7 +26,7 @@ export const AGENT_PROFILES = {
 } as const;
 
 // Judge panel profile
-export const JUDGE_PROFILE: ProfileKey = 'SONNET_4';
+export const JUDGE_PROFILE: ProfileKey = 'NOVA_PRO';
 
 /**
  * Default inference configuration

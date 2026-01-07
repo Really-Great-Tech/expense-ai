@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator';
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import { JUDGE_PROFILE } from '../../../agents/config/models.config';
+import { getAppConfig } from '../../../config/app.config';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -94,13 +95,11 @@ export class ParallelExpenseComplianceUQLMValidator {
     // Create sequential validator for fallback
     this.sequentialValidator = new ExpenseComplianceUQLMValidator(this.logger);
 
-    // Initialize Bedrock services with different temperatures using unified profile
-    // All judges use the same profile (SONNET_4) but with different temperatures for diversity
-    this.bedrockServices = [
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.3 }),
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.7 }),
-      new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: 0.5 }),
-    ];
+    // Initialize Bedrock services with configurable count and temperatures
+    const config = getAppConfig();
+    const judgeCount = Math.min(Math.max(config.validation.judgeCount, 1), 3);
+    const temperatures = config.validation.judgeTemperatures.slice(0, judgeCount);
+    this.bedrockServices = temperatures.map((temp) => new BedrockLlmService({ profile: JUDGE_PROFILE, temperature: temp }));
 
     // Initialize parallel validation configuration from environment variables
     this.config = this.loadParallelConfig();
@@ -121,8 +120,9 @@ export class ParallelExpenseComplianceUQLMValidator {
       judgeModelsCount: this.bedrockServices.length,
     });
 
+    const configTemps = config.validation.judgeTemperatures;
     this.bedrockServices.forEach((service, index) => {
-      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${index === 0 ? 0.3 : index === 1 ? 0.7 : 0.5})`);
+      this.logger.log(`   Judge ${index + 1}: ${service.getProfileName()} (temp: ${configTemps[index]})`);
     });
   }
 
@@ -1051,12 +1051,13 @@ SUMMARY: [Brief assessment]`;
 
   /**
    * Check if parallel validation is currently enabled and properly configured
+   * Parallel dimensions can run with 1+ judges (6 dimensions in parallel)
    */
   isParallelValidationReady(): boolean {
     return (
-      this.config.parallelValidationEnabled &&
-      this.bedrockServices.length >= 2 && // Need at least 2 judges for meaningful parallelization
-      this.config.dimensionConcurrency > 1
+      this.config.parallelValidationEnabled
+      // this.bedrockServices.length >= 1 &&
+      // this.config.dimensionConcurrency > 1
     );
   }
 

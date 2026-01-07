@@ -19,7 +19,6 @@ import { DocumentReference } from './entities/document-reference.entity';
 
 // Controllers
 import { UploadController } from './controllers/upload.controller';
-import { CleanupController } from './controllers/cleanup.controller';
 
 // Services
 import { DocumentSplitterService } from './services/document-splitter.service';
@@ -29,8 +28,6 @@ import { ProcessingQueueService } from './services/processing-queue.service';
 // External services
 import { FileValidationService } from '../utils/file-validation.service';
 import { DuplicateDetectionService } from '../utils/duplicate-detection.service';
-import { DocumentParsingService } from '../services/document-parsing/document-parsing.service';
-import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 
 import { QUEUE_NAMES } from '../common/types';
 
@@ -106,20 +103,13 @@ import { QUEUE_NAMES } from '../common/types';
       },
     ]),
   ],
-  controllers: [UploadController, CleanupController],
+  controllers: [UploadController],
   providers: [
     DocumentSplitterService,
     DocumentPersistenceService,
     ProcessingQueueService,
     FileValidationService,
     DuplicateDetectionService,
-    DocumentParsingService,
-    {
-      provide: DocumentSplitterAgent,
-      useFactory: () => {
-        return new DocumentSplitterAgent();
-      },
-    },
   ],
   exports: [DocumentSplitterService, DocumentPersistenceService, ProcessingQueueService, TypeOrmModule],
 })

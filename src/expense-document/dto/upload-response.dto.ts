@@ -68,9 +68,6 @@ export class SplitAnalysisDataDto {
   @ApiProperty({ description: 'Invoice groups with content and PDF paths', type: [InvoiceGroupDto] })
   invoices: InvoiceGroupDto[];
 
-  @ApiProperty({ description: 'Temporary directory containing split files' })
-  tempDirectory: string;
-
   @ApiProperty({ description: 'Created expense document ID' })
   expenseDocumentId: string;
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { pdfToPng, PngPageOutput } from 'pdf-to-png-converter';
+import { pdf } from 'pdf-to-img';
 
 /**
  * Represents a single page converted to an image
@@ -46,29 +46,36 @@ export class PdfToImageService {
     try {
       this.logger.log(`Starting PDF to image conversion (${pdfBuffer.length} bytes)`);
 
-      // Convert Buffer to ArrayBuffer for pdf-to-png-converter
-      const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.length);
-      const pngPages: PngPageOutput[] = await pdfToPng(pdfArrayBuffer, {
-        viewportScale: options?.viewportScale ?? PdfToImageService.DEFAULT_VIEWPORT_SCALE,
-        pagesToProcess: options?.pagesToProcess,
-        disableFontFace: true, // Improves performance
-        useSystemFonts: true,
-      });
+      const scale = options?.viewportScale ?? PdfToImageService.DEFAULT_VIEWPORT_SCALE;
+      const document = await pdf(pdfBuffer, { scale });
 
-      const pageImages: PageImage[] = pngPages.map((page) => ({
-        pageNumber: page.pageNumber,
-        imageBase64: page.content.toString('base64'),
-        width: page.width,
-        height: page.height,
-      }));
+      const pageImages: PageImage[] = [];
+      let pageNumber = 0;
+
+      for await (const image of document) {
+        pageNumber++;
+
+        if (options?.pagesToProcess && !options.pagesToProcess.includes(pageNumber)) {
+          continue;
+        }
+
+        pageImages.push({
+          pageNumber,
+          imageBase64: image.toString('base64'),
+          width: 0,
+          height: 0,
+        });
+      }
 
       const duration = Date.now() - startTime;
       this.logger.log(`Converted ${pageImages.length} pages to images in ${duration}ms`);
 
       return pageImages;
-    } catch (error: any) {
-      this.logger.error(`PDF to image conversion failed: ${error.message}`, error.stack);
-      throw new Error(`Failed to convert PDF to images: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`PDF to image conversion failed: ${errorMessage}`, errorStack);
+      throw new Error(`Failed to convert PDF to images: ${errorMessage}`);
     }
   }
 
@@ -85,21 +92,21 @@ export class PdfToImageService {
     viewportScale?: number,
   ): Promise<string> {
     try {
-      const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.length);
-      const pngPages = await pdfToPng(pdfArrayBuffer, {
-        viewportScale: viewportScale ?? PdfToImageService.DEFAULT_VIEWPORT_SCALE,
-        pagesToProcess: [pageNumber],
-        disableFontFace: true,
-        useSystemFonts: true,
-      });
+      const scale = viewportScale ?? PdfToImageService.DEFAULT_VIEWPORT_SCALE;
+      const document = await pdf(pdfBuffer, { scale });
 
-      if (pngPages.length === 0) {
-        throw new Error(`Page ${pageNumber} not found in PDF`);
+      let currentPage = 0;
+      for await (const image of document) {
+        currentPage++;
+        if (currentPage === pageNumber) {
+          return image.toString('base64');
+        }
       }
 
-      return pngPages[0].content.toString('base64');
-    } catch (error: any) {
-      this.logger.error(`Failed to convert page ${pageNumber}: ${error.message}`);
+      throw new Error(`Page ${pageNumber} not found in PDF`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to convert page ${pageNumber}: ${errorMessage}`);
       throw error;
     }
   }
@@ -134,18 +141,18 @@ export class PdfToImageService {
    */
   async getPageCount(pdfBuffer: Buffer): Promise<number> {
     try {
-      // Convert first page with minimal scale to get page count info
-      const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.length);
-      const pngPages = await pdfToPng(pdfArrayBuffer, {
-        viewportScale: 0.1, // Very low scale for speed
-        pagesToProcess: [-1], // Special value to get all pages
-        disableFontFace: true,
-        useSystemFonts: true,
-      });
+      const document = await pdf(pdfBuffer, { scale: 0.1 });
 
-      return pngPages.length;
-    } catch (error: any) {
-      this.logger.error(`Failed to get page count: ${error.message}`);
+      let count = 0;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _page of document) {
+        count++;
+      }
+
+      return count;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to get page count: ${errorMessage}`);
       throw error;
     }
   }

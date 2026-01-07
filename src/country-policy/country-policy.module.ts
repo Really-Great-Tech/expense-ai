@@ -6,14 +6,16 @@ import { CountryPolicy } from './entities/country-policy.entity';
 import { Datasource } from './entities/datasource.entity';
 import { CountryPolicyService } from './services/country-policy.service';
 import { CountryValidationService } from './services/country-validation.service';
+import { IcpValidationService } from './services/icp-validation.service';
 import { IsValidCountryConstraint } from '../common/validators/is-valid-country.validator';
+import { IsValidIcpConstraint } from '../common/validators/is-valid-icp.validator';
 
 @Module({
   imports: [
     // Keep all entities for migrations seeding
     TypeOrmModule.forFeature([Country, Version, CountryPolicy, Datasource]),
   ],
-  providers: [CountryPolicyService, CountryValidationService, IsValidCountryConstraint],
-  exports: [CountryPolicyService, CountryValidationService, IsValidCountryConstraint, TypeOrmModule],
+  providers: [CountryPolicyService, CountryValidationService, IcpValidationService, IsValidCountryConstraint, IsValidIcpConstraint],
+  exports: [CountryPolicyService, CountryValidationService, IcpValidationService, IsValidCountryConstraint, IsValidIcpConstraint, TypeOrmModule],
 })
 export class CountryPolicyModule {}

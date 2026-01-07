@@ -2,8 +2,17 @@ import { ImageQualityAssessmentAgent } from './image-quality-assessment.agent';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 
 jest.mock('../services/bedrock/bedrock-llm');
-jest.mock('pdf-to-png-converter', () => ({
-  pdfToPng: jest.fn().mockResolvedValue([{ content: Buffer.from('fake-png-content') }]),
+jest.mock('pdf-to-img', () => ({
+  pdf: jest.fn().mockImplementation(() => {
+    const pages = [Buffer.from('fake-png-content')];
+    return Promise.resolve({
+      async *[Symbol.asyncIterator]() {
+        for (const page of pages) {
+          yield page;
+        }
+      },
+    });
+  }),
 }));
 
 describe('ImageQualityAssessmentAgent', () => {
@@ -196,8 +205,8 @@ describe('ImageQualityAssessmentAgent', () => {
       const result = await agent.assessImageQualityFromBuffer(pdfBuffer, 'test.pdf');
 
       expect(result).toBeDefined();
-      const { pdfToPng } = require('pdf-to-png-converter');
-      expect(pdfToPng).toHaveBeenCalled();
+      const { pdf } = jest.requireMock('pdf-to-img');
+      expect(pdf).toHaveBeenCalled();
     });
 
     it('should return fallback result on error', async () => {
@@ -364,20 +373,32 @@ describe('ImageQualityAssessmentAgent', () => {
     it('should convert PDF buffer to PNG', async () => {
       const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e]);
 
-      const { pdfToPng } = require('pdf-to-png-converter');
-      pdfToPng.mockResolvedValue([{ content: Buffer.from('png-content') }]);
+      const { pdf } = jest.requireMock('pdf-to-img');
+      pdf.mockImplementation(() =>
+        Promise.resolve({
+          async *[Symbol.asyncIterator]() {
+            yield Buffer.from('png-content');
+          },
+        }),
+      );
 
       const result = await agent['convertPdfToImage'](pdfBuffer);
 
       expect(result).toBeDefined();
-      expect(pdfToPng).toHaveBeenCalled();
+      expect(pdf).toHaveBeenCalled();
     });
 
     it('should throw error if conversion fails', async () => {
       const pdfBuffer = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e]);
 
-      const { pdfToPng } = require('pdf-to-png-converter');
-      pdfToPng.mockResolvedValue([]);
+      const { pdf } = jest.requireMock('pdf-to-img');
+      pdf.mockImplementation(() =>
+        Promise.resolve({
+          async *[Symbol.asyncIterator]() {
+            // Yield nothing - empty PDF
+          },
+        }),
+      );
 
       await expect(agent['convertPdfToImage'](pdfBuffer)).rejects.toThrow('Failed to convert PDF to image');
     });

@@ -1,6 +1,4 @@
 import { Module, MiddlewareConsumer, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -17,6 +15,7 @@ import { SecurityMiddleware } from './middleware/security.middleware';
 import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { ResilienceModule } from './resilience';
+import { BullBoardModule } from './admin/bull-board.module';
 import { DatabaseConfigValidator } from './config/database-validation';
 import { DataSource } from 'typeorm';
 
@@ -58,9 +57,10 @@ import { DataSource } from 'typeorm';
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
     ResilienceModule, // Circuit breaker for AWS services
+    BullBoardModule, // Queue monitoring dashboard at /admin/queues
   ],
-  controllers: [AppController],
-  providers: [AppService, RedisConfigService],
+  controllers: [],
+  providers: [RedisConfigService],
 })
 export class AppModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AppModule.name);
