@@ -44,11 +44,11 @@ export class ValidationOrchestratorService {
     complianceData: any,
     extraction: any,
     timing: ProcessingTiming,
-  ): Promise<void> {
+  ): Promise<any> {
     if (!this.complianceValidator) {
       this.logger.warn('️ LLM-as-judge validation skipped (validator not available)');
       timing.phase_timings.llm_validation_seconds = '0.0';
-      return;
+      return null;
     }
 
     try {
@@ -113,6 +113,8 @@ export class ValidationOrchestratorService {
       };
 
       this.logger.log(` LLM-as-judge validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
+
+      return validationResult;
     } catch (error) {
       this.logger.error(` LLM-as-judge validation failed: ${error.message}`);
       this.logger.error('Stack trace:', error.stack);
@@ -125,6 +127,7 @@ export class ValidationOrchestratorService {
         execution_mode: 'error',
         validator_type: this.complianceValidator instanceof ParallelExpenseComplianceUQLMValidator ? 'parallel' : 'sequential',
       };
+      return null;
     }
   }
 

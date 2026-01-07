@@ -97,7 +97,7 @@ export class ExpenseProcessingService {
 
       // Phase 5: LLM-as-Judge Validation
       progressCallback?.('llmValidation', 96);
-      await this.validationOrchestrator.validateCompliance(
+      const llmValidationResult = await this.validationOrchestrator.validateCompliance(
         compliance,
         country,
         classification.expense_type || 'unknown',
@@ -118,7 +118,7 @@ export class ExpenseProcessingService {
         classification,
         extraction,
         compliance,
-        citations,
+        citations: llmValidationResult || citations,
         timing,
         metadata: {
           filename,

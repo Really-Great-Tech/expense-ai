@@ -194,10 +194,16 @@ const baseDBConfig: DataSourceOptions = {
     connectionLimit: config.database.connectionLimit,
     queueLimit: config.database.queueLimit,
 
+    // Connection stability - prevents silent disconnects during long jobs
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    idleTimeout: 60000,
+    maxIdle: 10,
+    waitForConnections: true,
+
     // IAM auth plugin
     ...getIAMAuthConfig(),
 
-    // Aurora MySQL specific optimizations
     multipleStatements: false,
     dateStrings: false,
     supportBigNumbers: true,

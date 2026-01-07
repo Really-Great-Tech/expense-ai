@@ -92,7 +92,7 @@ export class DocumentSplitterAgent extends BaseAgent {
     // Nova Pro for text-only analysis
     this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.DOCUMENT_SPLITTER });
     // Claude Sonnet 4 for vision-based analysis
-    this.visionLlm = new BedrockLlmService({ profile: 'SONNET_4' });
+    this.visionLlm = new BedrockLlmService({ profile: AGENT_PROFILES.DOCUMENT_SPLITTER });
   }
 
   /**
