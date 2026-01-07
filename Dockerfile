@@ -12,7 +12,6 @@ RUN apk add --no-cache curl ca-certificates python3 make g++ && adduser -S -u 10
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /usr/src/app/dist ./dist
-COPY country_seed ./country_seed
 RUN mkdir -p certs && curl -so certs/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem && chown -R nodejs /usr/src/app
 USER nodejs
 ENV NODE_ENV=production HUSKY=0 CI=true
