@@ -1,3 +1,8 @@
+// Mock pdf-to-img before any imports (ESM module that Jest can't parse)
+jest.mock('pdf-to-img', () => ({
+  pdf: jest.fn(),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgentFactoryService } from './agent-factory.service';
 import { FileClassificationAgent } from '../../agents/file-classification.agent';
