@@ -1,17 +1,13 @@
 import { Controller, Get, Param, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ExpenseStatusService } from '../services/expense-status.service';
-import { ReceiptResultsQueryService } from '../services/receipt-results-query.service';
 
 @ApiTags('Expense Status')
 @Controller('expenses')
 export class ExpenseStatusController {
   private readonly logger = new Logger(ExpenseStatusController.name);
 
-  constructor(
-    private expenseStatusService: ExpenseStatusService,
-    private receiptResultsQuery: ReceiptResultsQueryService,
-  ) {}
+  constructor(private expenseStatusService: ExpenseStatusService) {}
 
   /**
    * Get comprehensive status for an expense submission
@@ -253,7 +249,7 @@ This endpoint returns:
     this.logger.log(`Fetching results for expense ${expenseId}`);
 
     try {
-      return await this.receiptResultsQuery.getDocumentResults(expenseId);
+      return await this.expenseStatusService.getDocumentResults(expenseId);
     } catch (error) {
       this.logger.error(`Failed to fetch results for expense ${expenseId}:`, error);
       throw error;

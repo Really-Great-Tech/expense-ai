@@ -62,9 +62,15 @@ log('Migration paths configured', { paths: migrationPaths });
 /**
  * SSL Configuration for Aurora MySQL
  *
- * IAM authentication requires SSL/TLS - always enabled.
+ * IAM authentication requires SSL/TLS - only enabled for IAM mode.
  */
 const getSslConfig = () => {
+  // Local mode: no SSL
+  if (config.database.mode === 'local') {
+    log('Local mode: SSL disabled');
+    return false;
+  }
+
   // Path to RDS CA certificate bundle
   const certPath = join(process.cwd(), 'certs', 'global-bundle.pem');
   const certPathAlt = join(__dirname, '..', '..', 'certs', 'global-bundle.pem');
@@ -99,8 +105,16 @@ const getSslConfig = () => {
  * - The database user must be created with AWSAuthenticationPlugin
  * - mysql2 driver uses authPlugins to handle mysql_clear_password
  * - Token is generated via AWS SDK RDS Signer
+ *
+ * For local MySQL: returns empty config (uses password auth)
  */
 const getIAMAuthConfig = () => {
+  // Local mode: no IAM auth, use password
+  if (config.database.mode === 'local') {
+    log('Local mode: using password authentication');
+    return {};
+  }
+
   const hostname = config.database.host;
   const port = config.database.port;
   const username = config.database.user;
@@ -133,14 +147,16 @@ const getIAMAuthConfig = () => {
   };
 };
 
-// Aurora MySQL configuration (IAM authentication only)
+// MySQL configuration (IAM auth or local password auth)
+log('Database mode', { mode: config.database.mode });
+
 const baseDBConfig: DataSourceOptions = {
   type: 'mysql' as const,
   host: config.database.host,
   port: config.database.port,
   username: config.database.user,
-  // Password is empty - IAM token provided via authSwitchHandler in extra
-  password: '',
+  // Password: empty for IAM auth, from env for local
+  password: config.database.mode === 'local' ? config.database.password : '',
   database: config.database.database,
 
   // Dynamically resolved paths based on environment

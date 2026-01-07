@@ -63,7 +63,7 @@ export class DocumentSplitterProcessor extends WorkerHost {
       }
 
       // Download file from S3
-      const fileBuffer = await this.s3Storage.getFile(storageKey);
+      const fileBuffer = await this.s3Storage.downloadFile(storageKey);
       this.logger.log(`Downloaded file from S3: ${fileBuffer.length} bytes`);
 
       // STEP D: Extract markdown AND convert to images (parallel)

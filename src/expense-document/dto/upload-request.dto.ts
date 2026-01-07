@@ -25,7 +25,7 @@ export class SplitRequestDto {
 
   @ApiProperty({
     description: 'ICP (Internal Control Procedure) or policy context for downstream processing',
-    example: 'Atlas',
+    example: 'DEFAULT',
     required: true,
   })
   @IsValidIcp({

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { AppConfigType } from '../config/app.config';
 import { CircuitBreakerService } from '../resilience';
 
@@ -112,23 +112,6 @@ export class S3StorageService {
     }
   }
 
-  /**
-   * Alias for downloadFile - preferred method name
-   */
-  async getFile(storageKey: string): Promise<Buffer> {
-    return this.downloadFile(storageKey);
-  }
-
-  async fileExists(key: string): Promise<boolean> {
-    try {
-      const info = await this.getFileInfo(key);
-      return info.exists;
-    } catch (error) {
-      this.logger.error(`Failed to check file existence for ${key}:`, error);
-      return false;
-    }
-  }
-
   async getFileInfo(key: string): Promise<{ size: number; exists: boolean }> {
     try {
       const command = new HeadObjectCommand({
@@ -149,25 +132,6 @@ export class S3StorageService {
 
       this.logger.error(`Failed to get file info for ${key}:`, error);
       return { size: 0, exists: false };
-    }
-  }
-
-  async deleteFile(key: string): Promise<void> {
-    const breaker = this.circuitBreakerService.getS3Breaker();
-
-    try {
-      await breaker.execute(async () => {
-        const command = new DeleteObjectCommand({
-          Bucket: this.bucketName,
-          Key: key,
-        });
-
-        await this.s3Client.send(command);
-        this.logger.log(`File deleted from S3: ${key}`);
-      });
-    } catch (error) {
-      this.logger.error(`Failed to delete file ${key} from S3:`, error);
-      throw error;
     }
   }
 
@@ -245,19 +209,6 @@ export class S3StorageService {
     }
   }
 
-  async loadResult(key: string): Promise<any> {
-    try {
-      const resultKey = `results/${key}`;
-      const buffer = await this.downloadFile(resultKey);
-      const content = buffer.toString('utf8');
-
-      return JSON.parse(content);
-    } catch (error) {
-      this.logger.error(`Failed to load result ${key} from S3:`, error);
-      throw error;
-    }
-  }
-
   async saveValidationResult(key: string, data: any): Promise<void> {
     try {
       const validationKey = `validation_results/${key}`;
@@ -294,50 +245,6 @@ export class S3StorageService {
   }
 
   // ============================================
-  // File Reading Helpers
-  // ============================================
-
-  /**
-   * Alias for downloadFile
-   */
-  async readFile(key: string): Promise<Buffer> {
-    return this.downloadFile(key);
-  }
-
-  /**
-   * Read file and return as UTF-8 string
-   */
-  async readFileAsString(key: string): Promise<string> {
-    try {
-      const buffer = await this.readFile(key);
-      return buffer.toString('utf8');
-    } catch (error) {
-      this.logger.error(`Failed to read file as string ${key}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Read config file from S3 configs/ prefix
-   */
-  async readLocalConfigFile(relativePath: string): Promise<any> {
-    try {
-      const configKey = `configs/${relativePath}`;
-
-      try {
-        const content = await this.readFileAsString(configKey);
-        return JSON.parse(content);
-      } catch (s3Error) {
-        this.logger.warn(`Config not found in S3 (${configKey}), this might be expected for schemas/compliance data`);
-        throw new Error(`Config file not found in S3: ${configKey}`);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to read config file ${relativePath}:`, error);
-      throw error;
-    }
-  }
-
-  // ============================================
   // Storage Metadata
   // ============================================
 
@@ -351,31 +258,6 @@ export class S3StorageService {
       storageType: 's3',
       storageUrl: `s3://${this.bucketName}/${storageKey}`,
     };
-  }
-
-  /**
-   * Get S3 bucket name
-   */
-  getStorageBucket(): string {
-    return this.bucketName;
-  }
-
-  /**
-   * Get S3 URL for a key
-   */
-  getS3Url(key: string): string {
-    return `s3://${this.bucketName}/${key}`;
-  }
-
-  /**
-   * Extract key from S3 URL
-   */
-  extractKeyFromUrl(s3Url: string): string {
-    if (s3Url.startsWith('s3://')) {
-      const parts = s3Url.replace('s3://', '').split('/');
-      return parts.slice(1).join('/');
-    }
-    return s3Url;
   }
 
   // ============================================

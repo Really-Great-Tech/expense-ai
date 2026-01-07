@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
-import { CircuitBreakerService } from '../resilience';
+import { CircuitBreakerService } from '../../resilience';
 
 /**
  * Circuit Breaker Health Indicator
@@ -39,9 +39,7 @@ export class CircuitBreakerHealthIndicator extends HealthIndicator {
     );
 
     const result = this.getStatus(key, !hasOpenCircuit, {
-      message: hasOpenCircuit
-        ? 'One or more circuit breakers are open'
-        : 'All circuit breakers are healthy',
+      message: hasOpenCircuit ? 'One or more circuit breakers are open' : 'All circuit breakers are healthy',
       circuits: circuitDetails,
       openCircuits: allStatus.filter((s) => s.state === 'open').map((s) => s.name),
       halfOpenCircuits: allStatus.filter((s) => s.state === 'half-open').map((s) => s.name),

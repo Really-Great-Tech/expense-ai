@@ -101,17 +101,6 @@ describe('DocumentSplitterService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should have cleanup method (deprecated no-op)', () => {
-    expect(service.cleanupTempFiles).toBeDefined();
-    expect(typeof service.cleanupTempFiles).toBe('function');
-  });
-
-  it('cleanupTempFiles should be a no-op (no temp files in new architecture)', async () => {
-    const tempDir = '/tmp/test-dir';
-    // Should complete without errors (no-op)
-    await expect(service.cleanupTempFiles(tempDir)).resolves.not.toThrow();
-  });
-
   // Note: Full integration tests would require actual PDF files and LLM API access
   // This is a basic structure test to ensure the service is properly configured
 });

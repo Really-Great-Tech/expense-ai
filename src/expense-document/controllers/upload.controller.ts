@@ -149,7 +149,6 @@ The documentReader parameter specifies the reader for downstream processing of s
               fileSize: 67234,
             },
           ],
-          tempDirectory: '/temp/invoice-splits/1640995200000',
         },
       },
     },

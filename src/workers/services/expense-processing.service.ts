@@ -42,7 +42,7 @@ export class ExpenseProcessingService {
     const agents = this.agentFactory.getAgents();
 
     // Download file buffer from S3 for image quality assessment
-    const fileBuffer = await this.s3Storage.getFile(storageKey);
+    const fileBuffer = await this.s3Storage.downloadFile(storageKey);
     this.logger.debug(`Downloaded file from S3: ${storageKey} (${fileBuffer.length} bytes)`);
 
     try {

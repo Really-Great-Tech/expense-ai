@@ -3,7 +3,7 @@ import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
-import { pdfToPng } from 'pdf-to-png-converter';
+import { pdf } from 'pdf-to-img';
 
 /**
  * Agent responsible for assessing image quality of expense documents
@@ -60,19 +60,13 @@ export class ImageQualityAssessmentAgent extends BaseAgent {
    * @private
    */
   private async convertPdfToImage(pdfBuffer: Buffer): Promise<Buffer> {
-    const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.length);
-    const pngPages = await pdfToPng(pdfArrayBuffer, {
-      viewportScale: 2.0, // Higher quality for assessment
-      pagesToProcess: [1], // Only first page for quality assessment
-      disableFontFace: true,
-      useSystemFonts: true,
-    });
+    const document = await pdf(pdfBuffer, { scale: 2.0 });
 
-    if (pngPages.length === 0) {
-      throw new Error('Failed to convert PDF to image');
+    for await (const image of document) {
+      return image; // Return first page only
     }
 
-    return pngPages[0].content;
+    throw new Error('Failed to convert PDF to image');
   }
 
   /**

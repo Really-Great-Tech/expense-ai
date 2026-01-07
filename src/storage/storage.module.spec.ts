@@ -78,10 +78,7 @@ describe('StorageModule', () => {
       // Core S3 operations
       expect(typeof storageService.uploadFile).toBe('function');
       expect(typeof storageService.downloadFile).toBe('function');
-      expect(typeof storageService.getFile).toBe('function');
       expect(typeof storageService.getFileInfo).toBe('function');
-      expect(typeof storageService.fileExists).toBe('function');
-      expect(typeof storageService.deleteFile).toBe('function');
 
       // Document upload helpers
       expect(typeof storageService.uploadOriginalDocument).toBe('function');
@@ -89,20 +86,11 @@ describe('StorageModule', () => {
 
       // Result operations
       expect(typeof storageService.saveResult).toBe('function');
-      expect(typeof storageService.loadResult).toBe('function');
       expect(typeof storageService.saveValidationResult).toBe('function');
       expect(typeof storageService.saveMarkdownExtraction).toBe('function');
 
-      // File reading operations
-      expect(typeof storageService.readFile).toBe('function');
-      expect(typeof storageService.readFileAsString).toBe('function');
-      expect(typeof storageService.readLocalConfigFile).toBe('function');
-
       // Metadata helpers
       expect(typeof storageService.buildStorageMetadata).toBe('function');
-      expect(typeof storageService.getStorageBucket).toBe('function');
-      expect(typeof storageService.getS3Url).toBe('function');
-      expect(typeof storageService.extractKeyFromUrl).toBe('function');
     });
 
     it('should be properly exported for dependency injection', () => {
