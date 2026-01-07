@@ -11,7 +11,7 @@ export class SeedCountryPolicies1736504407000 implements MigrationInterface {
       const countryCode = this.getCountryCode(countryName);
 
       // Insert country
-      await queryRunner.query('INSERT INTO countries (name, code, active) VALUES (?, ?, 1)', [countryName, countryCode]);
+      await queryRunner.query('INSERT INTO countries (name, code, active) VALUES (?, ?, ?)', [countryName, countryCode, 1]);
 
       const countryResult = await queryRunner.query('SELECT id FROM countries WHERE name = ?', [countryName]);
       const countryId = countryResult[0].id;

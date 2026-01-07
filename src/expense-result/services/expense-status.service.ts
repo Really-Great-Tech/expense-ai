@@ -66,6 +66,63 @@ export interface ExpenseStatusResponse {
   };
 }
 
+export interface DocumentResultsResponse {
+  document: {
+    id: string;
+    originalFileName: string;
+    status: DocumentStatus;
+    totalReceipts: number;
+    country: string;
+    icp: string;
+    uploadedBy: string;
+    createdAt: Date;
+  };
+  overallStatus: OverallExpenseStatus;
+  receipts: Array<{
+    receiptId: string;
+    fileName: string;
+    fileSize: number;
+    storageKey: string;
+    status: ReceiptStatus;
+    processingStatus?: ProcessingStatus;
+    processingProgress: number;
+    processingCompletedAt?: Date;
+    hasResults: boolean;
+    hasErrors: boolean;
+    pages: number[];
+    receiptNumber: number;
+    totalPages: number;
+    results: {
+      extraction: Record<string, unknown>;
+      meta: {
+        receiptId: string;
+        sourceDocumentId: string;
+        processingCompletedAt?: Date;
+        processingTime?: number;
+        processed_at?: string;
+      };
+      issues: Array<{
+        index: number;
+        issue_type: string;
+        field: string;
+        description: string;
+        recommendation: string;
+        knowledge_base_reference: string;
+        severity: string;
+        confidence: number;
+      }>;
+    } | null;
+  }>;
+  overallProgress: number;
+  stats: {
+    total: number;
+    completed: number;
+    failed: number;
+    processing: number;
+    queued: number;
+  };
+}
+
 @Injectable()
 export class ExpenseStatusService {
   private readonly logger = new Logger(ExpenseStatusService.name);
@@ -362,7 +419,7 @@ export class ExpenseStatusService {
    * Get all receipt processing results for a document
    * Returns document info, receipts with their processing status and compliance results
    */
-  async getDocumentResults(documentId: string): Promise<any> {
+  async getDocumentResults(documentId: string): Promise<DocumentResultsResponse> {
     const document = await this.expenseDocumentRepo.findOne({
       where: { id: documentId }
     });

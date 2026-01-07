@@ -26,7 +26,7 @@ export class IsValidIcpConstraint implements ValidatorConstraintInterface {
     try {
       return await this.icpValidationService.isValidIcp(country, icp.trim());
     } catch (error) {
-      this.logger.error(`ICP validation error for "${icp}" in "${country}": ${error instanceof Error ? error.message : error}`);
+      this.logger.warn(`ICP validation error for "${icp}" in "${country}": ${error instanceof Error ? error.message : error}`);
       return false;
     }
   }

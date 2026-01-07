@@ -28,7 +28,7 @@ export class IcpValidationService {
       this.icpCache.set(normalizedCountry, icps);
     }
 
-    return this.icpCache.get(normalizedCountry).has(normalizedIcp);
+    return this.icpCache.get(normalizedCountry)?.has(normalizedIcp) ?? false;
   }
 
   /**
@@ -68,7 +68,7 @@ export class IcpValidationService {
       throw new Error(`No ICPs found in compliance data for country: ${country}`);
     }
 
-    this.logger.log(`Loaded ${icps.size} ICPs for ${country}: ${Array.from(icps).join(', ')}`);
+    this.logger.log(`Loaded ${icps.size} ICPs for ${country}`);
     return icps;
   }
 
