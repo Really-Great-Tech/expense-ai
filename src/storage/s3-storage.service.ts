@@ -80,19 +80,31 @@ export class S3StorageService {
   }
 
   async downloadFile(key: string): Promise<Buffer> {
+    return this.downloadFileFromBucket(this.bucketName, key);
+  }
+
+  /**
+   * Download file from a specific bucket (cross-bucket download)
+   * Use this when downloading from a bucket different from the configured default.
+   *
+   * @param bucket - The S3 bucket name
+   * @param key - The S3 object key
+   * @returns File contents as Buffer
+   */
+  async downloadFileFromBucket(bucket: string, key: string): Promise<Buffer> {
     const breaker = this.circuitBreakerService.getS3Breaker();
 
     try {
       return await breaker.execute(async () => {
         const command = new GetObjectCommand({
-          Bucket: this.bucketName,
+          Bucket: bucket,
           Key: key,
         });
 
         const response = await this.s3Client.send(command);
 
         if (!response.Body) {
-          throw new Error(`No body returned for file ${key}`);
+          throw new Error(`No body returned for file s3://${bucket}/${key}`);
         }
 
         const chunks: Buffer[] = [];
@@ -103,13 +115,34 @@ export class S3StorageService {
         }
 
         const buffer = Buffer.concat(chunks);
-        this.logger.debug(`File downloaded from S3: ${key} (${buffer.length} bytes)`);
+        this.logger.debug(`File downloaded from S3: s3://${bucket}/${key} (${buffer.length} bytes)`);
         return buffer;
       });
     } catch (error) {
-      this.logger.error(`Failed to download file ${key} from S3:`, error);
+      this.logger.error(`Failed to download file s3://${bucket}/${key} from S3:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Download file using an S3 URI (e.g., "s3://bucket/key")
+   * Parses the URI and downloads from the specified bucket.
+   *
+   * @param s3Uri - Full S3 URI (e.g., "s3://my-bucket/path/to/file.pdf")
+   * @returns File contents as Buffer
+   */
+  async downloadFileFromUri(s3Uri: string): Promise<Buffer> {
+    const s3Regex = /^s3:\/\/([^/]+)\/(.+)$/;
+    const match = s3Uri.match(s3Regex);
+
+    if (!match) {
+      throw new Error(`Invalid S3 URI: ${s3Uri}. Expected format: s3://bucket/key`);
+    }
+
+    const bucket = match[1];
+    const key = match[2];
+
+    return this.downloadFileFromBucket(bucket, key);
   }
 
   async getFileInfo(key: string): Promise<{ size: number; exists: boolean }> {

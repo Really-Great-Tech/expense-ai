@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -10,6 +10,7 @@ import * as path from 'path';
 import { StorageModule } from '../storage/storage.module';
 import { CountryPolicyModule } from '../country-policy/country-policy.module';
 import { ExpenseResultModule } from '../expense-result/expense-result.module';
+import { WorkflowModule } from '../workflow/workflow.module';
 
 // Entities
 import { ExpenseDocument } from './entities/expense-document.entity';
@@ -29,7 +30,7 @@ import { ProcessingQueueService } from './services/processing-queue.service';
 import { FileValidationService } from '../utils/file-validation.service';
 import { DuplicateDetectionService } from '../utils/duplicate-detection.service';
 
-import { QUEUE_NAMES } from '../common/types';
+import { QUEUE_NAMES } from '../common/constants/queue.constants';
 
 @Module({
   imports: [
@@ -37,34 +38,21 @@ import { QUEUE_NAMES } from '../common/types';
     StorageModule,
     CountryPolicyModule,
     ExpenseResultModule,
+    forwardRef(() => WorkflowModule),
 
-    // Register the queues for processing
-    BullModule.registerQueue(
-      {
-        name: QUEUE_NAMES.EXPENSE_PROCESSING,
-        defaultJobOptions: {
-          removeOnComplete: 10,
-          removeOnFail: 5,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
+    // Register the workflow queue
+    BullModule.registerQueue({
+      name: QUEUE_NAMES.EXPENSE_WORKFLOW,
+      defaultJobOptions: {
+        removeOnComplete: { age: 86400, count: 1000 },
+        removeOnFail: { age: 604800 },
+        attempts: 2,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
         },
       },
-      {
-        name: QUEUE_NAMES.DOCUMENT_SPLITTING,
-        defaultJobOptions: {
-          removeOnComplete: 10,
-          removeOnFail: 5,
-          attempts: 2,
-          backoff: {
-            type: 'exponential',
-            delay: 5000,
-          },
-        },
-      },
-    ),
+    }),
 
     // Configure file upload
     MulterModule.registerAsync({

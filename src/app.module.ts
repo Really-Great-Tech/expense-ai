@@ -5,7 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import appConfig, { AppConfigType } from './config/app.config';
 import { dataSourceOptions } from './config/database';
 import { ExpenseDocumentModule } from './expense-document/expense-document.module';
-import { WorkersModule } from './workers/workers.module';
+import { WorkflowModule } from './workflow/workflow.module';
 import { ExpenseResultModule } from './expense-result/expense-result.module';
 import { CountryPolicyModule } from './country-policy/country-policy.module';
 import { RedisConfigService } from './config/redis.config';
@@ -16,6 +16,7 @@ import { LoggerModule } from './tools/logger/logger.module';
 import { HealthModule } from './health/health.module';
 import { ResilienceModule } from './resilience';
 import { BullBoardModule } from './admin/bull-board.module';
+import { IngestModule } from './ingest/ingest.module';
 import { DatabaseConfigValidator } from './config/database-validation';
 import { DataSource } from 'typeorm';
 
@@ -51,13 +52,14 @@ import { DataSource } from 'typeorm';
     TypeOrmModule.forRoot(dataSourceOptions),
     ScheduleModule.forRoot(),
     ExpenseDocumentModule,
-    WorkersModule,
+    WorkflowModule,
     ExpenseResultModule,
     CountryPolicyModule,
     LoggerModule,
     HealthModule, // Health check endpoints for monitoring
     ResilienceModule, // Circuit breaker for AWS services
     BullBoardModule, // Queue monitoring dashboard at /admin/queues
+    IngestModule, // S3-based document ingest service
   ],
   controllers: [],
   providers: [RedisConfigService],

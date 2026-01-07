@@ -14,18 +14,14 @@ import { QUEUE_NAMES } from '../common/constants/queue.constants';
  * Available at /admin/queues when the application is running.
  */
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: QUEUE_NAMES.EXPENSE_PROCESSING }, { name: QUEUE_NAMES.DOCUMENT_SPLITTING }),
-  ],
+  imports: [BullModule.registerQueue({ name: QUEUE_NAMES.EXPENSE_WORKFLOW })],
 })
 export class BullBoardModule implements NestModule, OnModuleInit {
   private serverAdapter: ExpressAdapter;
 
   constructor(
-    @InjectQueue(QUEUE_NAMES.EXPENSE_PROCESSING)
-    private readonly expenseQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.DOCUMENT_SPLITTING)
-    private readonly splittingQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.EXPENSE_WORKFLOW)
+    private readonly workflowQueue: Queue,
   ) {
     this.serverAdapter = new ExpressAdapter();
     this.serverAdapter.setBasePath('/expenses-ai/admin/queues');
@@ -33,7 +29,7 @@ export class BullBoardModule implements NestModule, OnModuleInit {
 
   onModuleInit() {
     createBullBoard({
-      queues: [new BullMQAdapter(this.expenseQueue), new BullMQAdapter(this.splittingQueue)],
+      queues: [new BullMQAdapter(this.workflowQueue)],
       serverAdapter: this.serverAdapter,
     });
   }

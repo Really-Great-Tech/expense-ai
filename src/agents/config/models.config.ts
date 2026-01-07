@@ -22,7 +22,7 @@ export const AGENT_PROFILES = {
   COMPLIANCE: 'NOVA_PRO' as ProfileKey,
 
   // Document splitting
-  DOCUMENT_SPLITTER: 'NOVA_PRO' as ProfileKey,
+  DOCUMENT_SPLITTER: 'SONNET_4' as ProfileKey,
 } as const;
 
 // Judge panel profile

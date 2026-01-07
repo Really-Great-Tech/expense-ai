@@ -87,7 +87,7 @@ export interface JobResult {
 }
 
 // Re-export constants for backward compatibility
-export { QUEUE_NAMES, JOB_TYPES } from '../constants/queue.constants';
+export { QUEUE_NAMES, JOB_NAMES } from '../constants/queue.constants';
 
 // Expense schema for field descriptions used in agent prompts
 export const EXPENSE_SCHEMA = {
