@@ -58,4 +58,10 @@ export class HealthController {
   getCircuitBreakerStatus(): Promise<HealthCheckResult> {
     return this.health.check([() => this.circuitBreaker.getSummary('circuit-breakers')]);
   }
+
+  @Get('health/rate-limiter')
+  @HealthCheck()
+  getRateLimiterStatus(): Promise<HealthCheckResult> {
+    return this.health.check([() => this.circuitBreaker.getRateLimiterMetrics('rate-limiter')]);
+  }
 }

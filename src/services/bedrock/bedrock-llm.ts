@@ -2,7 +2,7 @@ import { BedrockRuntimeClient, ConverseCommand, ContentBlock, Message } from '@a
 import { Logger } from '@nestjs/common';
 import { BrokenCircuitError } from 'cockatiel';
 import { getAppConfig, AppConfigType } from '../../config/app.config';
-import { getGlobalCircuitBreakerService } from '../../resilience';
+import { getGlobalCircuitBreakerService, getGlobalRateLimiterService } from '../../resilience';
 
 // ============================================================================
 // Types
@@ -137,48 +137,54 @@ export class BedrockLlmService {
   }
 
   // Unified chat - ConverseCommand works for all models
-  // Wrapped with circuit breaker to prevent cascading failures
+  // Wrapped with rate limiter (controls concurrency) and circuit breaker (prevents cascading failures)
+  // Flow: RateLimiter (wait if at capacity) → CircuitBreaker (fail fast if degraded) → AWS SDK → Bedrock
   async chat(options: { messages: ChatMessage[] }): Promise<ChatResponse> {
+    const rateLimiter = getGlobalRateLimiterService();
     const circuitBreaker = getGlobalCircuitBreakerService().getBedrockBreaker();
 
-    try {
-      return await circuitBreaker.execute(async () => {
-        const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
+    // Rate limiter: Wait here if at model-specific capacity
+    return await rateLimiter.executeWithLimit(this.profileKey, async () => {
+      // Circuit breaker: Fail fast if Bedrock is degraded
+      try {
+        return await circuitBreaker.execute(async () => {
+          const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
 
-        const messages: Message[] = conversationMessages.map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: this.formatContentBlocks(msg.content),
-        }));
+          const messages: Message[] = conversationMessages.map((msg) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: this.formatContentBlocks(msg.content),
+          }));
 
-        const command = new ConverseCommand({
-          modelId: this.profile.arn,
-          messages,
-          system: systemMessage ? [{ text: systemMessage }] : undefined,
-          inferenceConfig: {
-            maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
-            temperature: this.temperature,
-          },
+          const command = new ConverseCommand({
+            modelId: this.profile.arn,
+            messages,
+            system: systemMessage ? [{ text: systemMessage }] : undefined,
+            inferenceConfig: {
+              maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
+              temperature: this.temperature,
+            },
+          });
+
+          const response = await this.client.send(command);
+          const content = response.output?.message?.content || [];
+          const text = content.map((block) => ('text' in block ? block.text : '')).join('');
+
+          return {
+            message: { content: text },
+            usage: {
+              input_tokens: response.usage?.inputTokens || 0,
+              output_tokens: response.usage?.outputTokens || 0,
+            },
+            modelUsed: this.profile.arn,
+          };
         });
-
-        const response = await this.client.send(command);
-        const content = response.output?.message?.content || [];
-        const text = content.map((block) => ('text' in block ? block.text : '')).join('');
-
-        return {
-          message: { content: text },
-          usage: {
-            input_tokens: response.usage?.inputTokens || 0,
-            output_tokens: response.usage?.outputTokens || 0,
-          },
-          modelUsed: this.profile.arn,
-        };
-      });
-    } catch (error) {
-      if (error instanceof BrokenCircuitError) {
-        throw new Error('Bedrock service temporarily unavailable (circuit breaker open)');
+      } catch (error) {
+        if (error instanceof BrokenCircuitError) {
+          throw new Error('Bedrock service temporarily unavailable (circuit breaker open)');
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   // Vision support

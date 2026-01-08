@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
-import { CircuitBreakerService } from '../../resilience';
+import { CircuitBreakerService, BedrockRateLimiterService } from '../../resilience';
 
 /**
  * Circuit Breaker Health Indicator
@@ -15,7 +15,10 @@ import { CircuitBreakerService } from '../../resilience';
  */
 @Injectable()
 export class CircuitBreakerHealthIndicator extends HealthIndicator {
-  constructor(private readonly circuitBreakerService: CircuitBreakerService) {
+  constructor(
+    private readonly circuitBreakerService: CircuitBreakerService,
+    private readonly rateLimiterService: BedrockRateLimiterService,
+  ) {
     super();
   }
 
@@ -103,6 +106,32 @@ export class CircuitBreakerHealthIndicator extends HealthIndicator {
       circuits: allStatus.map((s) => ({
         name: s.name,
         state: s.state,
+      })),
+    });
+  }
+
+  /**
+   * Get Bedrock rate limiter metrics
+   * Shows active calls, queued calls, and limits for each model profile
+   */
+  async getRateLimiterMetrics(key: string): Promise<HealthIndicatorResult> {
+    const allMetrics = this.rateLimiterService.getAllMetrics();
+    const totalActive = this.rateLimiterService.getTotalActiveCount();
+    const totalPending = this.rateLimiterService.getTotalPendingCount();
+    const hasQueuedRequests = this.rateLimiterService.hasQueuedRequests();
+
+    return this.getStatus(key, true, {
+      summary: {
+        totalActive,
+        totalPending,
+        hasQueuedRequests,
+      },
+      models: allMetrics.map((m) => ({
+        profile: m.profile,
+        active: m.activeCount,
+        pending: m.pendingCount,
+        limit: m.limit,
+        utilizationPercent: Math.round((m.activeCount / m.limit) * 100),
       })),
     });
   }
