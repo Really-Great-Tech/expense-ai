@@ -35,8 +35,7 @@ export class DocumentPersistenceService {
   ) {}
 
   async createOrGetExpenseDocument(file: Express.Multer.File, options: any): Promise<ExpenseDocument> {
-    const idempotencyKey = this.computeIdempotencyKey(file, options.userId);
-
+    const idempotencyKey = options.userId;
     let expenseDocument = await this.expenseDocumentRepository.findOne({
       where: { idempotencyKey },
     });

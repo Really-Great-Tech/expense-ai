@@ -17,14 +17,14 @@ import { ExpenseStatusController } from './controllers/expense-status.controller
 import { ExpenseStatusService } from './services/expense-status.service';
 import { QueueManagementService } from './services/queue-management.service';
 
-import { QUEUE_NAMES } from '../common/types';
+import { QUEUE_NAMES } from '../common/constants/queue.constants';
 
 @Module({
   imports: [
     // Register all entities needed by this module's services
     TypeOrmModule.forFeature([ReceiptProcessingResult, ExpenseDocument, Receipt]),
     BullModule.registerQueue({
-      name: QUEUE_NAMES.EXPENSE_PROCESSING,
+      name: QUEUE_NAMES.EXPENSE_WORKFLOW,
     }),
   ],
   controllers: [ExpenseStatusController],

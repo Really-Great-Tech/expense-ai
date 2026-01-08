@@ -66,12 +66,25 @@ async function bootstrap() {
 
     logger.log(`Request body size limits configured: JSON=${bodyLimit}, URL-encoded=${urlEncodedLimit}`, BOOTSTRAP_CONTEXT);
 
-    // Request size monitoring middleware
+    // Request size monitoring and limit middleware (50MB max)
+    const MAX_REQUEST_SIZE_MB = 50;
+    const MAX_REQUEST_SIZE_BYTES = MAX_REQUEST_SIZE_MB * 1024 * 1024;
+
     app.use((req: Request, res: Response, next: NextFunction) => {
       const contentLength = req.headers['content-length'];
       if (contentLength) {
         const sizeInBytes = parseInt(contentLength, 10);
         const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+
+        // Reject requests exceeding 50MB
+        if (sizeInBytes > MAX_REQUEST_SIZE_BYTES) {
+          logger.error(`Request rejected: ${sizeInMB}MB exceeds ${MAX_REQUEST_SIZE_MB}MB limit on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
+          return res.status(413).json({
+            statusCode: 413,
+            message: `Request size (${sizeInMB}MB) exceeds maximum allowed size of ${MAX_REQUEST_SIZE_MB}MB`,
+            error: 'Payload Too Large',
+          });
+        }
 
         // Log large requests for monitoring (> 100KB)
         if (sizeInBytes > 100 * 1024) {

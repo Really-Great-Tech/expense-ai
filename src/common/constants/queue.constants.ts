@@ -1,11 +1,11 @@
-// Queue names
+// Queue names - single unified workflow queue
 export const QUEUE_NAMES = {
-  EXPENSE_PROCESSING: 'expense-processing',
-  DOCUMENT_SPLITTING: 'document-splitting',
+  EXPENSE_WORKFLOW: 'expense-workflow',
 } as const;
 
-// Job types for queues
-export const JOB_TYPES = {
-  PROCESS_DOCUMENT: 'process-document',
-  SPLIT_DOCUMENT: 'split-document',
+// Job names for workflow queue
+export const JOB_NAMES = {
+  SPLIT_EXPENSE: 'split-expense',
+  PROCESS_RECEIPT: 'process-receipt',
+  PROCESS_EXPENSE: 'process-expense',
 } as const;
