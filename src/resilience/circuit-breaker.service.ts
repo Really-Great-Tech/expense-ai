@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import {
   CircuitBreakerPolicy,
   circuitBreaker,
@@ -11,12 +11,16 @@ import {
   IPolicy,
   wrap,
 } from 'cockatiel';
+import { CircuitBreakerQueueService } from '@/workers/services/circuit-breaker-queue.service';
+import { CircuitBreakerWorkerService } from '@/workers/services/circuit-breaker-worker.service';
 
 export interface CircuitBreakerConfig {
   /** Number of consecutive failures before opening circuit */
   threshold: number;
   /** Time in ms to wait before trying half-open */
   halfOpenAfter: number;
+  /** Enable queuing when circuit is open (default: true) */
+  enableQueuing?: boolean;
 }
 
 export interface RetryConfig {
@@ -34,6 +38,46 @@ export interface CircuitBreakerStatus {
   name: string;
   state: 'closed' | 'open' | 'half-open';
   failures: number;
+}
+
+/**
+ * Create a proxy wrapper for CircuitBreakerPolicy that intercepts execute calls to use queuing
+ */
+/**
+ * Create a proxy wrapper for CircuitBreakerPolicy that intercepts execute calls to use queuing
+ * This ensures all breaker.execute() calls automatically get queuing support when circuit is open
+ */
+function createQueuedCircuitBreakerPolicy(
+  breakerService: CircuitBreakerService,
+  breakerName: string,
+  underlyingPolicy: CircuitBreakerPolicy,
+): CircuitBreakerPolicy {
+  return new Proxy(underlyingPolicy, {
+    get(target: CircuitBreakerPolicy, prop: string | symbol) {
+      // Intercept execute method to route through executeWithQueue
+      if (prop === 'execute') {
+        // Wrap execute to automatically use queuing
+        // This matches the signature: execute<T>(fn: (context?) => T | Promise<T>, signal?): Promise<T>
+        return function <T>(fn: (context?: any) => T | Promise<T>, signal?: AbortSignal): Promise<T> {
+          // If AbortSignal is provided, we can't easily queue (would need to handle cancellation)
+          // For now, if signal is provided, fall back to direct execution
+          if (signal) {
+            return target.execute(fn, signal);
+          }
+
+          // Ensure function returns Promise (handle both sync and async functions)
+          const asyncFn = async () => {
+            const result = fn();
+            return result instanceof Promise ? result : Promise.resolve(result);
+          };
+          return breakerService.executeWithQueue(breakerName, asyncFn);
+        };
+      }
+      // Forward all other property access to underlying policy
+      const value = (target as any)[prop];
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  }) as CircuitBreakerPolicy;
 }
 
 /**
@@ -64,6 +108,29 @@ export class CircuitBreakerService {
   private readonly breakers = new Map<string, CircuitBreakerPolicy>();
   private readonly breakerConfigs = new Map<string, CircuitBreakerConfig>();
   private readonly wrappedPolicies = new Map<string, IPolicy>();
+  private queueService: CircuitBreakerQueueService | null = null;
+  private workerService: CircuitBreakerWorkerService | null = null;
+
+  constructor(
+    @Optional()
+    @Inject(forwardRef(() => CircuitBreakerQueueService))
+    queueService?: CircuitBreakerQueueService,
+    @Optional()
+    @Inject(forwardRef(() => CircuitBreakerWorkerService))
+    workerService?: CircuitBreakerWorkerService,
+  ) {
+    // Optional injection - queue service may not be available in all contexts
+    this.queueService = queueService || null;
+    this.workerService = workerService || null;
+  }
+
+  /**
+   * Set queue and worker services (for cases where DI doesn't work)
+   */
+  setQueueServices(queueService: CircuitBreakerQueueService, workerService: CircuitBreakerWorkerService): void {
+    this.queueService = queueService;
+    this.workerService = workerService;
+  }
 
   /**
    * Pre-configured circuit breaker configs for different service types
@@ -95,10 +162,17 @@ export class CircuitBreakerService {
 
   /**
    * Get or create a circuit breaker by name
+   * Returns a wrapped breaker that automatically uses queuing when enabled
    */
   getBreaker(name: string, customConfig?: Partial<CircuitBreakerConfig>): CircuitBreakerPolicy {
     const existing = this.breakers.get(name);
     if (existing) {
+      // Wrap existing breaker if queuing is now available (may have been set up after breaker creation)
+      const config = this.breakerConfigs.get(name) || { enableQueuing: true };
+      if (config.enableQueuing !== false && this.queueService) {
+        // Return wrapped version to ensure execute calls use queuing
+        return createQueuedCircuitBreakerPolicy(this, name, existing);
+      }
       return existing;
     }
 
@@ -110,10 +184,15 @@ export class CircuitBreakerService {
       breaker: new ConsecutiveBreaker(config.threshold),
     });
 
-    // Log state changes
+    // Log state changes and trigger queue processing
     policy.onStateChange((state) => {
       const stateName = this.getStateName(state);
       this.logger.warn(`Circuit breaker [${name}] state changed to: ${stateName}`);
+
+      // When circuit transitions to half-open, process pending requests
+      if (state === CircuitState.HalfOpen && config.enableQueuing !== false) {
+        this.handleHalfOpenState(name);
+      }
     });
 
     // onFailure receives: { duration, handled, reason: FailureReason }
@@ -130,9 +209,12 @@ export class CircuitBreakerService {
     this.breakers.set(name, policy);
     this.breakerConfigs.set(name, config);
 
-    this.logger.log(
-      `Circuit breaker [${name}] created: threshold=${config.threshold}, halfOpenAfter=${config.halfOpenAfter}ms`,
-    );
+    this.logger.log(`Circuit breaker [${name}] created: threshold=${config.threshold}, halfOpenAfter=${config.halfOpenAfter}ms`);
+
+    // Wrap the policy to automatically use queuing when enabled
+    if (config.enableQueuing !== false && this.queueService) {
+      return createQueuedCircuitBreakerPolicy(this, name, policy);
+    }
 
     return policy;
   }
@@ -294,5 +376,60 @@ export class CircuitBreakerService {
    */
   static isBrokenCircuitError(error: unknown): error is BrokenCircuitError {
     return error instanceof BrokenCircuitError;
+  }
+
+  /**
+   * Execute a function through the circuit breaker with queuing support
+   * When circuit is open, request is enqueued instead of failing fast
+   */
+  async executeWithQueue<T>(name: string, fn: () => Promise<T>, metadata?: Record<string, any>): Promise<T> {
+    const breaker = this.getBreaker(name);
+    const config = this.breakerConfigs.get(name) || { enableQueuing: true };
+
+    // If queuing is disabled, use standard execute
+    if (config.enableQueuing === false || !this.queueService) {
+      return breaker.execute(fn);
+    }
+
+    // Check circuit state
+    const state = breaker.state;
+
+    if (state === CircuitState.Closed) {
+      // Circuit is closed - execute normally
+      return breaker.execute(fn);
+    } else if (state === CircuitState.HalfOpen) {
+      // Circuit is half-open - execute directly to test recovery
+      return breaker.execute(fn);
+    } else if (state === CircuitState.Open) {
+      // Circuit is open - enqueue the request
+      this.logger.debug(`Circuit breaker [${name}] is open, enqueuing request for later processing`);
+      return this.queueService.enqueueRequest(name, fn, metadata);
+    } else {
+      // Unknown state - fallback to normal execute
+      return breaker.execute(fn);
+    }
+  }
+
+  /**
+   * Handle half-open state transition - process pending queued requests
+   */
+  private async handleHalfOpenState(name: string): Promise<void> {
+    if (!this.workerService || !this.queueService) {
+      this.logger.debug(`Queue/worker services not available, skipping pending request processing for [${name}]`);
+      return;
+    }
+
+    this.logger.log(`Circuit breaker [${name}] entered half-open state, processing pending requests`);
+
+    try {
+      // Get config to determine how many requests to test
+      const config = this.breakerConfigs.get(name);
+      const testLimit = config?.threshold || 3; // Test a few requests
+
+      // Trigger processing of pending requests
+      await this.workerService.processPendingRequests(name, testLimit);
+    } catch (error) {
+      this.logger.error(`Failed to process pending requests for circuit breaker [${name}]: ${error.message}`);
+    }
   }
 }
