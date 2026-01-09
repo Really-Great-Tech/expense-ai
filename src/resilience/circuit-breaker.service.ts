@@ -383,7 +383,32 @@ export class CircuitBreakerService {
    * When circuit is open, request is enqueued instead of failing fast
    */
   async executeWithQueue<T>(name: string, fn: () => Promise<T>, metadata?: Record<string, any>): Promise<T> {
-    const breaker = this.getBreaker(name);
+    // Get the underlying breaker directly (not the wrapped proxy) to avoid infinite recursion
+    // The proxy wrapper intercepts execute() and calls executeWithQueue, which would create a loop
+    const breaker = this.breakers.get(name);
+    if (!breaker) {
+      // If breaker doesn't exist, create it (this will return wrapped version, but we'll get underlying below)
+      this.getBreaker(name);
+      const createdBreaker = this.breakers.get(name);
+      if (!createdBreaker) {
+        throw new Error(`Failed to create circuit breaker [${name}]`);
+      }
+      // Use the underlying breaker from the map
+      return this.executeWithQueueInternal(createdBreaker, name, fn, metadata);
+    }
+
+    return this.executeWithQueueInternal(breaker, name, fn, metadata);
+  }
+
+  /**
+   * Internal method that executes with the underlying breaker (not the proxy)
+   */
+  private async executeWithQueueInternal<T>(
+    breaker: CircuitBreakerPolicy,
+    name: string,
+    fn: () => Promise<T>,
+    metadata?: Record<string, any>,
+  ): Promise<T> {
     const config = this.breakerConfigs.get(name) || { enableQueuing: true };
 
     // If queuing is disabled, use standard execute
