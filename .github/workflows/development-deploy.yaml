@@ -9,8 +9,6 @@ on:
         type: choice
         options:
           - '["integration"]'
-          - '["staging"]'
-          - '["integration", "staging"]'
 
 jobs:
   Tests:
