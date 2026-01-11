@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
 import { DocumentSplitterAgent } from '@/agents/document-splitter.agent';
 import { DocumentParsingService } from '@/services/document-parsing/document-parsing.service';
 import { PdfToImageService } from '@/services/pdf-conversion/pdf-to-image.service';
@@ -26,10 +27,12 @@ export class DocumentSplitterHandler {
     private readonly persistenceService: DocumentPersistenceService,
   ) {}
 
-  async handle(jobData: SplitExpenseJobData): Promise<SplitResult> {
+  async handle(job: Job<SplitExpenseJobData>): Promise<SplitResult> {
     const startTime = Date.now();
-    const { documentId, storageKey, storageBucket, originalFileName, documentReader } = jobData;
+    const { documentId, storageKey, storageBucket, originalFileName, documentReader } = job.data;
 
+    await job.updateProgress(0);
+    await job.log(`Starting document splitting: documentId=${documentId}, file=${originalFileName}`);
     this.logger.log(`Starting document splitting: documentId=${documentId}, file=${originalFileName}`);
 
     // Load ExpenseDocument
@@ -40,10 +43,13 @@ export class DocumentSplitterHandler {
 
     // Download file from S3 (supports cross-bucket downloads)
     const fileBuffer = await this.s3Storage.downloadFileFromBucket(storageBucket, storageKey);
+    await job.updateProgress(10);
+    await job.log(`Downloaded file from S3: s3://${storageBucket}/${storageKey} (${fileBuffer.length} bytes)`);
     this.logger.log(`Downloaded file from S3: s3://${storageBucket}/${storageKey} (${fileBuffer.length} bytes)`);
 
     // STEP D: Extract markdown AND convert to images (parallel)
     await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.PROCESSING);
+    await job.log('Extracting markdown and converting to images...');
 
     const [fullMarkdown, pageImages] = await Promise.all([
       this.parsingService.extractMarkdownFromBuffer(fileBuffer, originalFileName, documentReader || 'textract'),
@@ -68,29 +74,37 @@ export class DocumentSplitterHandler {
         hasVisionData: pageImages.length > 0,
       },
     });
+    await job.updateProgress(40);
+    await job.log(`Textract complete: ${pageMarkdowns.length} pages, hasVision=${pageImages.length > 0}`);
 
     // STEP E: LLM boundary detection (with vision when images available)
     await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.BOUNDARY_DETECTION);
+    await job.log('Running LLM boundary detection...');
     const pageAnalysis = await this.documentSplitterAgent.analyzePages(pageMarkdowns);
     this.validatePageAnalysis(pageAnalysis, pageMarkdowns.length);
 
     // STEP F: Create invoice groups (filtering Expensify pages)
     await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.SPLITTING);
-    const invoiceGroups = this.createInvoiceGroupsFromAnalysis(pageMarkdowns, pageAnalysis, originalFileName, jobData.fileSize);
+    await job.updateProgress(60);
+    await job.log(`Boundary detection complete: ${pageAnalysis.totalInvoices} invoices detected`);
+    const invoiceGroups = this.createInvoiceGroupsFromAnalysis(pageMarkdowns, pageAnalysis, originalFileName, job.data.fileSize);
 
     // STEP G: Create receipts (filters out Expensify container pages)
-    const storageUrl = `s3://${jobData.storageBucket}/${storageKey}`;
+    await job.log('Creating receipts from invoice groups...');
+    const storageUrl = `s3://${job.data.storageBucket}/${storageKey}`;
     const { receipts, skippedExpensify, segments } = await this.createReceiptsFromGroups(
       expenseDocument,
       invoiceGroups,
       {
         storageKey,
-        storageBucket: jobData.storageBucket,
+        storageBucket: job.data.storageBucket,
         storageType: 's3',
         storageUrl,
       },
       pageImages,
     );
+    await job.updateProgress(80);
+    await job.log(`Created ${receipts.length} receipts, skipped ${skippedExpensify} Expensify pages`);
 
     // STEP H: Update document completion
     await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.COMPLETED, {
@@ -106,6 +120,8 @@ export class DocumentSplitterHandler {
     });
 
     const processingTime = Date.now() - startTime;
+    await job.updateProgress(100);
+    await job.log(`Document splitting completed: ${receipts.length} receipts in ${processingTime}ms`);
     this.logger.log(`Document splitting completed: ${receipts.length} receipts in ${processingTime}ms`, {
       documentId,
       receiptIds: receipts.map((r) => r.id),

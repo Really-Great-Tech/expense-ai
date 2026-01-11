@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import { getAppConfig } from '../../../config/app.config';
+import { ServiceUnavailableError } from '../../../common/errors/service-errors';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -440,22 +441,30 @@ SUMMARY: [Brief assessment]`;
             response: responseText
           });
           
-        } catch (error) {
+        } catch (error: any) {
           this.logger.warn(`Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
           const errorResponse = `Error: ${error.message}`;
           judgeResponses.push(errorResponse);
           confidenceScores.push(0.0);
-          
+
           judgeDetails.push({
             model_name: modelName,
             confidence_score: 0.0,
-            response: errorResponse
-          });
+            response: errorResponse,
+            isServiceError: error instanceof ServiceUnavailableError || error.isRetryable,
+          } as any);
         }
       }
 
+      // Check if ALL judges failed with service errors - propagate to trigger job retry
+      const allFailed = judgeResponses.every((r) => r.startsWith('Error:'));
+      const hasServiceError = judgeDetails.some((d: any) => d.isServiceError);
+      if (allFailed && hasServiceError) {
+        throw new ServiceUnavailableError('Bedrock', new Error('All judges failed with service errors'), true);
+      }
+
       // Use the first successful response as primary
-      const primaryResponse = judgeResponses.find(r => !r.startsWith('Error:')) || judgeResponses[0];
+      const primaryResponse = judgeResponses.find((r) => !r.startsWith('Error:')) || judgeResponses[0];
       
       // Calculate average confidence score
       const avgConfidence = confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length;

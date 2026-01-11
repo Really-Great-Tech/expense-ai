@@ -3,6 +3,7 @@ import { ExpenseComplianceUQLMValidator } from './ExpenseComplianceUQLMValidator
 import { BedrockLlmService } from '../../../services/bedrock/bedrock-llm';
 import { JUDGE_PROFILE } from '../../../agents/config/models.config';
 import { getAppConfig } from '../../../config/app.config';
+import { ServiceUnavailableError } from '../../../common/errors/service-errors';
 import {
   ValidationDimension,
   ComplianceValidationResult,
@@ -67,6 +68,7 @@ interface JudgeResult {
   confidence_score: number;
   response: string;
   success: boolean;
+  isServiceError?: boolean;
 }
 
 /**
@@ -451,13 +453,14 @@ export class ParallelExpenseComplianceUQLMValidator {
                 success: true,
               } as JudgeResult;
             });
-          } catch (error) {
+          } catch (error: any) {
             this.logger.warn(`Parallel judge ${index + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
             return {
               model_name: modelName,
               confidence_score: 0.0,
               response: `Error: ${error.message}`,
               success: false,
+              isServiceError: error instanceof ServiceUnavailableError || error.isRetryable,
             } as JudgeResult;
           }
         }),
@@ -508,6 +511,13 @@ export class ParallelExpenseComplianceUQLMValidator {
       });
 
       this.logger.log(`Parallel judge panel completed for ${dimension}: ${successfulJudges}/${this.bedrockServices.length} judges successful`);
+
+      // Check if ALL judges failed with service errors - propagate to trigger job retry
+      const allJudgesFailed = successfulJudges === 0;
+      const hasServiceError = judgeResults.some((r) => r.status === 'fulfilled' && (r.value as JudgeResult).isServiceError);
+      if (allJudgesFailed && hasServiceError) {
+        throw new ServiceUnavailableError('Bedrock', new Error('All judges failed with service errors'), true);
+      }
 
       // Use the first successful response as primary, or first response if none successful
       const primaryResponse = judgeResponses.find((r) => !r.startsWith('Error:')) || judgeResponses[0];

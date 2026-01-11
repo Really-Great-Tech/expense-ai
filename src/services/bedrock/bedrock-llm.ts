@@ -1,8 +1,9 @@
 import { BedrockRuntimeClient, ConverseCommand, ContentBlock, Message } from '@aws-sdk/client-bedrock-runtime';
 import { Logger } from '@nestjs/common';
-import { BrokenCircuitError } from 'cockatiel';
+import { BrokenCircuitError, BulkheadRejectedError } from 'cockatiel';
 import { getAppConfig, AppConfigType } from '../../config/app.config';
-import { getGlobalCircuitBreakerService } from '../../resilience';
+import { getGlobalCircuitBreakerService, getGlobalBulkheadService } from '../../resilience';
+import { ServiceUnavailableError, RetryableBulkheadTimeoutError } from '../../common/errors/service-errors';
 
 // ============================================================================
 // Types
@@ -137,45 +138,75 @@ export class BedrockLlmService {
   }
 
   // Unified chat - ConverseCommand works for all models
-  // Wrapped with circuit breaker to prevent cascading failures
+  // Wrapped with bulkhead (concurrency limiter with timeout waiting) and circuit breaker
   async chat(options: { messages: ChatMessage[] }): Promise<ChatResponse> {
+    const bulkheadService = getGlobalBulkheadService();
     const circuitBreaker = getGlobalCircuitBreakerService().getBedrockBreaker();
 
     try {
-      return await circuitBreaker.execute(async () => {
-        const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
+      // Bulkhead with timeout: waits up to 15s for a slot instead of immediate rejection
+      // Circuit breaker: fail-fast if service is down
+      return await bulkheadService.executeWithTimeout('bedrock', async () => {
+        return await circuitBreaker.execute(async () => {
+          const { systemMessage, conversationMessages } = this.parseMessages(options.messages);
 
-        const messages: Message[] = conversationMessages.map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: this.formatContentBlocks(msg.content),
-        }));
+          const messages: Message[] = conversationMessages.map((msg) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: this.formatContentBlocks(msg.content),
+          }));
 
-        const command = new ConverseCommand({
-          modelId: this.profile.arn,
-          messages,
-          system: systemMessage ? [{ text: systemMessage }] : undefined,
-          inferenceConfig: {
-            maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
-            temperature: this.temperature,
-          },
+          const command = new ConverseCommand({
+            modelId: this.profile.arn,
+            messages,
+            system: systemMessage ? [{ text: systemMessage }] : undefined,
+            inferenceConfig: {
+              maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
+              temperature: this.temperature,
+            },
+          });
+
+          const response = await this.client.send(command);
+          const content = response.output?.message?.content || [];
+          const text = content.map((block) => ('text' in block ? block.text : '')).join('');
+
+          return {
+            message: { content: text },
+            usage: {
+              input_tokens: response.usage?.inputTokens || 0,
+              output_tokens: response.usage?.outputTokens || 0,
+            },
+            modelUsed: this.profile.arn,
+          };
         });
-
-        const response = await this.client.send(command);
-        const content = response.output?.message?.content || [];
-        const text = content.map((block) => ('text' in block ? block.text : '')).join('');
-
-        return {
-          message: { content: text },
-          usage: {
-            input_tokens: response.usage?.inputTokens || 0,
-            output_tokens: response.usage?.outputTokens || 0,
-          },
-          modelUsed: this.profile.arn,
-        };
       });
-    } catch (error) {
+    } catch (error: any) {
+      // ValidationException/AccessDeniedException are PERMANENT config errors
+      if (error.name === 'ValidationException' || error.name === 'AccessDeniedException') {
+        BedrockLlmService.logger.error(
+          `Bedrock config error (permanent, not retryable): ${error.name} - ${error.message}. ` +
+            'Check: 1) Model enabled in AWS console, 2) IAM permissions, 3) Region availability',
+        );
+        throw error;
+      }
+      // Bulkhead timeout - waited but no slot available, job should retry
+      if (error instanceof RetryableBulkheadTimeoutError) {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+      // Bulkhead rejected (shouldn't happen with executeWithTimeout, but keep for safety)
+      if (error instanceof BulkheadRejectedError) {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+      // Circuit breaker open - service is down
       if (error instanceof BrokenCircuitError) {
-        throw new Error('Bedrock service temporarily unavailable (circuit breaker open)');
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+      // AWS throttling - retryable
+      if (error.name === 'ThrottlingException' || error.$metadata?.httpStatusCode === 429) {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+      // AWS service unavailable - retryable
+      if (error.$metadata?.httpStatusCode === 503) {
+        throw new ServiceUnavailableError('Bedrock', error, true);
       }
       throw error;
     }

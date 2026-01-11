@@ -3,6 +3,7 @@ import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES, INFERENCE_CONFIG } from './config/models.config';
+import { ServiceUnavailableError } from '../common/errors/service-errors';
 
 /**
  * Agent responsible for generating citations mapping extracted fields to source document text
@@ -91,13 +92,23 @@ export class CitationGeneratorAgent extends BaseAgent {
       this.logger.debug(`Prompt metadata: ${JSON.stringify(this.getPromptMetadata())}`);
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
 
       this.logger.error(`Citation generation failed after ${duration}ms:`, error);
 
-      // Return fallback result
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
+      // Return fallback result for non-retryable errors
       return {
         citations: {},
         metadata: {
@@ -141,11 +152,21 @@ export class CitationGeneratorAgent extends BaseAgent {
       this.logger.debug(`Successfully processed batch with ${Object.keys(validatedResult.citations).length} citations`);
 
       return validatedResult;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to process citation batch: ${error.message}`);
       this.logger.error(`Batch data keys: ${Object.keys(batchData).join(', ')}`);
 
-      // Return a fallback result for this batch
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
+      // Return a fallback result for this batch (non-retryable errors)
       const fallbackResult: CitationResult = {
         citations: {},
         metadata: {

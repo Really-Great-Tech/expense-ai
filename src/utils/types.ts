@@ -55,4 +55,8 @@ export enum DocumentReaderType {
 export interface TextractConfig extends DocumentReaderConfig {
   featureTypes?: string[];
   outputFormat?: 'markdown' | 'text';
+  /** Enable async Textract API for multi-page PDFs (default: false, controlled by TEXTRACT_USE_ASYNC env) */
+  useAsync?: boolean;
+  /** S3 location if document is already in S3 (skips upload step for async) */
+  s3Location?: { bucket: string; key: string };
 }

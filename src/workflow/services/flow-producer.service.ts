@@ -27,8 +27,9 @@ export class FlowProducerService implements OnModuleDestroy {
       prefix: bullConfig.prefix,
     });
 
-    this.defaultAttempts = this.configService.get<number>('WORKER_MAX_RETRY_ATTEMPTS', 3);
-    this.backoffDelayMs = this.configService.get<number>('WORKER_BACKOFF_DELAY_MS', 2000);
+    // 4 attempts with 35s backoff ensures retries hit circuit breaker AFTER it recovers (15-30s halfOpenAfter)
+    this.defaultAttempts = this.configService.get<number>('WORKER_MAX_RETRY_ATTEMPTS', 4);
+    this.backoffDelayMs = this.configService.get<number>('WORKER_BACKOFF_DELAY_MS', 35000);
 
     this.logger.log('FlowProducerService initialized');
   }

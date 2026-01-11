@@ -20,6 +20,7 @@ import { DocumentReference } from './entities/document-reference.entity';
 
 // Controllers
 import { UploadController } from './controllers/upload.controller';
+import { LoadTestController } from './controllers/load-test.controller';
 
 // Services
 import { DocumentSplitterService } from './services/document-splitter.service';
@@ -91,7 +92,7 @@ import { QUEUE_NAMES } from '../common/constants/queue.constants';
       },
     ]),
   ],
-  controllers: [UploadController],
+  controllers: [UploadController, LoadTestController],
   providers: [
     DocumentSplitterService,
     DocumentPersistenceService,

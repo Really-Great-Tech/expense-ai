@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { ExpenseProcessingService } from '@/workers/services/expense-processing.service';
 import { ReceiptProcessingResultRepository } from '@/expense-result/repositories/receipt-processing-result.repository';
@@ -32,10 +33,12 @@ export class ReceiptProcessorHandler {
     private readonly configService: ConfigService,
   ) {}
 
-  async handle(jobData: ProcessReceiptJobData): Promise<{ receiptId: string; success: boolean }> {
+  async handle(job: Job<ProcessReceiptJobData>): Promise<{ receiptId: string; success: boolean }> {
     const startTime = Date.now();
-    const { receiptId, sourceDocumentId, userId, country, icp, documentReader, image } = jobData;
+    const { receiptId, sourceDocumentId, userId, country, icp, documentReader, image } = job.data;
 
+    await job.updateProgress(0);
+    await job.log(`Starting receipt processing: receiptId=${receiptId}, documentId=${sourceDocumentId}`);
     this.logger.log(`Starting receipt processing: receiptId=${receiptId}, documentId=${sourceDocumentId}`);
 
     try {
@@ -49,6 +52,7 @@ export class ReceiptProcessorHandler {
       if (!receipt) {
         throw new Error(`Receipt not found: ${receiptId}`);
       }
+      await job.updateProgress(10);
 
       // Get markdown content - prefer stored extractedText, fall back to extraction
       const markdownExtractionStart = Date.now();
@@ -67,13 +71,19 @@ export class ReceiptProcessorHandler {
       }
 
       const markdownExtractionTime = Date.now() - markdownExtractionStart;
-      this.logger.log(`Markdown ${markdownSource === 'stored' ? 'loaded' : 'extracted'} in ${markdownExtractionTime}ms`);
+      await job.updateProgress(20);
+      const mdSource = markdownSource === 'stored' ? 'loaded' : 'extracted';
+      await job.log(`Markdown ${mdSource} (${markdownContent.length} chars) in ${markdownExtractionTime}ms`);
+      this.logger.log(`Markdown ${mdSource} in ${markdownExtractionTime}ms`);
 
       // Load compliance data
+      await job.log(`Loading compliance data for ${country}...`);
       const complianceData = await this.loadComplianceData(country, icp);
+      await job.updateProgress(30);
 
       // Process the document through all agents
       // Note: We pass the image from job data to avoid downloading parent PDF again
+      await job.log('Running expense processing agents (classification, extraction, compliance)...');
       const result = await this.processExpenseDocumentWithImage(
         markdownContent,
         receipt.fileName,
@@ -90,8 +100,10 @@ export class ReceiptProcessorHandler {
         },
         userId,
       );
+      await job.updateProgress(80);
 
       const processingTime = Date.now() - startTime;
+      await job.log('Expense processing complete, saving results...');
       this.logger.log(`Receipt processing finished: receiptId=${receiptId} in ${processingTime}ms`);
 
       // Save complete results to database
@@ -116,11 +128,14 @@ export class ReceiptProcessorHandler {
         parsedData: result.extraction,
       } as any);
 
+      await job.updateProgress(100);
+      await job.log(`Receipt processing completed successfully in ${processingTime}ms`);
       this.logger.log(`Saved processing results to database for receipt ${receiptId}`);
 
       return { receiptId, success: true };
     } catch (error: any) {
       const processingTime = Date.now() - startTime;
+      await job.log(`Receipt processing FAILED after ${processingTime}ms: ${error.message}`);
       this.logger.error(`Receipt processing failed: receiptId=${receiptId}, error=${error.message}`, error.stack);
 
       // Mark as failed in database

@@ -67,12 +67,15 @@ export class CircuitBreakerService {
 
   /**
    * Pre-configured circuit breaker configs for different service types
+   *
+   * IMPORTANT: halfOpenAfter must be LESS than job backoff delay (20s)
+   * so that circuit can recover before job retries hit it again.
    */
   private readonly defaultConfigs: Record<string, CircuitBreakerConfig> = {
-    // LLM calls are slow, need longer recovery time
-    bedrock: { threshold: 30, halfOpenAfter: 10_000 },
-    // Textract can be rate-limited
-    textract: { threshold: 3, halfOpenAfter: 20_000 },
+    // Bedrock: 10 failures before open, 30s recovery (job backoff is 20s, so 2nd retry hits recovered circuit)
+    bedrock: { threshold: 10, halfOpenAfter: 30_000 },
+    // Textract: 10 failures before open, 15s recovery (faster recovery for rate limiting)
+    textract: { threshold: 10, halfOpenAfter: 15_000 },
     // S3 is usually reliable, higher threshold
     s3: { threshold: 5, halfOpenAfter: 15_000 },
     // Database operations need quick recovery

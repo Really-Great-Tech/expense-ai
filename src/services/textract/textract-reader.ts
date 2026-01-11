@@ -2,9 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Block, Relationship, FeatureType } from '@aws-sdk/client-textract';
-import { BrokenCircuitError } from 'cockatiel';
+import { BrokenCircuitError, BulkheadRejectedError } from 'cockatiel';
 import { DocumentReader, TextractConfig, ApiResponse } from '../../utils/types';
-import { getGlobalCircuitBreakerService } from '../../resilience';
+import { getGlobalCircuitBreakerService, getGlobalBulkheadService } from '../../resilience';
+import { RetryableBulkheadTimeoutError, ServiceUnavailableError } from '../../common/errors/service-errors';
+import { TextractAsyncService } from './textract-async.service';
 
 export interface TextractApiServiceOptions {
   region?: string;
@@ -16,16 +18,20 @@ export interface TextractApiServiceOptions {
  */
 export class TextractApiService implements DocumentReader {
   private textractClient: TextractClient;
+  private asyncService: TextractAsyncService | null = null;
   private parseCache = new Map<string, { result: Promise<ApiResponse<string>>; timestamp: number }>();
   private cacheTimeout = 10 * 60 * 1000; // 10 minutes cache
 
   private readonly uploadPath: string;
   private readonly logger = new Logger(TextractApiService.name);
+  private readonly useAsyncByDefault: boolean;
 
   constructor(options: TextractApiServiceOptions = {}) {
     const awsRegion = options.region || 'eu-west-1';
     this.uploadPath = options.uploadPath || './uploads';
+    this.useAsyncByDefault = process.env.TEXTRACT_USE_ASYNC === 'true';
     this.logger.log(` Initializing Textract client for region: ${awsRegion}`);
+    this.logger.log(` Async Textract: ${this.useAsyncByDefault ? 'ENABLED' : 'DISABLED'} (TEXTRACT_USE_ASYNC=${process.env.TEXTRACT_USE_ASYNC})`);
 
     // Initialize Textract client - uses AWS SDK default credential chain:
     // 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -37,6 +43,16 @@ export class TextractApiService implements DocumentReader {
       maxAttempts: 4,
       retryMode: 'adaptive',
     });
+  }
+
+  /**
+   * Get or create the async Textract service (lazy initialization)
+   */
+  private getAsyncService(): TextractAsyncService {
+    if (!this.asyncService) {
+      this.asyncService = new TextractAsyncService();
+    }
+    return this.asyncService;
   }
 
   /**
@@ -187,7 +203,16 @@ export class TextractApiService implements DocumentReader {
         };
       }
 
-      // Route to appropriate processing method
+      // Check if async processing should be used
+      const useAsync = config.useAsync ?? this.useAsyncByDefault;
+
+      // Route to async processing for multi-page PDFs when enabled
+      if (useAsync && isMultiPage && fileType === 'pdf') {
+        this.logger.log(`   Using ASYNC Textract API for ${estimatedPages}-page PDF`);
+        return await this.processWithAsyncApi(buffer, fileName, config);
+      }
+
+      // Route to appropriate sync processing method
       if (isMultiPage) {
         return await this.processMultiPageDocumentBySplitting(buffer, fileName, config, estimatedPages);
       } else {
@@ -446,64 +471,94 @@ export class TextractApiService implements DocumentReader {
 
   /**
    * Process single-page documents using synchronous APIs
-   * Wrapped with circuit breaker to prevent cascading failures
+   * Wrapped with bulkhead (concurrency limiter with timeout waiting) and circuit breaker to prevent:
+   * - Bulkhead: Overwhelming Textract with too many concurrent requests (waits up to 10s for slot)
+   * - Circuit Breaker: Cascading failures during outages
    */
   private async processSinglePageDocument(fileBuffer: Buffer, config: TextractConfig): Promise<ApiResponse<string>> {
+    const bulkheadService = getGlobalBulkheadService();
     const circuitBreaker = getGlobalCircuitBreakerService().getTextractBreaker();
 
     try {
-      return await circuitBreaker.execute(async () => {
-        // Determine which Textract API to use based on config
-        const featureTypes = config.featureTypes || [];
-        let blocks: Block[] = [];
+      // Bulkhead with timeout: waits up to 10s for a slot instead of immediate rejection
+      // Circuit breaker: fail-fast if service is down
+      // Order: Bulkhead (with wait) -> Circuit Breaker -> Textract API
+      return await bulkheadService.executeWithTimeout('textract', async () => {
+        return await circuitBreaker.execute(async () => {
+          // Determine which Textract API to use based on config
+          const featureTypes = config.featureTypes || [];
+          let blocks: Block[] = [];
 
-        this.logger.log(`   Using Textract API: ${featureTypes.length > 0 ? 'AnalyzeDocument' : 'DetectDocumentText'}`);
-        this.logger.log(`   Feature types: ${featureTypes.join(', ') || 'none'}`);
+          this.logger.log(`   Using Textract API: ${featureTypes.length > 0 ? 'AnalyzeDocument' : 'DetectDocumentText'}`);
+          this.logger.log(`   Feature types: ${featureTypes.join(', ') || 'none'}`);
 
-        if (featureTypes.length > 0) {
-          // Use AnalyzeDocument for advanced features (tables, forms, etc.)
-          const analyzeCommand = new AnalyzeDocumentCommand({
-            Document: {
-              Bytes: fileBuffer,
-            },
-            FeatureTypes: featureTypes as FeatureType[],
-          });
+          if (featureTypes.length > 0) {
+            // Use AnalyzeDocument for advanced features (tables, forms, etc.)
+            const analyzeCommand = new AnalyzeDocumentCommand({
+              Document: {
+                Bytes: fileBuffer,
+              },
+              FeatureTypes: featureTypes as FeatureType[],
+            });
 
-          this.logger.log('   Sending AnalyzeDocument request to Textract...');
-          const analyzeResponse = await this.textractClient.send(analyzeCommand);
-          blocks = analyzeResponse.Blocks || [];
-          this.logger.log(`    AnalyzeDocument successful, received ${blocks.length} blocks`);
-        } else {
-          // Use DetectDocumentText for simple text extraction
-          const detectCommand = new DetectDocumentTextCommand({
-            Document: {
-              Bytes: fileBuffer,
-            },
-          });
+            this.logger.log('   Sending AnalyzeDocument request to Textract...');
+            const analyzeResponse = await this.textractClient.send(analyzeCommand);
+            blocks = analyzeResponse.Blocks || [];
+            this.logger.log(`    AnalyzeDocument successful, received ${blocks.length} blocks`);
+          } else {
+            // Use DetectDocumentText for simple text extraction
+            const detectCommand = new DetectDocumentTextCommand({
+              Document: {
+                Bytes: fileBuffer,
+              },
+            });
 
-          this.logger.log('   Sending DetectDocumentText request to Textract...');
-          const detectResponse = await this.textractClient.send(detectCommand);
-          blocks = detectResponse.Blocks || [];
-          this.logger.log(`    DetectDocumentText successful, received ${blocks.length} blocks`);
-        }
+            this.logger.log('   Sending DetectDocumentText request to Textract...');
+            const detectResponse = await this.textractClient.send(detectCommand);
+            blocks = detectResponse.Blocks || [];
+            this.logger.log(`    DetectDocumentText successful, received ${blocks.length} blocks`);
+          }
 
-        // Convert blocks to markdown
-        const markdownContent = this.convertBlocksToMarkdown(blocks);
+          // Convert blocks to markdown
+          const markdownContent = this.convertBlocksToMarkdown(blocks);
 
-        this.logger.log(`Single-page document parsed successfully. Content length: ${markdownContent.length} characters`);
+          this.logger.log(`Single-page document parsed successfully. Content length: ${markdownContent.length} characters`);
 
-        return {
-          success: true,
-          data: markdownContent,
-        };
+          return {
+            success: true,
+            data: markdownContent,
+          };
+        });
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Handle bulkhead timeout (waited but no slot available) - RETRYABLE
+      if (error instanceof RetryableBulkheadTimeoutError) {
+        this.logger.warn(`Textract bulkhead timeout: ${error.message}`);
+        throw new ServiceUnavailableError('Textract', error, true);
+      }
+
+      // Handle bulkhead rejection - RETRYABLE
+      if (error instanceof BulkheadRejectedError) {
+        this.logger.warn('Textract bulkhead rejected request (queue full)');
+        throw new ServiceUnavailableError('Textract', error, true);
+      }
+
+      // Handle circuit breaker open - RETRYABLE
       if (error instanceof BrokenCircuitError) {
         this.logger.error('Textract service temporarily unavailable (circuit breaker open)');
-        return {
-          success: false,
-          error: 'Textract service temporarily unavailable (circuit breaker open)',
-        };
+        throw new ServiceUnavailableError('Textract', error, true);
+      }
+
+      // Handle AWS throttling - RETRYABLE
+      if (error.name === 'ThrottlingException' || error.$metadata?.httpStatusCode === 429) {
+        this.logger.warn(`Textract throttled: ${error.message}`);
+        throw new ServiceUnavailableError('Textract', error, true);
+      }
+
+      // Handle AWS service unavailable - RETRYABLE
+      if (error.$metadata?.httpStatusCode === 503) {
+        this.logger.error(`Textract service unavailable: ${error.message}`);
+        throw new ServiceUnavailableError('Textract', error, true);
       }
 
       this.logger.error(
@@ -511,6 +566,46 @@ export class TextractApiService implements DocumentReader {
         error instanceof Error ? error.stack : undefined,
       );
       throw error; // Re-throw to be handled by main error handler
+    }
+  }
+
+  /**
+   * Process document using async Textract API
+   * Uploads to S3 first (async API requires S3), then starts async job
+   */
+  private async processWithAsyncApi(buffer: Buffer, fileName: string, config: TextractConfig): Promise<ApiResponse<string>> {
+    try {
+      const asyncService = this.getAsyncService();
+
+      // Check if document is already in S3
+      if (config.s3Location) {
+        this.logger.log(`   Using existing S3 location: s3://${config.s3Location.bucket}/${config.s3Location.key}`);
+        return await asyncService.parseDocumentAsync(config.s3Location.bucket, config.s3Location.key, {
+          featureTypes: config.featureTypes as ('TABLES' | 'FORMS' | 'SIGNATURES')[],
+          outputFormat: config.outputFormat === 'text' ? 'markdown' : config.outputFormat,
+        });
+      }
+
+      // Upload to S3 for async processing
+      this.logger.log('   Uploading document to S3 for async processing...');
+      const { bucket, key } = await asyncService.uploadForProcessing(buffer, fileName);
+
+      this.logger.log(`   Starting async Textract analysis on s3://${bucket}/${key}`);
+      return await asyncService.parseDocumentAsync(bucket, key, {
+        featureTypes: config.featureTypes as ('TABLES' | 'FORMS' | 'SIGNATURES')[],
+        outputFormat: config.outputFormat === 'text' ? 'markdown' : config.outputFormat,
+      });
+    } catch (error: any) {
+      // Re-throw ServiceUnavailableError for job retries
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      this.logger.error(`   Async Textract processing failed: ${error.message}`, error.stack);
+
+      // Fallback to sync processing if async fails
+      this.logger.log('   Falling back to sync processing...');
+      return await this.processMultiPageDocumentBySplitting(buffer, fileName, config, 0);
     }
   }
 

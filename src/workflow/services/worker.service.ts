@@ -256,8 +256,8 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Handling split-expense job: documentId=${jobData.documentId}`);
 
-    // Step 1: Call the document splitter handler
-    const splitResult = await this.documentSplitterHandler.handle(jobData);
+    // Step 1: Call the document splitter handler (pass full job for logging/progress)
+    const splitResult = await this.documentSplitterHandler.handle(job);
 
     if (splitResult.receipts.length === 0) {
       this.logger.warn(`No receipts found in document: ${jobData.documentId}`);
@@ -318,8 +318,8 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Handling process-receipt job: receiptId=${jobData.receiptId}, documentId=${jobData.sourceDocumentId}`);
 
-    // Pass ProcessReceiptJobData directly to handler
-    await this.receiptProcessorHandler.handle(jobData);
+    // Pass full job to handler for logging/progress
+    await this.receiptProcessorHandler.handle(job);
 
     return {
       receiptId: jobData.receiptId,
@@ -366,8 +366,8 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Aggregated expense results: documentId=${documentId}, status=${status}, success=${successCount}, failed=${failedCount}`);
 
-    // Call ResultAggregatorHandler to finalize and optionally send webhook
-    await this.resultAggregatorHandler.handle({ documentId });
+    // Call ResultAggregatorHandler to finalize and optionally send webhook (pass full job)
+    await this.resultAggregatorHandler.handle(job);
 
     return {
       status,

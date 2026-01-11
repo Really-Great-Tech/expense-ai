@@ -5,6 +5,7 @@ import { ProcessingStorageService } from './processing-storage.service';
 import { ValidationOrchestratorService } from './validation-orchestrator.service';
 import { S3StorageService } from '@/storage/s3-storage.service';
 import { type CompleteProcessingResult } from '@/common/schemas/expense-schemas';
+import { ServiceUnavailableError } from '@/common/errors/service-errors';
 
 @Injectable()
 export class ExpenseProcessingService {
@@ -136,8 +137,19 @@ export class ExpenseProcessingService {
       await this.storageService.saveResults(filename, result);
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(` PARALLEL expense processing failed for ${filename}:`, error);
+
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Processing', error, true);
+      }
+
       throw new Error(`Parallel expense processing failed: ${error.message}`);
     }
   }

@@ -76,20 +76,20 @@ async function bootstrap() {
         const sizeInBytes = parseInt(contentLength, 10);
         const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
 
-        // Reject requests exceeding 50MB
-        if (sizeInBytes > MAX_REQUEST_SIZE_BYTES) {
-          logger.error(`Request rejected: ${sizeInMB}MB exceeds ${MAX_REQUEST_SIZE_MB}MB limit on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
-          return res.status(413).json({
-            statusCode: 413,
-            message: `Request size (${sizeInMB}MB) exceeds maximum allowed size of ${MAX_REQUEST_SIZE_MB}MB`,
-            error: 'Payload Too Large',
-          });
-        }
+        // // Reject requests exceeding 50MB
+        // if (sizeInBytes > MAX_REQUEST_SIZE_BYTES) {
+        //   logger.error(`Request rejected: ${sizeInMB}MB exceeds ${MAX_REQUEST_SIZE_MB}MB limit on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
+        //   return res.status(413).json({
+        //     statusCode: 413,
+        //     message: `Request size (${sizeInMB}MB) exceeds maximum allowed size of ${MAX_REQUEST_SIZE_MB}MB`,
+        //     error: 'Payload Too Large',
+        //   });
+        // }
 
-        // Log large requests for monitoring (> 100KB)
-        if (sizeInBytes > 100 * 1024) {
-          logger.warn(`Large request detected: ${sizeInMB}MB on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
-        }
+        // // Log large requests for monitoring (> 100KB)
+        // if (sizeInBytes > 100 * 1024) {
+        //   logger.warn(`Large request detected: ${sizeInMB}MB on ${req.method} ${req.path}`, BOOTSTRAP_CONTEXT);
+        // }
       }
       next();
     });

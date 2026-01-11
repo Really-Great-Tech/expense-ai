@@ -175,6 +175,7 @@ const DEFAULT_MIME_TYPE = 'application/pdf';
 export class IngestService {
   private readonly logger = new Logger(IngestService.name);
   private readonly defaultAttempts: number;
+  private readonly backoffDelayMs: number;
 
   constructor(
     @InjectQueue(QUEUE_NAMES.EXPENSE_WORKFLOW)
@@ -184,7 +185,8 @@ export class IngestService {
     private readonly jobRecordRepository: JobRecordRepository,
     private readonly configService: ConfigService,
   ) {
-    this.defaultAttempts = this.configService.get<number>('WORKER_MAX_RETRY_ATTEMPTS', 3);
+    this.defaultAttempts = this.configService.get<number>('WORKER_MAX_RETRY_ATTEMPTS', 4);
+    this.backoffDelayMs = this.configService.get<number>('WORKER_BACKOFF_DELAY_MS', 35000);
   }
 
   /**
@@ -266,7 +268,7 @@ export class IngestService {
       const job = await this.workflowQueue.add(JOB_NAMES.SPLIT_EXPENSE, jobData, {
         jobId: `split-${documentId}`,
         attempts: this.defaultAttempts,
-        backoff: { type: 'exponential', delay: 5000 },
+        backoff: { type: 'exponential', delay: this.backoffDelayMs },
         removeOnComplete: { age: 86400, count: 1000 },
         removeOnFail: { age: 604800 },
       });

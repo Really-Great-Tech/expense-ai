@@ -65,6 +65,7 @@ export interface AppConfigType {
     concurrency: number;
     splitterConcurrency: number;
     maxRetryAttempts: number;
+    backoffDelayMs: number;
     jobTimeout: number;
   };
 
@@ -82,6 +83,13 @@ export interface AppConfigType {
 
   // Document processing
   documentReader: string;
+
+  // Textract Configuration
+  textract: {
+    useAsync: boolean;
+    tempBucket: string | undefined;
+    asyncTimeoutMs: number;
+  };
 
   // TypeORM
   typeorm: {
@@ -164,9 +172,10 @@ export default registerAs('app', (): AppConfigType => {
     // WORKERS
     // ==========================================================================
     workers: {
-      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '5', 10),
+      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '25', 10),
       splitterConcurrency: parseInt(process.env.SPLITTER_CONCURRENCY || '25', 10),
-      maxRetryAttempts: parseInt(process.env.MAX_RETRY_ATTEMPTS || '3', 10),
+      maxRetryAttempts: parseInt(process.env.WORKER_MAX_RETRY_ATTEMPTS || '4', 10),
+      backoffDelayMs: parseInt(process.env.WORKER_BACKOFF_DELAY_MS || '35000', 10), // 35s > circuit breaker recovery (30s)
       jobTimeout: parseInt(process.env.JOB_TIMEOUT || '300000', 10),
     },
 
@@ -190,6 +199,15 @@ export default registerAs('app', (): AppConfigType => {
     // DOCUMENT PROCESSING
     // ==========================================================================
     documentReader: process.env.DOCUMENT_READER || 'textract',
+
+    // ==========================================================================
+    // TEXTRACT CONFIGURATION
+    // ==========================================================================
+    textract: {
+      useAsync: process.env.TEXTRACT_USE_ASYNC === 'true',
+      tempBucket: process.env.TEXTRACT_TEMP_BUCKET || process.env.S3_BUCKET_NAME,
+      asyncTimeoutMs: parseInt(process.env.TEXTRACT_ASYNC_TIMEOUT_MS || '300000', 10), // 5 min default
+    },
 
     // ==========================================================================
     // TYPEORM

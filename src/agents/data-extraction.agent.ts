@@ -3,6 +3,7 @@ import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
+import { ServiceUnavailableError } from '../common/errors/service-errors';
 
 /**
  * Agent responsible for extracting structured data from expense documents
@@ -76,13 +77,23 @@ export class DataExtractionAgent extends BaseAgent {
       this.logger.debug(`Prompt metadata: ${JSON.stringify(this.getPromptMetadata())}`);
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
 
       this.logger.error(`Data extraction failed after ${duration}ms:`, error);
 
-      // Return minimal fallback result
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
+      // Return minimal fallback result for non-retryable errors
       return {
         vendor_name: 'extraction_failed',
         notes: `Error: ${error.message}`,

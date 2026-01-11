@@ -3,6 +3,7 @@ import { BedrockLlmService } from '@/services/bedrock/bedrock-llm';
 import { PageMarkdown, PageAnalysisResult, PageGroup, DocumentMetadata } from '@/expense-document/types/upload.types';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
+import { ServiceUnavailableError } from '@/common/errors/service-errors';
 import pLimit from '@/tools/p-limit/limit';
 
 /**
@@ -119,7 +120,17 @@ export class DocumentSplitterAgent extends BaseAgent {
     } catch (error: any) {
       this.logger.error('Invoice analysis failed:', error);
 
-      // Return fallback: treat all pages as single invoice
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
+      // Return fallback: treat all pages as single invoice (non-retryable errors)
       return {
         totalInvoices: 1,
         pageGroups: [
@@ -420,6 +431,17 @@ Respond with JSON only:
       };
     } catch (error: any) {
       this.logger.warn(`Vision comparison failed: ${error.message}, defaulting to same document`);
+
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
       return { sameDocument: true, confidence: 0.3, reasoning: 'Comparison failed' };
     }
   }
@@ -815,7 +837,17 @@ Extract the following information and respond with ONLY valid JSON:
     } catch (error: any) {
       this.logger.warn(`Metadata extraction failed for doc ${docIndex}: ${error.message}`);
 
-      // Return fallback metadata based on rule-based detection only
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Bedrock', error, true);
+      }
+
+      // Return fallback metadata based on rule-based detection only (non-retryable errors)
       return {
         documentType: 'Unknown',
         confidence: 0.3,

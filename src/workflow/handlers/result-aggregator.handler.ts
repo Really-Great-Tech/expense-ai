@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { ExpenseStatusService, DocumentResultsResponse } from '@/expense-result/services/expense-status.service';
 import { DocumentPersistenceService } from '@/expense-document/services/document-persistence.service';
+import { ProcessExpenseJobData } from '../interfaces/workflow-job-data.interface';
 
 /**
  * ResultAggregatorHandler
@@ -26,17 +28,27 @@ export class ResultAggregatorHandler {
     }
   }
 
-  async handle(data: { documentId: string }): Promise<DocumentResultsResponse> {
-    const { documentId } = data;
+  async handle(job: Job<ProcessExpenseJobData>): Promise<DocumentResultsResponse> {
+    const { documentId } = job.data;
     const startTime = Date.now();
 
+    await job.updateProgress(0);
+    await job.log(`Aggregating results for document: ${documentId}`);
     this.logger.log(`Aggregating results for document: ${documentId}`);
 
     try {
+      // Get child job results for logging
+      const childrenValues = await job.getChildrenValues();
+      const childCount = Object.keys(childrenValues).length;
+      await job.log(`Collected results from ${childCount} child receipt jobs`);
+      await job.updateProgress(30);
+
       // Use existing ExpenseStatusService for aggregation
       const results = await this.expenseStatusService.getDocumentResults(documentId);
+      await job.updateProgress(60);
 
       const processingTime = Date.now() - startTime;
+      await job.log(`Results aggregated: ${results.stats.completed}/${results.stats.total} receipts processed`);
       this.logger.log(`Results aggregated for document ${documentId} in ${processingTime}ms`, {
         overallStatus: results.overallStatus,
         stats: results.stats,
@@ -44,11 +56,17 @@ export class ResultAggregatorHandler {
 
       // Send webhook notification if configured
       if (this.webhookUrl) {
+        await job.log('Sending webhook notification...');
         await this.sendWebhook(results);
+        await job.log('Webhook notification sent');
       }
+
+      await job.updateProgress(100);
+      await job.log(`Document processing completed in ${processingTime}ms`);
 
       return results;
     } catch (error: any) {
+      await job.log(`Aggregation FAILED: ${error.message}`);
       this.logger.error(`Failed to aggregate results for document ${documentId}: ${error.message}`, error.stack);
       throw error;
     }

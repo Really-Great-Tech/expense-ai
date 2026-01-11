@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { SplitAnalysisResponse } from '../types/upload.types';
 import { ExpenseDocument, DocumentStatus } from '@/expense-document/entities/expense-document.entity';
@@ -13,14 +14,20 @@ import { SplitExpenseJobData } from '@/workflow/interfaces/workflow-job-data.int
 @Injectable()
 export class DocumentSplitterService {
   private readonly logger = new Logger(DocumentSplitterService.name);
+  private readonly defaultAttempts: number;
+  private readonly backoffDelayMs: number;
 
   constructor(
     private readonly duplicateDetectionService: DuplicateDetectionService,
     private readonly s3Storage: S3StorageService,
     private readonly persistenceService: DocumentPersistenceService,
+    private readonly configService: ConfigService,
     @InjectQueue(QUEUE_NAMES.EXPENSE_WORKFLOW)
     private readonly workflowQueue: Queue<SplitExpenseJobData>,
-  ) {}
+  ) {
+    this.defaultAttempts = this.configService.get<number>('WORKER_MAX_RETRY_ATTEMPTS', 4);
+    this.backoffDelayMs = this.configService.get<number>('WORKER_BACKOFF_DELAY_MS', 35000);
+  }
 
   /**
    * Analyze and split document asynchronously via background queue
@@ -113,8 +120,8 @@ export class DocumentSplitterService {
 
       await this.workflowQueue.add(JOB_NAMES.SPLIT_EXPENSE, jobData, {
         jobId: `split-${expenseDocument.id}`,
-        attempts: 2,
-        backoff: { type: 'exponential', delay: 5000 },
+        attempts: this.defaultAttempts,
+        backoff: { type: 'exponential', delay: this.backoffDelayMs },
         removeOnComplete: { age: 86400, count: 1000 },
         removeOnFail: { age: 604800 },
       });

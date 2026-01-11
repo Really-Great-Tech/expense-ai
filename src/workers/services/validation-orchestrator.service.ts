@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ExpenseComplianceUQLMValidator';
 import { ParallelExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ParallelExpenseComplianceUQLMValidator';
 import { ProcessingTiming } from './processing-metrics.service';
+import { ServiceUnavailableError } from '../../common/errors/service-errors';
 
 @Injectable()
 export class ValidationOrchestratorService {
@@ -115,7 +116,7 @@ export class ValidationOrchestratorService {
       this.logger.log(` LLM-as-judge validation completed in ${(llmValidationTime / 1000).toFixed(2)}s (${executionMode} mode)`);
 
       return validationResult;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(` LLM-as-judge validation failed: ${error.message}`);
       this.logger.error('Stack trace:', error.stack);
       timing.phase_timings.llm_validation_seconds = '0.0';
@@ -127,6 +128,18 @@ export class ValidationOrchestratorService {
         execution_mode: 'error',
         validator_type: this.complianceValidator instanceof ParallelExpenseComplianceUQLMValidator ? 'parallel' : 'sequential',
       };
+
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Validation', error, true);
+      }
+
+      // Return null for non-retryable errors (validation is optional)
       return null;
     }
   }
@@ -157,8 +170,19 @@ export class ValidationOrchestratorService {
 
       this.logger.log(` LLM-as-judge validation completed with confidence: ${validationResult?.overall_score || 0}`);
       return validationResult;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(' LLM-as-judge validation failed:', error);
+
+      // Re-throw ServiceUnavailableError to trigger job retry
+      if (error instanceof ServiceUnavailableError) {
+        throw error;
+      }
+
+      // Wrap other retryable errors
+      if (error.isRetryable || error.name === 'ServiceUnavailableError') {
+        throw new ServiceUnavailableError('Validation', error, true);
+      }
+
       throw new Error(`LLM validation failed: ${error.message}`);
     }
   }
