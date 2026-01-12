@@ -192,6 +192,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const jobName = job.name;
 
     this.logger.log(`Processing job: ${job.id} (${jobName}), attempt ${job.attemptsMade + 1}`);
+    job.log(`Processing job: ${job.id} (${jobName}), attempt ${job.attemptsMade + 1}`);
 
     try {
       // Wrap job processing with timeout protection
@@ -212,6 +213,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       this.logger.error(`Job failed: ${job.id} (${jobName}), error: ${error.message}`, error.stack);
+      job.log(`Job failed: ${job.id} (${jobName}), error: ${error.message}`);
       throw error;
     }
   }
@@ -227,7 +229,9 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         abortController.abort();
-        reject(new Error(`Job ${job.id} timed out after ${this.timeoutMs}ms`));
+        const timeoutError = new Error(`Job ${job.id} timed out after ${this.timeoutMs}ms`);
+        job.log(`Job ${job.id} timed out after ${this.timeoutMs}ms`);
+        reject(timeoutError);
       }, this.timeoutMs);
     });
 
@@ -255,12 +259,14 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const jobData = job.data;
 
     this.logger.log(`Handling split-expense job: documentId=${jobData.documentId}`);
+    job.log(`Handling split-expense job: documentId=${jobData.documentId}`);
 
     // Step 1: Call the document splitter handler
     const splitResult = await this.documentSplitterHandler.handle(jobData);
 
     if (splitResult.receipts.length === 0) {
       this.logger.warn(`No receipts found in document: ${jobData.documentId}`);
+      job.log(`No receipts found in document: ${jobData.documentId}`);
       return {
         status: 'split-success',
         receiptCount: 0,
@@ -287,6 +293,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         this.logger.debug(`Prepared receipt ${receipt.id} for processing (jobId: ${childJobId})`);
       } catch (error) {
         this.logger.error(`Failed to prepare receipt ${receipt.id}: ${error.message}`);
+        job.log(`Failed to prepare receipt ${receipt.id}: ${error.message}`);
         // Continue with other receipts - partial success is acceptable
       }
     }
@@ -302,6 +309,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.logger.log(`Created expense flow: documentId=${jobData.documentId}, receipts=${splitResult.receipts.length}`);
+    job.log(`Created expense flow: documentId=${jobData.documentId}, receipts=${splitResult.receipts.length}`);
 
     return {
       status: 'split-success',
@@ -317,6 +325,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const jobData = job.data;
 
     this.logger.log(`Handling process-receipt job: receiptId=${jobData.receiptId}, documentId=${jobData.sourceDocumentId}`);
+    job.log(`Handling process-receipt job: receiptId=${jobData.receiptId}, documentId=${jobData.sourceDocumentId}`);
 
     // Pass ProcessReceiptJobData directly to handler
     await this.receiptProcessorHandler.handle(jobData);
@@ -335,6 +344,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const { documentId } = job.data;
 
     this.logger.log(`Handling process-expense job: documentId=${documentId}`);
+    job.log(`Handling process-expense job: documentId=${documentId}`);
 
     // Get results from successful child jobs
     const childrenValues = await job.getChildrenValues();
@@ -365,6 +375,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.logger.log(`Aggregated expense results: documentId=${documentId}, status=${status}, success=${successCount}, failed=${failedCount}`);
+    job.log(`Aggregated expense results: documentId=${documentId}, status=${status}, success=${successCount}, failed=${failedCount}`);
 
     // Call ResultAggregatorHandler to finalize and optionally send webhook
     await this.resultAggregatorHandler.handle({ documentId });
