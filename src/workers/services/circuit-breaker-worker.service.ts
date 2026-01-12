@@ -162,6 +162,7 @@ export class CircuitBreakerWorkerService implements OnModuleInit, OnModuleDestro
     this.logger.log(
       `Processing circuit breaker request: breaker=${breakerName}, requestId=${requestId}`,
     );
+    job.log(`Processing circuit breaker request: breaker=${breakerName}, requestId=${requestId}`);
 
     try {
       // Get callback from registry
@@ -180,6 +181,7 @@ export class CircuitBreakerWorkerService implements OnModuleInit, OnModuleDestro
         this.logger.debug(
           `Skipping request ${requestId}: circuit ${breakerName} is still open, waiting for half-open state`,
         );
+        job.log(`Skipping request ${requestId}: circuit ${breakerName} is still open, waiting for half-open state`);
 
         callbackEntry.reject(new Error(`Circuit ${breakerName} is still open, request queued too early`));
         this.queueService.removeCallback(callbackId);
@@ -205,6 +207,7 @@ export class CircuitBreakerWorkerService implements OnModuleInit, OnModuleDestro
       this.logger.debug(
         `Successfully processed circuit breaker request: breaker=${breakerName}, requestId=${requestId}`,
       );
+      job.log(`Successfully processed circuit breaker request: breaker=${breakerName}, requestId=${requestId}`);
 
       return {
         requestId,
@@ -219,6 +222,7 @@ export class CircuitBreakerWorkerService implements OnModuleInit, OnModuleDestro
         `Failed to process circuit breaker request ${requestId}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
+      job.log(`Failed to process circuit breaker request ${requestId}: ${errorMessage}`);
 
       // Reject the promise for the original caller
       const callbackEntry = this.queueService.getCallback(callbackId);
