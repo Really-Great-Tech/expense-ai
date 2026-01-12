@@ -121,7 +121,7 @@ export class DocumentSplitterService {
       await this.workflowQueue.add(JOB_NAMES.SPLIT_EXPENSE, jobData, {
         jobId: `split-${expenseDocument.id}`,
         attempts: this.defaultAttempts,
-        backoff: { type: 'exponential', delay: this.backoffDelayMs },
+        backoff: { type: 'exponential', delay: this.backoffDelayMs, jitter: 0.5 },
         removeOnComplete: { age: 86400, count: 1000 },
         removeOnFail: { age: 604800 },
       });

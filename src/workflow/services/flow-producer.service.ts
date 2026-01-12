@@ -77,6 +77,7 @@ export class FlowProducerService implements OnModuleDestroy {
           backoff: {
             type: 'exponential' as const,
             delay: this.backoffDelayMs,
+            jitter: 0.5,
           },
           // Allow parent to run even if this child fails (for partial success handling)
           ignoreDependencyOnFailure: true,
@@ -111,6 +112,7 @@ export class FlowProducerService implements OnModuleDestroy {
         backoff: {
           type: 'exponential' as const,
           delay: this.backoffDelayMs,
+          jitter: 0.5,
         },
         removeOnComplete: {
           age: 86400,
