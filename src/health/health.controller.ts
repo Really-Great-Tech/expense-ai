@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { HealthCheck, HealthCheckService, HealthCheckResult } from '@nestjs/terminus';
 import { MySqlHealthIndicator } from './indicators/mysql.health';
 import { RedisHealthIndicator } from './indicators/redis.health';
@@ -57,5 +57,10 @@ export class HealthController {
   @HealthCheck()
   getCircuitBreakerStatus(): Promise<HealthCheckResult> {
     return this.health.check([() => this.circuitBreaker.getSummary('circuit-breakers')]);
+  }
+
+  @Post('redis/flush')
+  flushRedis(): Promise<{ success: boolean; message: string }> {
+    return this.redisHealth.flushAll();
   }
 }

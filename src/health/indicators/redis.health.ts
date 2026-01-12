@@ -42,6 +42,36 @@ export class RedisHealthIndicator extends HealthIndicator implements OnModuleDes
     }
   }
 
+  async flushAll(): Promise<{ success: boolean; message: string }> {
+    try {
+      const appConfig = this.configService.get<AppConfigType>('app');
+      const host = appConfig?.redis?.host || 'localhost';
+      const port = appConfig?.redis?.port || 6379;
+
+      if (!this.client) {
+        this.client = new Redis({
+          host,
+          port,
+          lazyConnect: true,
+          connectTimeout: 5000,
+        });
+      }
+
+      await this.client.flushall();
+
+      return {
+        success: true,
+        message: `Redis flushed successfully at ${host}:${port}`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: `Redis flush failed: ${errorMessage}`,
+      };
+    }
+  }
+
   async onModuleDestroy() {
     if (this.client) {
       await this.client.quit();

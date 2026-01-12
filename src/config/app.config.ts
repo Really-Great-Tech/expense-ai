@@ -172,8 +172,8 @@ export default registerAs('app', (): AppConfigType => {
     // WORKERS
     // ==========================================================================
     workers: {
-      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '25', 10),
-      splitterConcurrency: parseInt(process.env.SPLITTER_CONCURRENCY || '25', 10),
+      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '50', 10),
+      splitterConcurrency: parseInt(process.env.SPLITTER_CONCURRENCY || '50', 10),
       maxRetryAttempts: parseInt(process.env.WORKER_MAX_RETRY_ATTEMPTS || '4', 10),
       backoffDelayMs: parseInt(process.env.WORKER_BACKOFF_DELAY_MS || '35000', 10), // 35s > circuit breaker recovery (30s)
       jobTimeout: parseInt(process.env.JOB_TIMEOUT || '300000', 10),
@@ -204,8 +204,8 @@ export default registerAs('app', (): AppConfigType => {
     // TEXTRACT CONFIGURATION
     // ==========================================================================
     textract: {
-      useAsync: process.env.TEXTRACT_USE_ASYNC === 'true',
-      tempBucket: process.env.TEXTRACT_TEMP_BUCKET || process.env.S3_BUCKET_NAME,
+      useAsync: true,
+      tempBucket: process.env.S3_BUCKET_NAME,
       asyncTimeoutMs: parseInt(process.env.TEXTRACT_ASYNC_TIMEOUT_MS || '300000', 10), // 5 min default
     },
 
