@@ -84,8 +84,8 @@ export class DocumentSplitterAgent extends BaseAgent {
 
     // Configure parallel processing concurrency
     this.config = {
-      boundaryDetectionConcurrency: config?.boundaryDetectionConcurrency ?? 15,
-      metadataExtractionConcurrency: config?.metadataExtractionConcurrency ?? 8,
+      boundaryDetectionConcurrency: config?.boundaryDetectionConcurrency ?? 2,
+      metadataExtractionConcurrency: config?.metadataExtractionConcurrency ?? 2,
     };
     this.boundaryLimiter = pLimit(this.config.boundaryDetectionConcurrency);
     this.metadataLimiter = pLimit(this.config.metadataExtractionConcurrency);

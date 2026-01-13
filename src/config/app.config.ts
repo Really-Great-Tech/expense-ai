@@ -175,7 +175,7 @@ export default registerAs('app', (): AppConfigType => {
       concurrency: parseInt(process.env.WORKER_CONCURRENCY || '100', 10),
       splitterConcurrency: parseInt(process.env.SPLITTER_CONCURRENCY || '100', 10),
       maxRetryAttempts: parseInt(process.env.WORKER_MAX_RETRY_ATTEMPTS || '6', 10),
-      backoffDelayMs: parseInt(process.env.WORKER_BACKOFF_DELAY_MS || '60000', 10), // 35s > circuit breaker recovery (30s)
+      backoffDelayMs: parseInt(process.env.WORKER_BACKOFF_DELAY_MS || '60000', 10), // 60s > circuit breaker recovery (30s)
       jobTimeout: parseInt(process.env.JOB_TIMEOUT || '300000', 10),
     },
 

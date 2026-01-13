@@ -135,10 +135,10 @@ export class ParallelExpenseComplianceUQLMValidator {
   private loadParallelConfig(): ParallelValidationConfig {
     return {
       parallelValidationEnabled: (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') === 'true',
-      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6', 10),
+      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '2', 10),
       judgeConcurrency: parseInt(process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3', 10),
-      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '5', 10),
-      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10', 10),
+      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '2', 10),
+      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '2', 10),
       fallbackToSequential: true,
       minSuccessfulDimensions: 3, // Minimum 50% success rate
     };
