@@ -6,6 +6,8 @@ import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
 import { ServiceUnavailableError } from '../common/errors/service-errors';
 import { filterComplianceByIcp, getFilterStats } from './utils/compliance-filter.util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -46,6 +48,16 @@ export class IssueDetectionAgent extends BaseAgent {
 
       // Filter compliance data to include only rules for the specified ICP
       const filteredComplianceData = filterComplianceByIcp(complianceData, icp);
+
+      // Save filtered compliance data to disk for debugging
+      const debugDir = path.join(process.cwd(), 'filtered-rules-debug');
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true });
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const debugFileName = `filtered-compliance-${country}-${icp}-${timestamp}.json`;
+      const debugFilePath = path.join(debugDir, debugFileName);
+      fs.writeFileSync(debugFilePath, JSON.stringify(filteredComplianceData, null, 2), 'utf-8');
 
       // Log filtering statistics
       const stats = getFilterStats(complianceData, filteredComplianceData);
