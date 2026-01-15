@@ -5,6 +5,7 @@ import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
 import { ServiceUnavailableError } from '../common/errors/service-errors';
+import { filterComplianceByIcp, getFilterStats } from './utils/compliance-filter.util';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -43,13 +44,23 @@ export class IssueDetectionAgent extends BaseAgent {
     try {
       this.logger.log(`Starting compliance analysis for ${country}/${icp}`);
 
-      // Get the prompt and compile with variables
+      // Filter compliance data to include only rules for the specified ICP
+      const filteredComplianceData = filterComplianceByIcp(complianceData, icp);
+
+      // Log filtering statistics
+      const stats = getFilterStats(complianceData, filteredComplianceData);
+      this.logger.debug(`Filtered compliance rules for ICP '${icp}':`, stats);
+      this.logger.debug(`Receipt Standards: ${stats.receiptStandards.original} → ${stats.receiptStandards.filtered}`);
+      this.logger.debug(`Gross-Up Policies: ${stats.grossUpPolicies.original} → ${stats.grossUpPolicies.filtered}`);
+      this.logger.debug(`Additional Info Policies: ${stats.additionalInfoPolicies.original} → ${stats.additionalInfoPolicies.filtered}`);
+
+      // Get the prompt and compile with variables using filtered compliance data
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
         expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,
-        complianceData: JSON.stringify(complianceData, null, 2),
+        complianceData: JSON.stringify(filteredComplianceData, null, 2),
         extractedData: JSON.stringify(extractedData, null, 2),
       });
 
