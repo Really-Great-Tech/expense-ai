@@ -184,7 +184,7 @@ export class BedrockLlmService {
       if (error.name === 'ValidationException' || error.name === 'AccessDeniedException') {
         BedrockLlmService.logger.error(
           `Bedrock config error (permanent, not retryable): ${error.name} - ${error.message}. ` +
-            'Check: 1) Model enabled in AWS console, 2) IAM permissions, 3) Region availability',
+          'Check: 1) Model enabled in AWS console, 2) IAM permissions, 3) Region availability',
         );
         throw error;
       }

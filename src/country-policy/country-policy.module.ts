@@ -8,6 +8,7 @@ import { CountryPolicyService } from './services/country-policy.service';
 import { CountryValidationService } from './services/country-validation.service';
 import { IcpValidationService } from './services/icp-validation.service';
 import { PolicyPersistenceService } from './services/policy-persistence.service';
+import { PolicySeedWriterService } from './services/policy-seed-writer.service';
 import { PolicyUploadOrchestrator } from './services/policy-upload-orchestrator.service';
 import { PolicyUploadController } from './controllers/policy-upload.controller';
 import { PolicyExtractionAgent } from '../agents/policy-extraction.agent';
@@ -28,8 +29,9 @@ import { StorageModule } from '../storage/storage.module';
     CountryPolicyService,
     CountryValidationService,
     IcpValidationService,
-    // New policy upload services
+    // Policy upload pipeline services
     PolicyPersistenceService,
+    PolicySeedWriterService,
     PolicyUploadOrchestrator,
     PolicyExtractionAgent,
     // Validators
@@ -45,4 +47,4 @@ import { StorageModule } from '../storage/storage.module';
     TypeOrmModule,
   ],
 })
-export class CountryPolicyModule {}
+export class CountryPolicyModule { }
