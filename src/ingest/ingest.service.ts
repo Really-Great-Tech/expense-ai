@@ -269,8 +269,8 @@ export class IngestService {
         jobId: `split-${documentId}`,
         attempts: this.defaultAttempts,
         backoff: { type: 'exponential', delay: this.backoffDelayMs, jitter: 0.5 },
-        removeOnComplete: { age: 86400, count: 1000 },
-        removeOnFail: { age: 604800 },
+        removeOnComplete: { age: 3600, count: 500 }, // 1 hour (reduced from 24 hours)
+        removeOnFail: { age: 604800, count: 200 }, // 7 days
       });
 
       // Step 4: Create job record for audit trail

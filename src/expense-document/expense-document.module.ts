@@ -45,8 +45,8 @@ import { QUEUE_NAMES } from '../common/constants/queue.constants';
     BullModule.registerQueue({
       name: QUEUE_NAMES.EXPENSE_WORKFLOW,
       defaultJobOptions: {
-        removeOnComplete: { age: 86400, count: 1000 },
-        removeOnFail: { age: 604800 },
+        removeOnComplete: { age: 3600, count: 500 }, // 1 hour (reduced from 24 hours)
+        removeOnFail: { age: 604800, count: 200 }, // 7 days
         attempts: 2,
         backoff: {
           type: 'exponential',
