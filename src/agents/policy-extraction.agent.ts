@@ -1,55 +1,43 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ExtractedPolicyData } from '../country-policy/interfaces/policy-types.interface';
+import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { TextractApiService } from '../services/textract/textract-reader';
+import { AGENT_PROFILES } from './config/models.config';
+import {
+  ExtractedPolicyDataSchema,
+} from '../common/schemas/country-policy-schemas';
+import {
+  POLICY_EXTRACTION_SYSTEM_PROMPT,
+  createPolicyExtractionUserPrompt,
+} from '../country-policy/prompts/policy-extraction.prompt';
 
 /**
  * ============================================================================
- * POLICY EXTRACTION AGENT - LLM PLACEHOLDER
+ * POLICY EXTRACTION AGENT
  * ============================================================================
  * 
- * This agent is responsible for extracting structured policy data from
- * uploaded documents (PDF, DOCX, Excel).
+ * Extracts structured policy data from uploaded documents using:
+ * 1. Textract for PDF/image text extraction
+ * 2. Claude Sonnet for intelligent policy parsing
+ * 3. Zod for response validation
  * 
- * TODO: LLM TEAM - Implement the actual extraction logic
- * 
- * Required Output Format:
- * {
- *   receiptStandards: [
- *     {
- *       required_data: string,
- *       travel_non_travel_both: string,
- *       expense_type: string,
- *       icp_name: string,
- *       mandatory_optional: string,
- *       rule: string
- *     }
- *   ],
- *   compliancePoliciesGrossUpRelated: [
- *     {
- *       travel_non_travel_both: string,
- *       expense_type: string,
- *       icp_name: string,
- *       gross_up: boolean,
- *       gross_up_rule: string
- *     }
- *   ],
- *   compliancePoliciesAdditionalInfoRelated: [
- *     {
- *       travel_non_travel_both: string,
- *       expense_type: string,
- *       icp_name: string,
- *       additional_info_required: boolean,
- *       additional_info_rule: string
- *     }
- *   ]
- * }
- * 
- * Reference: See src/seeds/country-policies.seed.ts for examples
+ * Output matches the structure in country-policies.seed.ts
  * ============================================================================
  */
 
 @Injectable()
 export class PolicyExtractionAgent {
   private readonly logger = new Logger(PolicyExtractionAgent.name);
+  private readonly llm: BedrockLlmService;
+  private readonly textract: TextractApiService;
+
+  constructor() {
+    // Initialize LLM with policy extraction profile (Claude Sonnet)
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.POLICY_EXTRACTION });
+    this.textract = new TextractApiService();
+
+    this.logger.log(`PolicyExtractionAgent initialized with profile: ${AGENT_PROFILES.POLICY_EXTRACTION}`);
+  }
 
   /**
    * Extract policy data from uploaded document
@@ -57,180 +45,175 @@ export class PolicyExtractionAgent {
    * @param fileBuffer - The file content as buffer
    * @param fileName - Original file name
    * @param mimeType - MIME type of the file
+   * @param countryName - Country name for context
    * @returns Extracted policy structure matching COUNTRY_POLICY_SEEDS format
-   * 
-   * ============================================================================
-   * TODO: LLM TEAM - IMPLEMENT THIS METHOD
-   * ============================================================================
-   * 
-   * Implementation Steps:
-   * 1. Convert file to text/structured data based on type:
-   *    - PDF: Use PDF parser (e.g., pdf-parse, pdfjs-dist)
-   *    - DOCX: Use DOCX parser (e.g., mammoth, docx)
-   *    - Excel: Use Excel parser (e.g., xlsx, exceljs)
-   * 
-   * 2. Use LLM to extract structured data:
-   *    - Send document text to LLM (e.g., AWS Bedrock, OpenAI)
-   *    - Use structured prompts to extract:
-   *      - Receipt standards (mandatory fields, rules)
-   *      - Gross-up policies (tax treatment)
-   *      - Additional info requirements (documentation needs)
-   * 
-   * 3. Validate extracted structure:
-   *    - Ensure all required fields are present
-   *    - Validate data types (boolean, string, etc.)
-   *    - Check for consistency
-   * 
-   * 4. Return formatted data matching the interface
-   * 
-   * Example LLM Prompt Structure:
-   * ```
-   * Extract expense policy information from this document.
-   * 
-   * Required Output Format:
-   * - Receipt Standards: What data must receipts contain?
-   * - Gross-up Policies: Which expenses are tax-free or need gross-up?
-   * - Additional Requirements: What extra documentation is needed?
-   * 
-   * For each rule, specify:
-   * - Expense type (Hotel, Flight, Restaurant, etc.)
-   * - Travel vs Non-travel applicability
-   * - ICP/Company name
-   * - Specific rule text
-   * ```
-   * ============================================================================
    */
   async extractPolicyFromDocument(
     fileBuffer: Buffer,
     fileName: string,
     mimeType: string,
+    countryName: string = 'Unknown',
   ): Promise<ExtractedPolicyData> {
-    
+
     this.logger.log('============================================');
-    this.logger.log('🤖 [PLACEHOLDER] LLM EXTRACTION STARTING');
+    this.logger.log('🤖 POLICY EXTRACTION STARTING');
     this.logger.log('============================================');
     this.logger.log(`📄 File: ${fileName}`);
     this.logger.log(`📋 Type: ${mimeType}`);
     this.logger.log(`💾 Size: ${fileBuffer.length} bytes`);
+    this.logger.log(`🌍 Country: ${countryName}`);
     this.logger.log('');
-    this.logger.warn('⚠️  TODO: LLM team must implement actual extraction logic');
+
+    // Step 1: Extract text from document
+    this.logger.log('📝 Step 1: Extracting text from document...');
+    const documentText = await this.extractTextFromDocument(fileBuffer, fileName, mimeType);
+
+    if (!documentText || documentText.trim().length < 100) {
+      throw new Error(`Failed to extract sufficient text from document. Extracted ${documentText?.length || 0} characters.`);
+    }
+
+    this.logger.log(`   ✓ Extracted ${documentText.length} characters`);
     this.logger.log('');
 
-    // Simulate processing time
-    await this.simulateProcessing(2000);
+    // Step 2: Call LLM to extract structured policies
+    this.logger.log('🧠 Step 2: Calling LLM for policy extraction...');
+    const startTime = Date.now();
 
-    // TODO: LLM TEAM - Replace this mock data with actual extraction
-    const mockData: ExtractedPolicyData = {
-      receiptStandards: [
-        {
-          required_data: 'Supplier business name',
-          travel_non_travel_both: 'Both',
-          expense_type: 'Hotel, Flight, Restaurant, Office supplies',
-          icp_name: 'Extracted from document',
-          mandatory_optional: 'Mandatory',
-          rule: '[PLACEHOLDER] Document must show supplier business name - extracted by LLM'
-        },
-        {
-          required_data: 'Transaction date',
-          travel_non_travel_both: 'Both',
-          expense_type: 'Hotel, Flight, Restaurant, Office supplies',
-          icp_name: 'Extracted from document',
-          mandatory_optional: 'Mandatory',
-          rule: '[PLACEHOLDER] Document must show transaction date - extracted by LLM'
-        },
-        {
-          required_data: 'Total amount',
-          travel_non_travel_both: 'Both',
-          expense_type: 'Hotel, Flight, Restaurant, Office supplies',
-          icp_name: 'Extracted from document',
-          mandatory_optional: 'Mandatory',
-          rule: '[PLACEHOLDER] Document must show total amount - extracted by LLM'
-        }
+    const response = await this.llm.chat({
+      messages: [
+        { role: 'system', content: POLICY_EXTRACTION_SYSTEM_PROMPT },
+        { role: 'user', content: createPolicyExtractionUserPrompt(documentText, countryName) },
       ],
-      compliancePoliciesGrossUpRelated: [
-        {
-          travel_non_travel_both: 'Non-Travel',
-          expense_type: 'Office supplies, Equipment',
-          icp_name: 'Extracted from document',
-          gross_up: false,
-          gross_up_rule: '[PLACEHOLDER] Business expenses are tax exempt - extracted by LLM'
-        },
-        {
-          travel_non_travel_both: 'Travel',
-          expense_type: 'Restaurant',
-          icp_name: 'Extracted from document',
-          gross_up: true,
-          gross_up_rule: '[PLACEHOLDER] Per diem rates apply, excess taxable - extracted by LLM'
-        }
-      ],
-      compliancePoliciesAdditionalInfoRelated: [
-        {
-          travel_non_travel_both: 'Travel',
-          expense_type: 'Mileage',
-          icp_name: 'Extracted from document',
-          additional_info_required: true,
-          additional_info_rule: '[PLACEHOLDER] Mileage log required with route details - extracted by LLM'
-        },
-        {
-          travel_non_travel_both: 'Both',
-          expense_type: 'All expenses',
-          icp_name: 'Extracted from document',
-          additional_info_required: true,
-          additional_info_rule: '[PLACEHOLDER] Manager approval required before submission - extracted by LLM'
-        }
-      ]
-    };
+    });
 
-    this.logger.log('✅ Extraction complete (MOCK DATA)');
-    this.logger.log(`   - Receipt standards: ${mockData.receiptStandards.length}`);
-    this.logger.log(`   - Gross-up policies: ${mockData.compliancePoliciesGrossUpRelated.length}`);
-    this.logger.log(`   - Additional info policies: ${mockData.compliancePoliciesAdditionalInfoRelated.length}`);
+    const llmDuration = Date.now() - startTime;
+    this.logger.log(`   ✓ LLM response received in ${llmDuration}ms`);
+    this.logger.log(`   ✓ Tokens: ${response.usage?.input_tokens || 'N/A'} input, ${response.usage?.output_tokens || 'N/A'} output`);
+    this.logger.log('');
+
+    // Step 3: Parse JSON response
+    this.logger.log('📊 Step 3: Parsing LLM response...');
+    const extractedData = this.parseJsonResponse(response.message.content);
+    this.logger.log('');
+
+    // Step 4: Validate with Zod schema
+    this.logger.log('✅ Step 4: Validating extracted data...');
+    const validatedData = this.validateExtractedData(extractedData);
+
+    this.logger.log(`   - Receipt standards: ${validatedData.receiptStandards.length}`);
+    this.logger.log(`   - Gross-up policies: ${validatedData.compliancePoliciesGrossUpRelated.length}`);
+    this.logger.log(`   - Additional info policies: ${validatedData.compliancePoliciesAdditionalInfoRelated.length}`);
+    this.logger.log('============================================');
+    this.logger.log('✅ POLICY EXTRACTION COMPLETE');
     this.logger.log('============================================');
     this.logger.log('');
 
-    return mockData;
+    return validatedData;
   }
 
   /**
-   * Validate extracted policy data structure
-   * Ensures all required fields are present and properly formatted
+   * Extract text content from various document formats
    */
-  validateExtractedData(data: ExtractedPolicyData): boolean {
+  private async extractTextFromDocument(
+    fileBuffer: Buffer,
+    fileName: string,
+    mimeType: string,
+  ): Promise<string> {
+    // PDF and images: Use Textract
+    if (mimeType === 'application/pdf' || mimeType.startsWith('image/')) {
+      const result = await this.textract.parseDocumentFromBuffer(fileBuffer, fileName, {
+        extractTables: true,
+      });
+
+      if (!result.success) {
+        throw new Error(`Textract extraction failed: ${(result as any).error || 'Unknown error'}`);
+      }
+
+      return result.data || '';
+    }
+
+    // DOCX: Use mammoth (dynamic import to avoid startup dependency)
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mammoth = require('mammoth');
+        const mammothResult = await mammoth.extractRawText({ buffer: fileBuffer });
+        return mammothResult.value;
+      } catch (error) {
+        this.logger.error('mammoth import failed - install with: npm install mammoth');
+        throw new Error('DOCX parsing not available. Install mammoth package.');
+      }
+    }
+
+    // XLSX/CSV: Use xlsx library (dynamic import)
+    if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType === 'application/vnd.ms-excel' ||
+      mimeType === 'text/csv'
+    ) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const XLSX = require('xlsx');
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+
+        // Convert all sheets to text
+        const textParts: string[] = [];
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const text = XLSX.utils.sheet_to_txt(sheet);
+          textParts.push(`--- Sheet: ${sheetName} ---\n${text}`);
+        }
+
+        return textParts.join('\n\n');
+      } catch (error) {
+        this.logger.error('xlsx import failed - install with: npm install xlsx');
+        throw new Error('Excel/CSV parsing not available. Install xlsx package.');
+      }
+    }
+
+    throw new Error(`Unsupported file type: ${mimeType}`);
+  }
+
+  /**
+   * Parse JSON from LLM response, handling potential markdown code blocks
+   */
+  private parseJsonResponse(content: string): unknown {
+    let jsonString = content.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonString.startsWith('```json')) {
+      jsonString = jsonString.slice(7);
+    } else if (jsonString.startsWith('```')) {
+      jsonString = jsonString.slice(3);
+    }
+
+    if (jsonString.endsWith('```')) {
+      jsonString = jsonString.slice(0, -3);
+    }
+
+    jsonString = jsonString.trim();
+
     try {
-      // Check that arrays exist
-      if (!Array.isArray(data.receiptStandards)) return false;
-      if (!Array.isArray(data.compliancePoliciesGrossUpRelated)) return false;
-      if (!Array.isArray(data.compliancePoliciesAdditionalInfoRelated)) return false;
-
-      // Validate receipt standards
-      for (const standard of data.receiptStandards) {
-        if (!standard.required_data || !standard.rule) return false;
-      }
-
-      // Validate gross-up policies
-      for (const policy of data.compliancePoliciesGrossUpRelated) {
-        if (typeof policy.gross_up !== 'boolean') return false;
-        if (!policy.gross_up_rule) return false;
-      }
-
-      // Validate additional info policies
-      for (const policy of data.compliancePoliciesAdditionalInfoRelated) {
-        if (typeof policy.additional_info_required !== 'boolean') return false;
-        if (!policy.additional_info_rule) return false;
-      }
-
-      return true;
+      return JSON.parse(jsonString);
     } catch (error) {
-      this.logger.error('Validation failed:', error);
-      return false;
+      this.logger.error('Failed to parse LLM response as JSON');
+      this.logger.error(`Response preview: ${jsonString.substring(0, 500)}...`);
+      throw new Error('LLM response is not valid JSON. Please retry.');
     }
   }
 
   /**
-   * Helper method to simulate processing time
-   * Remove this when implementing actual LLM extraction
+   * Validate extracted policy data using Zod schema
    */
-  private async simulateProcessing(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  validateExtractedData(data: unknown): ExtractedPolicyData {
+    const result = ExtractedPolicyDataSchema.safeParse(data);
+
+    if (!result.success) {
+      const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      this.logger.error('Validation errors:', errors);
+      throw new Error(`Extracted data validation failed:\n${errors.join('\n')}`);
+    }
+
+    return result.data as ExtractedPolicyData;
   }
 }

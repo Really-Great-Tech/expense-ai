@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PolicyExtractionAgent } from '../../agents/policy-extraction.agent';
 import { PolicyPersistenceService } from './policy-persistence.service';
+import { PolicySeedWriterService } from './policy-seed-writer.service';
 import { S3StorageService } from '../../storage/s3-storage.service';
 import {
   PolicyUploadResponse,
@@ -13,12 +14,13 @@ import {
  * POLICY UPLOAD ORCHESTRATOR SERVICE
  * ============================================================================
  * 
- * This service orchestrates the complete policy upload pipeline:
- * 1. Store uploaded files (S3 or local)
- * 2. Extract policy data via LLM (placeholder)
+ * Orchestrates the complete policy upload pipeline:
+ * 1. Store uploaded files to S3
+ * 2. Extract policy data via LLM
  * 3. Validate extracted data
- * 4. Save to database (placeholder)
- * 5. Return comprehensive results
+ * 4. Save to database
+ * 5. Update seed file (optional)
+ * 6. Return comprehensive results
  * 
  * Handles multiple files uploaded simultaneously.
  * ============================================================================
@@ -31,8 +33,9 @@ export class PolicyUploadOrchestrator {
   constructor(
     private readonly llmAgent: PolicyExtractionAgent,
     private readonly persistenceService: PolicyPersistenceService,
+    private readonly seedWriterService: PolicySeedWriterService,
     private readonly storageService: S3StorageService,
-  ) {}
+  ) { }
 
   /**
    * Process multiple uploaded policy documents
@@ -41,6 +44,7 @@ export class PolicyUploadOrchestrator {
    * @param countryName - Country name for these policies
    * @param countryCode - Optional country code
    * @param description - Optional description
+   * @param updateSeedFile - Whether to update the seed file (default: true)
    * @returns Complete upload result with per-file status
    */
   async processMultipleFiles(
@@ -48,13 +52,15 @@ export class PolicyUploadOrchestrator {
     countryName: string,
     countryCode?: string,
     description?: string,
+    updateSeedFile: boolean = true,
   ): Promise<PolicyUploadResponse> {
-    
+
     this.logger.log('========================================================');
     this.logger.log('🚀 POLICY UPLOAD PIPELINE STARTING');
     this.logger.log('========================================================');
     this.logger.log(`🌍 Country: ${countryName}`);
     this.logger.log(`📁 Files to process: ${files.length}`);
+    this.logger.log(`📝 Update seed file: ${updateSeedFile}`);
     this.logger.log('');
 
     const results: FileProcessingResult[] = [];
@@ -66,7 +72,7 @@ export class PolicyUploadOrchestrator {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       this.logger.log(`📄 Processing file ${i + 1}/${files.length}: ${file.originalname}`);
-      
+
       try {
         // Process single file through the pipeline
         const result = await this.processSingleFile(
@@ -74,10 +80,11 @@ export class PolicyUploadOrchestrator {
           countryName,
           countryCode,
           description,
+          updateSeedFile,
         );
 
         results.push(result);
-        
+
         if (result.status === 'success') {
           successCount++;
           lastSuccessfulVersionId = result.versionId;
@@ -90,9 +97,9 @@ export class PolicyUploadOrchestrator {
       } catch (error) {
         failureCount++;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+
         this.logger.error(`❌ File ${i + 1} processing failed:`, error);
-        
+
         results.push({
           fileName: file.originalname,
           status: 'failed',
@@ -124,39 +131,36 @@ export class PolicyUploadOrchestrator {
   /**
    * Process a single policy document
    * 
-   * 1. LLM extracts policy from file.buffer (file content in memory)
-   * 2. Validate extracted data
-   * 3. Save to database
-   * 4. Store file to S3 for tracking
+   * 1. Store file to S3
+   * 2. LLM extracts policy from file content
+   * 3. Validate extracted data
+   * 4. Save to database
+   * 5. Update seed file (optional)
    */
   private async processSingleFile(
     file: Express.Multer.File,
     countryName: string,
     countryCode?: string,
     description?: string,
+    updateSeedFile: boolean = true,
   ): Promise<FileProcessingResult> {
-    
-    // STEP 1: LLM extracts policy from file content
-    // The file.buffer contains the actual file content (PDF, DOCX, etc.)
+
+    // STEP 1: Store file to S3
+    const fileInfo = await this.storeFile(file);
+
+    // STEP 2: LLM extracts policy from file content
     const extractedData = await this.llmAgent.extractPolicyFromDocument(
-      file.buffer,        // ← File content here
+      file.buffer,
       file.originalname,
       file.mimetype,
+      countryName,
     );
 
-    // STEP 2: Validate extracted data
-    const isValid = this.llmAgent.validateExtractedData(extractedData);
-    if (!isValid) {
-      throw new BadRequestException('Extracted policy data validation failed');
-    }
-    
+    // STEP 3: Validate extracted data (already validated by Zod in agent)
     const isValidForDb = this.persistenceService.validatePolicyData(extractedData);
     if (!isValidForDb) {
       throw new BadRequestException('Policy data does not meet database requirements');
     }
-
-    // STEP 3: Store file to S3 (for datasource tracking)
-    const fileInfo = await this.storeFile(file);
 
     // STEP 4: Save to database
     const saveResult = await this.persistenceService.savePolicyToDatabase(
@@ -165,6 +169,16 @@ export class PolicyUploadOrchestrator {
       fileInfo,
       countryCode,
     );
+
+    // STEP 5: Update seed file (optional)
+    if (updateSeedFile) {
+      try {
+        await this.seedWriterService.addCountryToSeedFile(countryName, extractedData);
+      } catch (error) {
+        // Log but don't fail - database is the source of truth
+        this.logger.warn(`Seed file update failed (non-critical): ${error}`);
+      }
+    }
 
     return {
       fileName: file.originalname,
@@ -175,54 +189,54 @@ export class PolicyUploadOrchestrator {
   }
 
   /**
-   * Store uploaded file to S3 or local storage
-   * 
-   * TODO: Implement actual file storage
-   * - For production: Upload to S3
-   * - For development: Save to local filesystem
-   * - Store file metadata
+   * Store uploaded file to S3
    */
   private async storeFile(file: Express.Multer.File): Promise<StoredFileInfo> {
     // Determine file type from MIME type
-    let fileType: 'pdf' | 'docx' | 'xlsx' | 'csv' = 'pdf';
-    
-    if (file.mimetype.includes('pdf')) {
-      fileType = 'pdf';
-    } else if (file.mimetype.includes('wordprocessingml')) {
+    // Must match Datasource entity enum: ['url', 'file', 'csv', 'docx']
+    let fileType: 'file' | 'docx' | 'csv' = 'file';
+
+    if (file.mimetype.includes('wordprocessingml')) {
       fileType = 'docx';
-    } else if (file.mimetype.includes('spreadsheetml') || file.mimetype.includes('excel')) {
-      fileType = 'xlsx';
     } else if (file.mimetype.includes('csv')) {
       fileType = 'csv';
+    } else {
+      // PDF, Excel, and images all map to 'file'
+      fileType = 'file';
     }
 
-    // TODO: Implement actual storage
-    // For S3: await this.storageService.uploadFile(file.buffer, fileName);
-    // For local: await fs.writeFile(path, file.buffer);
-    
-    const mockFilePath = `/mock-storage/country-policies/${Date.now()}-${file.originalname}`;
+    // Generate S3 key
+    const timestamp = Date.now();
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const s3Key = `country-policies/${timestamp}-${safeFileName}`;
 
-    this.logger.log(`     [PLACEHOLDER] File would be stored at: ${mockFilePath}`);
+    try {
+      // Upload to S3 - returns the s3Key as string
+      const uploadedKey = await this.storageService.uploadFile(file.buffer, s3Key);
 
-    return {
-      fileName: file.originalname,
-      fileType,
-      filePath: mockFilePath,
-      fileSize: file.size,
-      uploadedAt: new Date(),
-      rawContent: undefined, // Could store extracted text here
-    };
-  }
+      this.logger.log(`   ✓ File stored to S3: ${uploadedKey}`);
 
-  /**
-   * Count total rules across all policy types
-   */
-  private countTotalRules(data: any): number {
-    return (
-      (data.receiptStandards?.length || 0) +
-      (data.compliancePoliciesGrossUpRelated?.length || 0) +
-      (data.compliancePoliciesAdditionalInfoRelated?.length || 0)
-    );
+      return {
+        fileName: file.originalname,
+        fileType,
+        filePath: uploadedKey,
+        fileSize: file.size,
+        uploadedAt: new Date(),
+        rawContent: undefined,
+      };
+    } catch (error) {
+      // Fallback to local storage indication if S3 fails
+      this.logger.warn(`   ⚠️ S3 upload failed, using local reference: ${error}`);
+
+      return {
+        fileName: file.originalname,
+        fileType,
+        filePath: `local://uploads/${s3Key}`,
+        fileSize: file.size,
+        uploadedAt: new Date(),
+        rawContent: undefined,
+      };
+    }
   }
 
   /**
@@ -235,6 +249,8 @@ export class PolicyUploadOrchestrator {
       'application/vnd.ms-excel', // XLS
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // XLSX
       'text/csv',
+      'image/png',
+      'image/jpeg',
     ];
 
     return allowedTypes.includes(mimeType);

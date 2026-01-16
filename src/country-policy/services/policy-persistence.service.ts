@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Country } from '../entities/country.entity';
 import { Version } from '../entities/version.entity';
 import { CountryPolicy } from '../entities/country-policy.entity';
@@ -13,24 +13,18 @@ import {
 
 /**
  * ============================================================================
- * POLICY PERSISTENCE SERVICE - DATABASE PLACEHOLDER
+ * POLICY PERSISTENCE SERVICE
  * ============================================================================
  * 
- * This service replicates the EXACT logic from the migration file:
+ * Saves extracted policy data to database using the same logic as:
  * src/migrations/1736504407000-SeedCountryPolicies.ts
  * 
- * It saves policy data to all necessary database tables in the correct order.
- * 
- * TODO: IMPLEMENT DATABASE OPERATIONS
- * 
- * Tables to insert (in order):
- * 1. countries         → Store country info
- * 2. versions          → Create version record
- * 3. country_policies  → Store policy rules as JSON
- * 4. datasources       → Track source documents
- * 5. UPDATE countries  → Set active_policy_id
- * 
- * Reference: src/migrations/1736504407000-SeedCountryPolicies.ts
+ * Uses transactions to ensure atomic operations across:
+ * 1. countries (insert/update)
+ * 2. versions (insert)
+ * 3. country_policies (insert with JSON rules)
+ * 4. datasources (insert for file tracking)
+ * 5. countries (update active_policy_id)
  * ============================================================================
  */
 
@@ -47,72 +41,11 @@ export class PolicyPersistenceService {
     private readonly policyRepo: Repository<CountryPolicy>,
     @InjectRepository(Datasource)
     private readonly datasourceRepo: Repository<Datasource>,
-  ) {}
+    private readonly dataSource: DataSource,
+  ) { }
 
   /**
-   * Save extracted policy to database
-   * Mirrors the exact flow from the migration file
-   * 
-   * @param countryName - Country name (e.g., "Germany")
-   * @param countryCode - Optional country code (e.g., "DE")
-   * @param policyData - Extracted policy data from LLM
-   * @param fileInfo - Information about the uploaded source file
-   * @returns Result with IDs of created records
-   * 
-   * ============================================================================
-   * TODO: IMPLEMENT DATABASE OPERATIONS
-   * ============================================================================
-   * 
-   * Follow this exact sequence (from migration):
-   * 
-   * 1. Generate Version ID
-   *    const versionId = this.generateVersionId(); // v2025.01.14
-   * 
-   * 2. Insert/Update Country
-   *    const country = await this.countryRepo.save({
-   *      name: countryName,
-   *      code: countryCode || this.getCountryCode(countryName),
-   *      active: true
-   *    });
-   * 
-   * 3. Create Version
-   *    const version = await this.versionRepo.save({
-   *      countryId: country.id,
-   *      versionId: versionId
-   *    });
-   * 
-   * 4. Transform Policy Data to Rules
-   *    const rules = {
-   *      receiptStandards: policyData.receiptStandards,
-   *      compliancePoliciesGrossUpRelated: policyData.compliancePoliciesGrossUpRelated,
-   *      compliancePoliciesAdditionalInfoRelated: policyData.compliancePoliciesAdditionalInfoRelated
-   *    };
-   * 
-   * 5. Insert Country Policy
-   *    const policy = await this.policyRepo.save({
-   *      rules: JSON.stringify(rules),
-   *      versionCountryId: country.id,
-   *      versionId: versionId
-   *    });
-   * 
-   * 6. Insert Datasource (Track Source File)
-   *    const datasource = await this.datasourceRepo.save({
-   *      type: fileInfo.fileType,
-   *      source: fileInfo.filePath,
-   *      content: fileInfo.rawContent,
-   *      countryId: country.id,
-   *      versionCountryId: country.id,
-   *      versionId: versionId
-   *    });
-   * 
-   * 7. Update Country with Active Policy
-   *    await this.countryRepo.update(country.id, {
-   *      activePolicyId: policy.id
-   *    });
-   * 
-   * IMPORTANT: Use database transactions for atomicity!
-   * If any step fails, roll back all changes.
-   * ============================================================================
+   * Save extracted policy to database within a transaction
    */
   async savePolicyToDatabase(
     countryName: string,
@@ -120,9 +53,9 @@ export class PolicyPersistenceService {
     fileInfo: StoredFileInfo,
     countryCode?: string,
   ): Promise<PolicySaveResult> {
-    
+
     this.logger.log('============================================');
-    this.logger.log('💾 [PLACEHOLDER] DATABASE SAVE STARTING');
+    this.logger.log('💾 DATABASE SAVE STARTING');
     this.logger.log('============================================');
     this.logger.log(`🌍 Country: ${countryName}`);
     this.logger.log(`🏷️  Code: ${countryCode || 'auto-derived'}`);
@@ -131,50 +64,107 @@ export class PolicyPersistenceService {
     this.logger.log(`💰 Gross-up policies: ${policyData.compliancePoliciesGrossUpRelated.length}`);
     this.logger.log(`📝 Additional info policies: ${policyData.compliancePoliciesAdditionalInfoRelated.length}`);
     this.logger.log('');
-    this.logger.warn('⚠️  TODO: Implement actual database operations');
-    this.logger.log('');
 
-    // Simulate database save
-    await this.simulateSave(1500);
-
-    // Generate version ID (same as migration)
+    // Generate version ID (same format as migration)
     const versionId = this.generateVersionId();
     const derivedCode = countryCode || this.getCountryCode(countryName);
 
-    // TODO: Implement actual database operations here
-    // Follow the sequence documented in the method comment above
+    // Run all operations in a transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // MOCK IMPLEMENTATION - Replace with actual DB operations
-    const mockResult: PolicySaveResult = {
-      success: true,
-      countryId: `mock-country-${Date.now()}`,
-      countryCode: derivedCode,
-      versionId: versionId,
-      policyId: `mock-policy-${Date.now()}`,
-      datasourceId: `mock-datasource-${Date.now()}`,
-    };
+    try {
+      // Step 1: Check if country exists
+      let country = await queryRunner.manager.findOne(Country, {
+        where: { name: countryName },
+      });
 
-    this.logger.log('✅ Database save complete (MOCK)');
-    this.logger.log(`   - Country ID: ${mockResult.countryId}`);
-    this.logger.log(`   - Version ID: ${mockResult.versionId}`);
-    this.logger.log(`   - Policy ID: ${mockResult.policyId}`);
-    this.logger.log(`   - Datasource ID: ${mockResult.datasourceId}`);
-    this.logger.log('');
-    this.logger.log('📊 Tables that should be updated:');
-    this.logger.log('   1. ✓ countries (INSERT/UPDATE)');
-    this.logger.log('   2. ✓ versions (INSERT)');
-    this.logger.log('   3. ✓ country_policies (INSERT with JSON rules)');
-    this.logger.log('   4. ✓ datasources (INSERT with file info)');
-    this.logger.log('   5. ✓ countries (UPDATE active_policy_id)');
-    this.logger.log('============================================');
-    this.logger.log('');
+      if (country) {
+        this.logger.log(`   ✓ Found existing country: ${countryName} (ID: ${country.id})`);
+      } else {
+        // Create new country
+        country = queryRunner.manager.create(Country, {
+          name: countryName,
+          code: derivedCode,
+          active: true,
+        });
+        country = await queryRunner.manager.save(Country, country);
+        this.logger.log(`   ✓ Created new country: ${countryName} (ID: ${country.id})`);
+      }
 
-    return mockResult;
+      // Step 2: Create version
+      const version = queryRunner.manager.create(Version, {
+        countryId: country.id,
+        versionId: versionId,
+      });
+      await queryRunner.manager.save(Version, version);
+      this.logger.log(`   ✓ Created version: ${versionId}`);
+
+      // Step 3: Create policy with JSON rules
+      // TypeORM handles JSON serialization automatically for JSON columns
+      const rules = {
+        receiptStandards: policyData.receiptStandards,
+        compliancePoliciesGrossUpRelated: policyData.compliancePoliciesGrossUpRelated,
+        compliancePoliciesAdditionalInfoRelated: policyData.compliancePoliciesAdditionalInfoRelated,
+      };
+
+      const policy = queryRunner.manager.create(CountryPolicy, {
+        rules: rules as any, // TypeORM JSON column handles serialization
+        versionCountryId: country.id,
+        versionId: versionId,
+      });
+      const savedPolicy = await queryRunner.manager.save(CountryPolicy, policy);
+      this.logger.log(`   ✓ Created policy (ID: ${savedPolicy.id})`);
+
+      // Step 4: Create datasource record
+      const datasource = queryRunner.manager.create(Datasource, {
+        type: fileInfo.fileType,
+        source: fileInfo.filePath,
+        content: fileInfo.rawContent || null,
+        countryId: country.id,
+        versionCountryId: country.id,
+        versionId: versionId,
+      });
+      const savedDatasource = await queryRunner.manager.save(Datasource, datasource);
+      this.logger.log(`   ✓ Created datasource (ID: ${savedDatasource.id})`);
+
+      // Step 5: Update country's active policy
+      await queryRunner.manager.update(Country, country.id, {
+        activePolicyId: savedPolicy.id,
+      });
+      this.logger.log(`   ✓ Updated country active policy`);
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+
+      this.logger.log('');
+      this.logger.log('============================================');
+      this.logger.log('✅ DATABASE SAVE COMPLETE');
+      this.logger.log('============================================');
+      this.logger.log('');
+
+      return {
+        success: true,
+        countryId: country.id,
+        countryCode: derivedCode,
+        versionId: versionId,
+        policyId: savedPolicy.id,
+        datasourceId: savedDatasource.id,
+      };
+
+    } catch (error) {
+      // Rollback on any error
+      await queryRunner.rollbackTransaction();
+      this.logger.error('❌ Database save failed, transaction rolled back:', error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**
    * Generate version ID in format: v{year}.{month}.{day}
-   * Same logic as migration
    */
   private generateVersionId(): string {
     const now = new Date();
@@ -185,8 +175,7 @@ export class PolicyPersistenceService {
   }
 
   /**
-   * Get country code from country name
-   * Same mapping as migration
+   * Get country code from country name (ISO 3166-1 alpha-2)
    */
   private getCountryCode(countryName: string): string {
     const codes: Record<string, string> = {
@@ -205,26 +194,28 @@ export class PolicyPersistenceService {
       Taiwan: 'TW',
       Thailand: 'TH',
       Vietnam: 'VN',
+      Netherlands: 'NL',
+      'United Kingdom': 'GB',
+      'United States': 'US',
+      Singapore: 'SG',
+      Malaysia: 'MY',
+      Philippines: 'PH',
+      India: 'IN',
+      Australia: 'AU',
+      'New Zealand': 'NZ',
+      Canada: 'CA',
+      Mexico: 'MX',
+      Brazil: 'BR',
     };
 
     return codes[countryName] || countryName.substring(0, 2).toUpperCase();
   }
 
   /**
-   * Helper method to simulate database save time
-   * Remove this when implementing actual database operations
-   */
-  private async simulateSave(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
    * Validate policy data before saving
-   * Ensures data integrity
    */
   validatePolicyData(policyData: ExtractedPolicyData): boolean {
     try {
-      // Check arrays exist
       if (!Array.isArray(policyData.receiptStandards)) {
         this.logger.error('Invalid policy data: receiptStandards must be an array');
         return false;
@@ -238,8 +229,7 @@ export class PolicyPersistenceService {
         return false;
       }
 
-      // Check that at least one policy exists
-      const totalPolicies = 
+      const totalPolicies =
         policyData.receiptStandards.length +
         policyData.compliancePoliciesGrossUpRelated.length +
         policyData.compliancePoliciesAdditionalInfoRelated.length;

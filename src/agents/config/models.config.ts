@@ -23,6 +23,9 @@ export const AGENT_PROFILES = {
 
   // Document splitting
   DOCUMENT_SPLITTER: 'SONNET_4' as ProfileKey,
+
+  // Country policy extraction from documents
+  POLICY_EXTRACTION: 'SONNET_4' as ProfileKey,
 } as const;
 
 // Judge panel profile

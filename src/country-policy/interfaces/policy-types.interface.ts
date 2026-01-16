@@ -43,7 +43,7 @@ export interface ExtractedPolicyData {
  */
 export interface StoredFileInfo {
   fileName: string;
-  fileType: 'pdf' | 'docx' | 'xlsx' | 'csv';
+  fileType: 'url' | 'file' | 'csv' | 'docx'; // Must match Datasource entity enum
   filePath: string; // S3 path or local path
   fileSize: number;
   uploadedAt: Date;
