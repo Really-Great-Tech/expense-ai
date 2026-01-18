@@ -4,8 +4,12 @@ import { BedrockLlmService, ChatMessage } from './bedrock-llm';
 // Mock app.config to provide test profile ARNs
 jest.mock('../../config/app.config', () => ({
   getAppConfig: jest.fn(() => ({
-    aws: { region: 'eu-west-1' },
     bedrock: {
+      aws: {
+        region: 'eu-west-1',
+        accessKeyId: 'test-access-key',
+        secretAccessKey: 'test-secret-key',
+      },
       novaMicroArn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-micro-test',
       novaProArn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/nova-pro-test',
       sonnet4Arn: 'arn:aws:bedrock:eu-west-1:123456789:application-inference-profile/sonnet-4-test',

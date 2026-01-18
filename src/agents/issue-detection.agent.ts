@@ -5,6 +5,9 @@ import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
 import { ServiceUnavailableError } from '../common/errors/service-errors';
+import { filterComplianceByIcp, getFilterStats } from './utils/compliance-filter.util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -43,13 +46,39 @@ export class IssueDetectionAgent extends BaseAgent {
     try {
       this.logger.log(`Starting compliance analysis for ${country}/${icp}`);
 
-      // Get the prompt and compile with variables
+      // Filter compliance data to include only rules for the specified ICP
+      const filteredComplianceData = filterComplianceByIcp(complianceData, icp);
+
+      // Save filtered compliance data to disk for debugging (development only)
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          const debugDir = path.join(process.cwd(), 'filtered-rules-debug');
+          if (!fs.existsSync(debugDir)) {
+            fs.mkdirSync(debugDir, { recursive: true });
+          }
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const debugFileName = `filtered-compliance-${country}-${icp}-${timestamp}.json`;
+          const debugFilePath = path.join(debugDir, debugFileName);
+          fs.writeFileSync(debugFilePath, JSON.stringify(filteredComplianceData, null, 2), 'utf-8');
+        } catch (error) {
+          this.logger.warn(`Failed to write debug file: ${error.message}`);
+        }
+      }
+
+      // Log filtering statistics
+      const stats = getFilterStats(complianceData, filteredComplianceData);
+      this.logger.log(`Filtered compliance rules for ICP '${icp}':`, stats);
+      this.logger.log(`Receipt Standards: ${stats.receiptStandards.original} → ${stats.receiptStandards.filtered}`);
+      this.logger.log(`Gross-Up Policies: ${stats.grossUpPolicies.original} → ${stats.grossUpPolicies.filtered}`);
+      this.logger.log(`Additional Info Policies: ${stats.additionalInfoPolicies.original} → ${stats.additionalInfoPolicies.filtered}`);
+
+      // Get the prompt and compile with variables using filtered compliance data
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
         expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,
-        complianceData: JSON.stringify(complianceData, null, 2),
+        complianceData: JSON.stringify(filteredComplianceData, null, 2),
         extractedData: JSON.stringify(extractedData, null, 2),
       });
 

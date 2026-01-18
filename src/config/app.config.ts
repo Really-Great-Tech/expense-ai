@@ -54,6 +54,11 @@ export interface AppConfigType {
 
   // Bedrock/LLM - Application Inference Profiles
   bedrock: {
+    aws: {
+      accessKeyId: string;
+      secretAccessKey: string;
+      region: string;
+    };
     novaMicroArn: string;
     novaProArn: string;
     sonnet4Arn: string;
@@ -162,6 +167,11 @@ export default registerAs('app', (): AppConfigType => {
     // BEDROCK/LLM - Application Inference Profile ARNs
     // ==========================================================================
     bedrock: {
+      aws: {
+        accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY || '',
+        region: process.env.BEDROCK_AWS_REGION || 'eu-west-1',
+      },
       novaMicroArn: process.env.BEDROCK_NOVA_MICRO_ARN || '',
       novaProArn: process.env.BEDROCK_NOVA_PRO_ARN || '',
       sonnet4Arn: process.env.BEDROCK_SONNET_4_ARN || '',
