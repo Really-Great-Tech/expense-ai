@@ -62,7 +62,7 @@ export interface ChatWithVisionOptions {
 interface ProfileDefinition {
   name: string;
   supportsVision: boolean;
-  arnKey: 'novaMicroArn' | 'novaProArn' | 'sonnet4Arn' | 'sonnet45Arn';
+  arnKey: keyof AppConfigType['bedrock'];
 }
 
 export class BedrockLlmService {
@@ -111,20 +111,13 @@ export class BedrockLlmService {
 
   private static getClient(): BedrockRuntimeClient {
     const config = this.getConfig();
-    const region = config.bedrock.aws.region;
+    const region = config.aws.region;
 
     if (!this.clientCache.has(region)) {
-      // SECURITY WARNING: AWS credentials are configured below
-      // NEVER log these credentials or the config object containing them
-      // See: .github/PAPAYA_RULES_FOR_DEVELOPMENT.md - Rule 1: Secrets and Credentials
       this.clientCache.set(
         region,
         new BedrockRuntimeClient({
           region,
-          credentials: {
-            accessKeyId: config.bedrock.aws.accessKeyId,
-            secretAccessKey: config.bedrock.aws.secretAccessKey,
-          },
           maxAttempts: 4,
           retryMode: 'adaptive',
         }),
@@ -240,7 +233,10 @@ export class BedrockLlmService {
     ];
 
     return this.chat({
-      messages: [...(options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : []), { role: 'user' as const, content }],
+      messages: [
+        ...(options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : []),
+        { role: 'user' as const, content },
+      ],
     });
   }
 
