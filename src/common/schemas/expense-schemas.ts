@@ -36,10 +36,12 @@ export const CitationInfoSchema = z.object({
   match_type: z.string(),
 });
 
-export const FieldCitationSchema = z.object({
-  field_citation: CitationInfoSchema.nullable(),
-  value_citation: CitationInfoSchema.nullable(),
-}).strict();
+export const FieldCitationSchema = z
+  .object({
+    field_citation: CitationInfoSchema.nullable(),
+    value_citation: CitationInfoSchema.nullable(),
+  })
+  .strict();
 
 export const CitationMetadataSchema = z.object({
   total_fields_analyzed: z.number(),
@@ -48,10 +50,12 @@ export const CitationMetadataSchema = z.object({
   average_confidence: z.number(),
 });
 
-export const CitationResultSchema = z.object({
-  citations: z.record(z.string(), FieldCitationSchema),
-  metadata: CitationMetadataSchema,
-}).strict();
+export const CitationResultSchema = z
+  .object({
+    citations: z.record(z.string(), FieldCitationSchema),
+    metadata: CitationMetadataSchema,
+  })
+  .strict();
 
 // Issue Detection Schemas
 export const ComplianceIssueSchema = z.object({
@@ -82,6 +86,14 @@ export const TechnicalDetailsSchema = z.object({
 export const IssueDetectionResultSchema = z.object({
   validation_result: ValidationResultSchema,
   technical_details: TechnicalDetailsSchema,
+  validation_metadata: z
+    .object({
+      total_issues_flagged: z.number(),
+      valid_issues: z.number(),
+      hallucinated_issues_filtered: z.number(),
+      hallucination_rate: z.number(),
+    })
+    .optional(),
 });
 
 // Data Extraction Schema - Flexible schema to handle any extracted data
@@ -131,32 +143,38 @@ export const ProcessingTimingSchema = z.object({
     citation_generation_seconds: z.string(),
     llm_validation_seconds: z.string().optional(),
   }),
-  validation: z.object({
-    total_time_seconds: z.string(),
-    phase_sum_seconds: z.string().optional(),
-    expected_parallel_time_seconds: z.string().optional(),
-    sequential_sum_seconds: z.string().optional(),
-    difference_seconds: z.string(),
-    is_consistent: z.boolean(),
-    tolerance_seconds: z.string(),
-    processing_mode: z.string().optional(),
-    time_saved_seconds: z.string().optional(),
-    error: z.string().optional(),
-  }).optional(),
-  performance_metrics: z.object({
-    parallel_group_1_seconds: z.string(),
-    parallel_group_2_seconds: z.string(),
-    total_parallel_time_seconds: z.string(),
-    estimated_sequential_time_seconds: z.string(),
-    estimated_speedup_factor: z.string(),
-  }).optional(),
+  validation: z
+    .object({
+      total_time_seconds: z.string(),
+      phase_sum_seconds: z.string().optional(),
+      expected_parallel_time_seconds: z.string().optional(),
+      sequential_sum_seconds: z.string().optional(),
+      difference_seconds: z.string(),
+      is_consistent: z.boolean(),
+      tolerance_seconds: z.string(),
+      processing_mode: z.string().optional(),
+      time_saved_seconds: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
+  performance_metrics: z
+    .object({
+      parallel_group_1_seconds: z.string(),
+      parallel_group_2_seconds: z.string(),
+      total_parallel_time_seconds: z.string(),
+      estimated_sequential_time_seconds: z.string(),
+      estimated_speedup_factor: z.string(),
+    })
+    .optional(),
   agent_performance: z.object({
-    markdown_extraction: z.object({
-      start_time: z.string(),
-      end_time: z.string(),
-      duration_minutes: z.string(),
-      document_reader_used: z.string(),
-    }).optional(),
+    markdown_extraction: z
+      .object({
+        start_time: z.string(),
+        end_time: z.string(),
+        duration_minutes: z.string(),
+        document_reader_used: z.string(),
+      })
+      .optional(),
     image_quality_assessment: z.object({
       start_time: z.string(),
       end_time: z.string(),
@@ -187,14 +205,16 @@ export const ProcessingTimingSchema = z.object({
       duration_minutes: z.string(),
       model_used: z.string(),
     }),
-    llm_validation: z.object({
-      start_time: z.string(),
-      end_time: z.string(),
-      duration_seconds: z.string(),
-      overall_confidence: z.number().optional(),
-      reliability_level: z.string().optional(),
-      error: z.string().optional(),
-    }).optional(),
+    llm_validation: z
+      .object({
+        start_time: z.string(),
+        end_time: z.string(),
+        duration_seconds: z.string(),
+        overall_confidence: z.number().optional(),
+        reliability_level: z.string().optional(),
+        error: z.string().optional(),
+      })
+      .optional(),
   }),
 });
 
@@ -214,18 +234,22 @@ export const CompleteProcessingResultSchema = z.object({
     icp: z.string(),
     processed_at: z.string(),
     llm_validation_enabled: z.boolean().optional(), // NEW: LLM validation flag
-    llm_validation: z.object({
-      enabled: z.boolean(),
-      processing_time_ms: z.number(),
-      results_saved_separately: z.boolean(),
-    }).optional(),
-    optimization: z.object({
-      parallel_processing: z.boolean(),
-      parallel_group_1_duration_seconds: z.string(),
-      parallel_group_2_duration_seconds: z.string(),
-      estimated_sequential_time_seconds: z.string(),
-      actual_parallel_time_seconds: z.string(),
-    }).optional(),
+    llm_validation: z
+      .object({
+        enabled: z.boolean(),
+        processing_time_ms: z.number(),
+        results_saved_separately: z.boolean(),
+      })
+      .optional(),
+    optimization: z
+      .object({
+        parallel_processing: z.boolean(),
+        parallel_group_1_duration_seconds: z.string(),
+        parallel_group_2_duration_seconds: z.string(),
+        estimated_sequential_time_seconds: z.string(),
+        actual_parallel_time_seconds: z.string(),
+      })
+      .optional(),
   }),
 });
 
