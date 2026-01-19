@@ -4036,7 +4036,7 @@ export const COUNTRY_POLICY_SEEDS: Record<string, {
       }
     ]
   },
-  "UAE": {
+  "United Arab Emirates (UAE)": {
     "receiptStandards": [
       {
         "required_data": "Supplier business name",
@@ -4101,6 +4101,2108 @@ export const COUNTRY_POLICY_SEEDS: Record<string, {
         "icp_name": "Local Employer (specific entity name not provided in document)",
         "additional_info_required": true,
         "additional_info_rule": "Manager approval required before expense reimbursement can be processed"
+      }
+    ]
+  },
+  "Netherlands": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar, Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show supplier business name"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar, Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show transaction date"
+      },
+      {
+        "required_data": "Total amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar, Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show total amount"
+      },
+      {
+        "required_data": "Worker name as recipient",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "Extersus",
+        "mandatory_optional": "Mandatory",
+        "rule": "Hotels, flights, car rentals etc. should be addressed under the worker's name, not the end client"
+      },
+      {
+        "required_data": "Worker name as recipient",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "The worker's name should be on the receipt or invoice. The exception to this is where it is not possible to use the worker's name e.g. on flight tickets or hotel bookings"
+      },
+      {
+        "required_data": "Worker name as recipient",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "The exception to this is where it is not possible to use Global People's name e.g. on flight tickets or hotel bookings, on which you should put your own name and address"
+      },
+      {
+        "required_data": "ICP company name on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Professional services, Other",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoices should, where possible, state company name \"Parakar Netherlands B.V.\""
+      },
+      {
+        "required_data": "ICP company name and address on invoice for amounts exceeding €450",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Professional services, Other",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoices with a total amount exceeding €450.00 needs to be addressed to \"Parakar Netherlands B.V.\" and Address \"Sophiastraat 42, 4811EM Breda\""
+      },
+      {
+        "required_data": "ICP company name, address, ID, and VAT ID on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services, Other",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Global People's name, and address and tax number should appear on the receipt or invoice (including IT equipment). Global People NL BV, Schiphol Bouleward 359, 1118BJ, ID 863204612, VAT ID: NL863204612B01, Schiphol, Netherlands"
+      },
+      {
+        "required_data": "Full name of each participant",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Restaurant, Entertainment",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "Every claim should include: Full name of each participant"
+      },
+      {
+        "required_data": "Full company name of each participant",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Restaurant, Entertainment",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "Every claim should include: full company name of each participant, even if they are colleagues"
+      },
+      {
+        "required_data": "ICP company name and address on device invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Telecommunications, Equipment",
+        "icp_name": "Parakar",
+        "mandatory_optional": "Mandatory",
+        "rule": "If a worker purchases a phone for business usage: the invoice for the device must be in name of and addressed to Parakar Netherlands BV"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Other",
+        "icp_name": "Global People",
+        "gross_up": true,
+        "gross_up_rule": "All expenses that has been approved by the client as a business expense will be NET to the employee (grossed up) if not tax free"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People",
+        "gross_up": true,
+        "gross_up_rule": "Parking is refundable, but it will be taxed. KM reimbursement will be tax-free, but fuel expenses will be taxed"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Train, Other",
+        "icp_name": "Global People, Parakar",
+        "gross_up": true,
+        "gross_up_rule": "At your discretion, it is possible to increase the daily per diem rate. However, any per diem amount exceeding the set maximum according to the per diem will be taxed and subject to Social Contributions"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Telecommunications",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Reimbursement of an ov-chip card are considered as a taxable salary"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "When the employer allows, it is possible to use a company car for private occasions, like holiday trips, groceries or family visits. When a worker drives over 500 private kilometres on an annual basis, the private use of a company car will be considered as 'salary of kind'"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Entertainment",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Costs for lunch, dinner, drinks etc. with business relations, business gifts, conference visits, study trips and other forms of representation are limited deductible. A deduction of up to 80% of such expenses"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Mileage reimbursement rates: EUR 0.19 per kilometer (when using private car, parking is covered in this rate)"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Company car fixed monthly allowance formula: Total amount of KM return * 214 days (or part time equivalent) * EUR 0.23/12 = EUR"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Other",
+        "icp_name": "local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Domestic business trips per diem rates: Small expenses during the day: €5.03, Small expenses in the evening: €10.07, Breakfast: €11.27, Lunch: €10.19, Dinner: €25.59, Accommodation: €114.12"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar, Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar, Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Medical, Other",
+        "icp_name": "Extersus, Parakar",
+        "additional_info_required": true,
+        "additional_info_rule": "Online copies of invoices and receipts are sufficient, a hard copy is not required"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Train, Other",
+        "icp_name": "Parakar",
+        "additional_info_required": true,
+        "additional_info_rule": "Business Trip – submit a separate report for each trip. Domestic Travel - will reimburse based on actual receipt, not taking into account per diem policy"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Please add the attached car details (model, year, etc.) and a map describing the route"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Parakar",
+        "additional_info_required": true,
+        "additional_info_rule": "When using a private car, the receipt for car parking is not allowed to be reimbursed since this is covered in the EUR 0,19 mileage allowance. When using a company car, receipts for car parking can be claimed through the expense claim system"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Train, Other",
+        "icp_name": "Global People, Parakar",
+        "additional_info_required": true,
+        "additional_info_rule": "Invoices are needed to be provided when using the per diem method (including hotels)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Train, Other",
+        "icp_name": "Extersus",
+        "additional_info_required": false,
+        "additional_info_rule": "Invoices are not needed to be provided when using the per diem method please note though that the tax free reimbursement is based under the type of expenses that the employee had to make (e.g. if it is not necessary to stay in a hotel during the business travel, the reimbursement regarding the lodging should not be included in the tax free per diem)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Train, Other",
+        "icp_name": "Global People, Parakar",
+        "additional_info_required": true,
+        "additional_info_rule": "You can not set a lower per diem rate than assigned by the Government"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Training and educational expenses – please include manager confirmation for the expense"
+      }
+    ]
+  },
+  "South Africa": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment",
+        "icp_name": "local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted showing the supplier/vendor business name"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment",
+        "icp_name": "local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt must show the date when the transaction occurred"
+      },
+      {
+        "required_data": "Total amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment",
+        "icp_name": "local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt must clearly display the total amount paid"
+      },
+      {
+        "required_data": "Employee name and details",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment",
+        "icp_name": "local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "The workers name and details should appear on invoices, not the Local Employers details"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt e.g. laptops, office supplies, relevant software etc. Tax exemptions will only be applied providing sufficient proof is shared e.g. tax receipts, invoices."
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Telecommunications, Professional services, Medical, Utilities, Training, Entertainment",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Other expenses are subject to varying tax rules. Tax exemptions will only be applied providing sufficient proof is shared e.g. tax receipts, invoices."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Expenses for transportation are subject to taxation. Mileage can be reimbursed either by: (1) providing a fixed monthly taxable transport allowance, or (2) reimbursing workers against receipts as a taxable reimbursement. Both methods will be reimbursed according to The South African Revenue Service (SARS) 80/20 tax ruling, under which 80% of the travel expense is taxed in line with the SARS Fixed Cost Table. The percentage is reduced to 20% if the employer is satisfied that at least 80% of the use of the motor vehicle for the tax year will be for business purposes. Travel between the workers home and place of work cannot be claimed and is regarded as private travel. Workers can calculate their claim based on: (a) the table of costs supplied by SARS each year (Fixed Cost Table based on vehicle value brackets), or (b) actual costs by keeping an accurate record of all expenses during the year, including fuel, maintenance, lease and insurance costs. The fixed cost must be reduced on a pro-rata basis if the vehicle is used for business purposes for less than a full year. No fuel cost may be claimed if the employee has not borne the full cost of fuel, and no maintenance cost may be claimed if the employee has not borne the full cost of maintaining the vehicle (e.g. if covered by a maintenance plan). Where an allowance or advance is based on the actual distance travelled by the employee for business purposes, no tax is payable up to the rate published on the SARS website, regardless of the value of the vehicle. Under section 8(1)(b)(iii), where no other compensation (other than parking or toll fees) is payable, the rate is 418 cents per kilometre. However, this alternative is not available if other compensation (other than parking or toll fees) is received from the employer in respect of the vehicle. Employees may also be entitled to claim a reduction on the fringe benefit for business mileage travelled in motor vehicles provided by an employer (Company Cars), using the same minimum information requirements."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant",
+        "icp_name": "local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Domestic business trips have set per diem rates which cover meals and incidentals. International business trips can also use per diem rates based on Government limits set for each destination. It is also possible to cover business trips through the regular expense method as long as valid receipts are provided. Without supporting documents any applicable tax exemption cannot be applied and the expense reimbursement will be treated instead as a taxable allowance. When using the per diem method, workers are given a set subsistence allowance tax free based on Government limits. At your discretion, it is possible to increase the daily per diem rate. However, any per diem amount exceeding the set maximum will be taxed and subject to Social Contributions. It is permitted to offer a lower per diem rate than the one set by SARS."
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Telecommunications, Training, Professional services, Medical, Utilities, Entertainment, Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "In order to claim a deduction, workers must record their vehicle's odometer reading on 1 March each year (the first day of the tax year for individuals), and again on the last day of February the following year (the last day of the tax year for individuals). The difference between the closing and opening readings will give the total kilometres travelled for the year. Without these readings, you cannot claim a tax deduction."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "It is now compulsory to keep a logbook of all your travel in which you record your business kilometres if you want to claim a travel deduction. The logbook must contain the following minimum information relating to your business travel: Date of travel, Kilometres travelled, Travel details (where to and reason for the trip). Without a logbook, you will not be able to claim a travel deduction."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "The logbook must record: Date of each business trip (mandatory), Total Business Kilometres travelled per trip (mandatory), Business Travel Details showing From location (origin) - mandatory, To location (destination) - mandatory, and Reason for the trip (mandatory). Opening Kilometres (vehicle odometer at start) and Closing Kilometres (vehicle odometer at end) are optional fields."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "If using the actual cost method instead of SARS Fixed Cost Table, the logbook should include: Actual Fuel & Oil Costs in Rand (R) - optional, and Actual Repairs & Maintenance Costs in Rand (R) - optional."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers must retain their logbook for a period of at least five years as they may be required to submit it to SARS for verification of their claim. SARS accepts electronic logbooks as an acceptable record."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Where the worker has used more than one vehicle in the tax year, a separate logbook must be kept for each vehicle that was used"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "The actual distance travelled during a tax year, and the distance travelled for business purposes substantiated by a log book, are used to determine the costs which may be claimed against a travelling allowance"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "The current rates for domestic business trips per diem can be found in SARS documentation (external reference required)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "The current per diem rates for international business trips can be found in SARS documentation for Foreign destinations (external reference required)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "The cost tables which apply to the tax year from 1 March 2022 to 28 February 2023 are provided in the SARS Travel Logbook (Fixed Cost Table based on vehicle value brackets ranging from vehicles under R95,000 to vehicles exceeding R665,000)"
+      }
+    ]
+  },
+  "United Kingdom": {
+    "receiptStandards": [
+      {
+        "required_data": "Receipt or invoice document",
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted with expenses. Documents must be actual tax receipts or invoices; booking confirmations will not suffice. Online copies are sufficient, a hard copy is not required"
+      },
+      {
+        "required_data": "ICP company name and details on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "IT equipment, job related equipment",
+        "icp_name": "Global People UK Limited",
+        "mandatory_optional": "Mandatory",
+        "rule": "For EoR under Global People: the Local experts details should be used where possible, this also applies to invoices related to IT equipment: Global People UK Limited, 2 New Bailey, 6 Stanley Street, Salford, Manchester, M3 5GS, United Kingdom, ID: 14356784"
+      },
+      {
+        "required_data": "ICP company name on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Parakar UK Limited",
+        "mandatory_optional": "Mandatory",
+        "rule": "For EoR under Parakar: invoices where possible should state their name \"Parakar UK Limited\""
+      },
+      {
+        "required_data": "Employee name or company name on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Atlas",
+        "mandatory_optional": "Mandatory",
+        "rule": "For EoR under Atlas: Invoices and supporting documents may contain the name of the worker or the company"
+      },
+      {
+        "required_data": "Employee name or Baldock name on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Baldock",
+        "mandatory_optional": "Mandatory",
+        "rule": "For EoR under Baldock: invoices can contain either the Name of Baldock or of the worker"
+      },
+      {
+        "required_data": "Employee name on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "People 2.0",
+        "mandatory_optional": "Mandatory",
+        "rule": "For EoR under People 2.0: it is possible to process invoices that contain the name of the worker"
+      },
+      {
+        "required_data": "Employee full name on invoice",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "Global People UK Limited",
+        "mandatory_optional": "Mandatory",
+        "rule": "With Papaya Partner Global People for hotels, flights the invoice should state the full name of the worker not end client"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Job related equipment, Laptop, Office supplies, Entertainment, Awards",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": false,
+        "gross_up_rule": "Many business expenses related to workers completing their job will be tax exempt. The UK Government provides specific terms that apply to each benefit including job related equipment, laptops, office supplies, entertainment, awards. Tax exemptions will only be applied providing sufficient proof is shared"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": false,
+        "gross_up_rule": "Training expenses are tax exempt when approved by direct manager"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage (cars, vans, motorbikes, bicycles)",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": false,
+        "gross_up_rule": "Workers using private vehicles, including cars, vans, motorbikes and bicycles, for work purposes should be reimbursed according to the mileage travelled using UK Government specific mileage rates which are tax-free"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Meals, Subsistence",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": false,
+        "gross_up_rule": "Domestic business travel has set subsistence costs that can be applied to cover meals using UK Government rates which are tax-free"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Meals, Transport, Accommodation",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": true,
+        "gross_up_rule": "Business trip outside of the UK can be reimbursed using the per diem method applying a set rate towards subsistence costs tax free. UK Government sets specific per diem rates to cover meals, transport, accommodation and other costs. It is possible to increase the daily per diem rate. However, any portion of the per diem amount that exceeds the set Government rate will be taxable"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Meals, Transport, Accommodation",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "gross_up": true,
+        "gross_up_rule": "It is permitted to reimburse workers against actual expenses and receipts instead of per diem for international travel. Expenses that fall outside of per diem can be reimbursed as expense reimbursements against receipts. All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, International travel",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "With Papaya Partner, GoGlobal - An A1 certificate is required when travelling with additional costs"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, International travel",
+        "icp_name": "Global People UK Limited",
+        "additional_info_required": true,
+        "additional_info_rule": "With Papaya Partner Global People, Business Trip - submit a separate report for each trip"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People UK Limited",
+        "additional_info_required": true,
+        "additional_info_rule": "For mileage reimbursement they must be provided the car details (model, year etc) and a map showing the travelled route (a screenshot from google maps will suffice). Under Papaya's Partner Global People all these details must be provided in order to process the claim"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Atlas, Baldock, GoGlobal, Parakar UK Limited, People 2.0",
+        "additional_info_required": true,
+        "additional_info_rule": "Mileage reimbursement claims should be supported with car details (model, year etc) and a map showing the travelled route (a screenshot from google maps will suffice)"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "additional_info_required": true,
+        "additional_info_rule": "If a worker uses more than one vehicle in a year the mileage will all be calculated based on a combined mileage total"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "additional_info_required": true,
+        "additional_info_rule": "Training expenses require the approval of the direct manager"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Accommodation, International travel (per diem method)",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "additional_info_required": false,
+        "additional_info_rule": "No receipts or invoices need to be provided when using the per diem method for international business travel"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Accommodation, International travel",
+        "icp_name": "Atlas, Baldock, GoGlobal, Global People UK Limited, Parakar UK Limited, People 2.0",
+        "additional_info_required": true,
+        "additional_info_rule": "It is permitted to not use the per diem method and instead: Apply for a bespoke rate from the HMRC and include the payments in a P11D form OR Reimburse workers against actual expenses and receipts"
+      }
+    ]
+  },
+  "Egypt": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional services, Medical, Other",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the supplier's business name (the company or individual that provided the goods or services)"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional services, Medical, Other",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the date when the transaction occurred"
+      },
+      {
+        "required_data": "Total amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the total amount paid"
+      },
+      {
+        "required_data": "Local Employer name and details OR worker name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional services, Medical, Other",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "The Local Employer's name and details or worker's should be used on receipts and invoices where required"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt. Only purely business related elements of an expense will be tax free, anything additional will be subject to tax. Tax exemptions will only be applied providing sufficient proof is shared (e.g., tax receipts, invoices, etc.)"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage, Fuel, Parking",
+        "icp_name": "Local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Mileage reimbursement rates and rules for workers who use their private vehicle for work purposes are not stipulated in the Labour Code. Reimbursement of mileage, fuel, parking and car expenses are done at the discretion of each employer, and therefore may be subject to taxation"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant",
+        "icp_name": "Local service provider",
+        "gross_up": false,
+        "gross_up_rule": "Domestic and international business travel expenses are reimbursed against receipts and invoices. There are no set government per diem rates. Employers can reimburse against receipts and invoices, and these are generally tax exempt when properly documented"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional services, Medical, Other",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before the receipt or invoice is submitted"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Telecommunications, Mileage, Fuel, Parking, Professional services, Medical, Other",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Tax exemptions will only be applied providing sufficient proof is shared (e.g., tax receipts, invoices, etc.). Only purely business related elements of an expense will be tax free"
+      }
+    ]
+  },
+  "Lithuania": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show supplier business name"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show transaction date when purchase occurred"
+      },
+      {
+        "required_data": "Total amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show total amount"
+      },
+      {
+        "required_data": "Tax receipt or invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      },
+      {
+        "required_data": "ICP company name and address on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Bill to ICP company. The Local Employer's name and details should appear on invoices: Global People CZ s.r.o., Pobřežní 394/12, Karlín, 186 00 Prague 8, Czech Republic"
+      },
+      {
+        "required_data": "Employee name",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Flight",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Bill to employee name. The exception is where it is not possible to use the Local Employer's name e.g. on flight tickets, in which case the worker's name and details should be used"
+      },
+      {
+        "required_data": "Mileage distance",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "The mileage must be indicated on the expense report"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Professional services, Telecommunications, Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax free"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt. Only purely business related elements of this expense will be tax free, anything additional will be subject to tax. Tax exemptions will only be applied providing sufficient proof is shared e.g. tax receipts, invoices"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Taxi",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Business travel expenses outside of per diem can be paid out through expense reimbursements against receipts and are tax exempt when sufficient proof is provided"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Domestic business trip: 15 EUR per day for meals is tax-free. There is no limit value per meal. Any costs outside of the per diem should be submitted as expenses against receipts and invoices and are tax exempt"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "International business trip: Per diem rates vary by country. General rate EUR 31 if country not mentioned. It is possible to increase the daily per diem rate. However, any portion of the per diem amount that exceeds the set rate will be taxable and subject to social contributions. When one or more meals is provided by company and additional funds provided for food, such benefits would be considered as income and should be taxed as income related to the employment relationship"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Workers using private vehicles for work purposes should be reimbursed according to the mileage travelled. For the purchase of fuel, based on the car brand, the car's fuel consumption rate is determined and the refund amount is calculated. This is tax-free when proper documentation is provided. Rental cars for business purposes are permitted with reimbursement of costs and fuels, providing the car is used only for business purposes"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "For the purchase of fuel, the car's technical passport must be submitted"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Hotel",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Business trip – submit a separate report for each trip. If the employment agreement doesn't state otherwise, according to Lithuanian law the employer is obligated to pay at least 50% of the estimated daily allowance for the business trip in advance and no later than the last working day before the start of the business trip"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "International business trips: No receipts or invoices need to be provided when using the per diem method. When going abroad, for the day leaving Lithuania, per diem is calculated according to the destination country amount. When returning, per diem for arrival day is calculated according to the country from which returning. When travelling to several countries on one day, the average daily allowance is paid for that day"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Professional services, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Online copies of receipts and invoices are sufficient, a hard copy is not required. Any personal information not required for reimbursement purposes should be removed before submission"
+      }
+    ]
+  },
+  "Luxembourg": {
+    "receiptStandards": [
+      {
+        "required_data": "Tax receipt or invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Taxi, Mileage, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be actual tax receipts or invoices; booking confirmations will not suffice. Online copies are sufficient, a hard copy is not required"
+      },
+      {
+        "required_data": "Worker name and details",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Taxi, Mileage, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "mandatory_optional": "Mandatory",
+        "rule": "The worker's name and details can be used on invoices when needed, not the Local Employer. The worker's name and details should appear on invoices, not the Local Employer"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "gross_up": true,
+        "gross_up_rule": "Many business expenses related to workers completing their job will be tax exempt. Only purely business related elements of this expense will be tax free, anything additional will be subject to tax. All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free. Tax exemptions will only be applied providing sufficient proof is shared (e.g. tax receipts, invoices, etc.)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi",
+        "icp_name": "Local service provider",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free. Tax exemptions will only be applied providing sufficient proof is shared (e.g. tax receipts, invoices, etc.)"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Local service provider",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free. Mileage can be submitted as any other expense claim based on actual receipts"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Taxi, Mileage, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Taxi, Mileage, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers should report their expenses through Expensify or a manual expense report (to be agreed between the worker and manager). An internal process and expense policy must be determined with the worker so they know the method and deadline for submitting expense claims to their Line Manager"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Office supplies, Software, Equipment, Taxi, Mileage, Telecommunications, Professional services",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "Submitted expense reports must be reviewed and approved, ensuring all required supporting documents have been included (e.g. receipts, invoices), by the agreed cutoff date"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi",
+        "icp_name": "Local service provider",
+        "additional_info_required": true,
+        "additional_info_rule": "For international business travel: Any travel policy should be agreed upon prior to the worker starting"
+      }
+    ]
+  },
+  "Cyprus": {
+    "receiptStandards": [
+      {
+        "required_data": "Receipt or invoice document",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Business expenses, Mileage, Business travel",
+        "icp_name": "Eurofast Global Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted with expenses. Online copies are sufficient, a hard copy is not required to be shared but workers should keep these files"
+      },
+      {
+        "required_data": "ICP company name and full address on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Business expenses, Mileage, Business travel",
+        "icp_name": "Eurofast Global Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "For expenses above €100, the local Employer details should be used on the invoice including address: Eurofast Global Ltd, Cypress Centre, 5 Chytron Street, Agioi Omologites, Nicosia 1075, Cyprus"
+      },
+      {
+        "required_data": "ICP company details OR employee name on invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Business expenses, Mileage, Business travel",
+        "icp_name": "Eurofast Global Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "For expenses under €100, the details on the invoice can be either the local employer or the worker"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Business expenses, Mileage, Business travel",
+        "icp_name": "Eurofast Global Ltd",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Business expenses",
+        "icp_name": "Eurofast Global Ltd",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax-exempt. Other expenses are subject to varying tax rules. Only purely business-related elements of an expense will be tax free, anything additional will be subject to tax"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage, Fuel, Parking, Car expenses",
+        "icp_name": "Eurofast Global Ltd",
+        "gross_up": false,
+        "gross_up_rule": "Mileage reimbursement rates and rules for workers who use their private vehicle for work purposes are not stipulated in the Labour Code. Reimbursement of mileage, fuel, parking and car expenses are done at the discretion of each employer and is tax free"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Meals, Transportation, Accommodations",
+        "icp_name": "Eurofast Global Ltd",
+        "gross_up": false,
+        "gross_up_rule": "Business travel expenses follow the same process as reimbursement of non-travel expenses. There are no set government per diem rates but employer can set their own to be used to cover meals, transportation and accommodations (with receipts these are tax-free)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Daily allowance",
+        "icp_name": "Eurofast Global Ltd",
+        "gross_up": true,
+        "gross_up_rule": "Any other set daily allowance which is not paid against receipts will be taxable"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Business expenses, Mileage, Business travel",
+        "icp_name": "Eurofast Global Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers should keep hard copy files of receipts even though online copies are sufficient for submission"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Business expenses",
+        "icp_name": "Eurofast Global Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Tax exemptions will only be applied providing sufficient proof is shared (e.g. tax receipts, invoices etc.)"
+      }
+    ]
+  },
+  "Czech Republic": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Clear and readable receipts and invoices must be submitted with expenses. Documents must be actual tax receipts or invoices; booking confirmations will not suffice."
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets, Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Clear and readable receipts and invoices must be submitted with expenses showing the transaction date."
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Clear and readable receipts and invoices must show the total amount in local currency."
+      },
+      {
+        "required_data": "ICP company name on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Training, Telecommunications, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "The Local Employers name and details should appear on invoices, not the workers: Global People CZ s.r.o., Pobřežní 394/12, Karlín, 186 00 Prague 8, ID: 10660313, VAT ID: CZ10660313, Czech Republic."
+      },
+      {
+        "required_data": "Employee name as traveler",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "The exception to the above is where it is not possible to use the Local Employers name e.g. on flight tickets, in which case the workers name and details should be used. Hotel/flights invoices should indicate the name of the worker not the end client."
+      },
+      {
+        "required_data": "Language requirement",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be either in Czech or English language, if not the case, then a simple explanation of the expense in said languages must be provided (i.e. Computer; dinner airport)."
+      },
+      {
+        "required_data": "Item description",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Clear and readable receipts and invoices must show specific goods or services purchased."
+      },
+      {
+        "required_data": "Fuel purchase details",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Fuel (for mileage reimbursement)",
+        "icp_name": "Global People CZ s.r.o.",
+        "mandatory_optional": "Mandatory",
+        "rule": "Fuel receipts must show the number of litres and price paid."
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment (purely business use)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt as long as the invoices are compliant with the rules as set above. Only purely business related elements of this expense will be tax free. All approved expenses will be paid as NET to the employee and grossed up if they are not tax free"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Transportation, Telecommunications",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax free. Only purely business related elements of this expense will be tax free, anything additional will be subject to tax. Or can be grossed up if approved by the client."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (domestic business travel per diem)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "Domestic business travel have set per diem rates to cover meals which are tax-free. The current rates can be found at the specified link. If only partial food is provided, the base per diem amount is reduced for each meal as follows: Business trips of 5-12 hours - 70% of base rate is tax-free, Business trips of 12-18 hours - 35% of base rate is tax-free, Business trips over 18 hours - 25% of base rate is tax-free."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (international business travel per diem)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "International business trips can be reimbursed using the per diem method, applying a set rate towards meal costs tax free. The Czech Labour Code sets specific per diem rates. However, it is possible to increase the daily per diem rate. Any portion of the per diem amount that exceeds the set rate will be taxable and subject to social contributions."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage (two-wheeled vehicles and tricycles)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "The Czech Labour Code sets specific mileage rates for reimbursement. The current rates for 2024 are: two-wheeled vehicles and tricycles CZK 1.50 per KM - these are tax-free at the statutory rate."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage (motor vehicles)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "The Czech Labour Code sets specific mileage rates for reimbursement. The current rates for 2024 are: motor vehicles CZK 5.60 per KM - these are tax-free at the statutory rate."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Fuel (for mileage reimbursement)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "The worker is entitled to fuel reimbursement, either according to the price actually paid or according to the average price determined by the Decree No. 341/2023. The rates for 2024 are tax-free: CZK 38.20 for automotive gasoline 95 octane, CZK 42.60 for automotive gasoline 98 octane, CZK 38.70 for diesel, CZK 7.70 for 1 kWh of electricity."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (international pocket money)",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": false,
+        "gross_up_rule": "You can provide pocket money up to 40% of the meals allowance as an additional allowance tax-free for an international trip. This is a voluntary contribution by the employer. Pocket money is calculated as a percentage of the resulting meals allowance before deductions for the provided meals."
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "Training expenses will be tax free with sufficient proof, but require the approval of the direct manager. All approved expenses will be paid as NET to the employee and grossed up if they are not tax free."
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "gross_up": true,
+        "gross_up_rule": "Tickets to business events, conferences, etc. are tax free with sufficient proof and explanation of the type of event. All approved expenses will be paid as NET to the employee and grossed up if they are not tax free."
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "We require separate report per business trip. Online copies of invoices and receipts are sufficient, a hard copy is not required."
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted."
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Telecommunications, Fuel, Parking, Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Tax exemptions will only be applied providing sufficient proof is shared e.g. tax receipts, invoices etc. Without these documents any applicable tax exemption cannot be applied."
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expenses with foreign currency",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "For expenses in foreign currency, receipts should be submitted with clear exchange rate documentation to convert to local currency."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "A logbook is required for each used car. The logbook is an accounting document used to record data on the operation of a company or private car used for business. The logbook is used by the tax office to check whether the car is actually used to generate, maintain and secure income. The logbook can be in paper or electronic form."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Each logbook should contain: Vehicle information (Car type, License plate, Average fuel consumption stated in the technical certificate), Start and end of vehicle operation."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Each logbook should contain details of each trip: Date of the journey beginning and end of the trip, Tachometer status at the beginning of the journey and at the end of the journey, Safety breaks (start and end time), Departure point and destination point, Purpose of travel."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Our local partner reimbursed mileage per calculation method based on route, car details and destination, the worker will need to share a map with the relevant route (google maps is sufficient)."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "In case of trips abroad, toll payment and vehicle damages information must be included in the logbook."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (domestic per diem)",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "If meals have been pre-arranged the per diem rate can be reduced. Meals do not apply to employees if during a business trip that lasts 5 to 12 hours, 2 free meals were provided, more than 12 hours, but no longer than 18 hours, 3 free meals were provided. You cannot mix per diem method with actual expenses. You will need to agree with the worker on one method per business trip."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (international per diem)",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "The per diem rate should be paid to workers in advance of the business trip. Receipts or invoices do not need to be provided when using the per diem method but per diem only applies to meals. You cannot mix per diem method with actual expenses. You will need to agree with the worker on one method per business trip."
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant (international expenses without per diem)",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Expenses that fall outside of per diem can be reimbursed as expense reimbursements against receipts. The Local Employers name and details should appear on invoices, not the workers."
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Training expenses require the approval of the direct manager."
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Conference tickets",
+        "icp_name": "Global People CZ s.r.o.",
+        "additional_info_required": true,
+        "additional_info_rule": "Tickets to business events, conferences, etc. must be provided along with an explanation of the type of event."
+      }
+    ]
+  },
+  "Denmark": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must show the supplier's business name that provided the goods or services"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "The date when the purchase or transaction occurred must be visible on the receipt"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "The total cost including any taxes must be clearly shown on the receipt"
+      },
+      {
+        "required_data": "ICP company details on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Equipment, Office supplies, Office services",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "For business expenses (non-travel), invoices must show the Local Employer details as follows: Vensure Global EOR DNK ApS, CVR-no. 45560902, C/O Bruun & Hjejle, Nørregade 21, 1165 København K. Bill to ICP company"
+      },
+      {
+        "required_data": "Employee name on invoice",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Parking, Fuel",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "For business trips, when it is not possible to have the Local Employer details appear, then the worker's name can be used on invoices and receipts. Bill to employee name"
+      },
+      {
+        "required_data": "Item description",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Specific description of goods or services purchased must appear on the receipt. Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Equipment, Office supplies, Office services, Phone bill, Internet bill",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "gross_up": false,
+        "gross_up_rule": "Many business expenses related to workers completing their job will be tax exempt providing sufficient proof is shared (tax receipts, invoices). All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "gross_up": true,
+        "gross_up_rule": "The Danish Government sets specific mileage rates for reimbursement. The 2025 rates are 3.81 DKK per km up to 20,000 km per year, 2.23 DKK per km above 20,000 km per year. Mileage reimbursement above 20,000 km per year is subject to different tax treatment (lower rate applies, which indicates taxable portion). Cycling/moped/scooter/e-scooter is 0.63 DKK per km"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Fuel, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "gross_up": true,
+        "gross_up_rule": "For domestic trips (within Denmark): The 2025 per diem rates for trips of 24 hours and more are 597 DKK per day for meals/incidentals and 256 DKK per night for accommodation. Any portion of the per diem amount that exceeds the set Government rate will be taxable. For international trips: rates vary by country (see Danish government website). If the worker receives free meals during travel provided by the employer or business connections, the per diem must be reduced by certain percentages as specified in the Danish Government website. Expenses that exceed per diem rates are subject to tax"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers must submit expenses using the Papaya Direct excel template provided for Denmark (Global People). Any personal information not required for reimbursement purposes should be removed before submission. Online copies of receipts and invoices are sufficient; hard copies are not required"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking, Mileage",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "Manager approval required. The worker must determine with their Line Manager an internal process and expense policy including the method and deadline for submitting expense claims. Manager must review submitted expense reports and approve expense claims by the agreed cutoff date, ensuring all required supporting documents have been included"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "Map screenshot per ride must be attached showing the route traveled. The mileage claim must include date, vehicle type (rental/work/personal), total km, and comments. No receipts are required since this expense is based on usage rather than bills/invoices/receipts. Must document: route details (start and end location), total kilometers traveled, vehicle type (car, van, motorbike, bicycle, cycling, moped, scooter, or e-scooter), and vehicle ownership (Rental, Work-owned, or Personal)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Fuel, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "If the worker receives a tax-free travel allowance which is lower than the government rates, they can get a deduction for the difference. In that case, they must state the amount corresponding to the difference in their tax assessment notice"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Fuel, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "For expenses that use the per diem method: Receipts or invoices are NOT needed when using the per diem method. For expenses that fall outside of per diem: These can be reimbursed as expense reimbursements against actual receipts. It is permitted to not use the per diem method and instead reimburse workers against actual expenses and receipts"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Fuel, Parking",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "If using foreign currency for international travel expenses: The original currency amount, exchange (FX) rate, and payment currency must be documented and reported. The expense report template requires fields for: Original currency, Fx rate, and Payment currency"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Equipment, Office supplies, Office services, Fuel, Phone bill, Internet bill, Parking, Mileage",
+        "icp_name": "Global People (Vensure Global EOR DNK ApS)",
+        "additional_info_required": true,
+        "additional_info_rule": "Submission and processing: Expense reimbursements will be processed in the monthly payroll run and will be reflected in the worker's pay slip. Papaya will share the submitted report with the Local Employer (Global People) for processing and reimbursement"
+      }
+    ]
+  },
+  "Brazil": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICAC AO LTDA, SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the name of the business/vendor that provided the goods or services"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICAC AO LTDA, SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the date when the purchase or transaction occurred"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICAC AO LTDA, SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must show the final cost/total amount of the transaction"
+      },
+      {
+        "required_data": "Tax receipt or invoice format",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICAC AO LTDA, SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be actual tax receipts or invoices. Booking confirmations, card vouchers, or handwritten notes do not count as taxable documents and will not be sufficient"
+      },
+      {
+        "required_data": "ICP company name on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "The Local Employer's name MUST appear on invoices in order to be tax exempt, not the worker's details. Invoice must show: SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP"
+      },
+      {
+        "required_data": "ICP tax ID on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoice must show the Local Employer's tax ID: 26.713.382/0001-94"
+      },
+      {
+        "required_data": "ICP address on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoice must show the Local Employer's address: Av Marques de Sao Vicente 02219, Bloco Corporate Time - Agua Branca - CEP: 0536-040, Sao Paulo"
+      },
+      {
+        "required_data": "ICP company name on receipt",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Taxi",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "The Local Employer's name MUST appear on receipts (including receipts from taxis, restaurants or stores) in order to be tax exempt, not the worker's details. Receipt must show: SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP"
+      },
+      {
+        "required_data": "ICP tax ID on receipt",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Taxi",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt must show the Local Employer's tax ID: 26.713.382/0001-94"
+      },
+      {
+        "required_data": "PDF and XML version of invoice",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "If the worker receives a PDF and XML version of an invoice, both versions must be uploaded"
+      },
+      {
+        "required_data": "Payment method",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Office Equipment must be paid with debit or credit card"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICACAO LTDA",
+        "gross_up": true,
+        "gross_up_rule": "Many business expenses related to workers completing their job will be tax exempt. Other expenses are subject to varying tax rules. Only purely business related elements of this expense will be tax free, anything additional will be subject to tax. Tax exemptions will only be applied providing sufficient proof is shared (tax receipts, invoices, etc.)"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free. The Local Employer will review every expense item to determine if an expense is tax deductible or not. If an expense is not deductible, taxes will be charged. The current tax rate is 34%"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "gross_up": false,
+        "gross_up_rule": "Office Equipment will be tax deductible when ordered in the correct way: paid with debit or credit card, the invoice shows tax ID and address under the Local Employer name, and all supporting documents are included"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "gross_up": true,
+        "gross_up_rule": "Mileage will be reimbursed as a taxable bonus (subject to 34% tax rate)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Taxi",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "gross_up": true,
+        "gross_up_rule": "Per diem rate towards subsistence costs (meals and taxis) during domestic business travel will be paid out to workers as a taxable bonus (subject to 34% tax rate)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "gross_up": false,
+        "gross_up_rule": "Flights and accommodation costs purchased by the Local Employer and recharged to the client will be tax exempt"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Taxi",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "gross_up": true,
+        "gross_up_rule": "Per diem rate towards subsistence costs (meals and taxis) during international business travel will be paid out to workers as a taxable bonus (subject to 34% tax rate)"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICACAO LTDA",
+        "additional_info_required": true,
+        "additional_info_rule": "The local Employer details should appear on the Expense report: APEX AMERICA BRASIL SERVICOS DE COMUNICACAO LTDA, Address: ALFREDO EGIDIO DE SOUZA ARANHA, 100, SAO PAULO, Estado de SP"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Mileage",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICACAO LTDA",
+        "additional_info_required": true,
+        "additional_info_rule": "Each business trip must be reported separately with the following information: Start and End Date (date and time), Start and Destination Point, Purpose of the Trip, Currency Exchange Rate, reason for travel, location, and approval"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "APEX AMERICA BRASIL SERVICOS DE COMUNICACAO LTDA, SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "additional_info_required": true,
+        "additional_info_rule": "A logbook for mileage is required"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Mileage",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "additional_info_required": true,
+        "additional_info_rule": "Mileage must be at least 50 km away from the office. Documentation must prove it is for business purposes only and does not include any personal related trips or weekend travel"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMENTO E SELECAO LTDA-EPP",
+        "additional_info_required": true,
+        "additional_info_rule": "All supporting documents must be included with the office equipment expense claim"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant, Taxi",
+        "icp_name": "SGF GLOBAL BRASIL RECRUTAMEN TO E SELECAO LTDA-EPP",
+        "additional_info_required": false,
+        "additional_info_rule": "No receipts or invoices need to be provided when using the per diem method for subsistence costs during business travel"
+      }
+    ]
+  },
+  "Chile": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show the supplier's business name (the company or provider that supplied the goods or services)"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show the date when the transaction occurred"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Mandatory",
+        "rule": "Document must show the total amount paid. All reimbursements will be recognized in Chilean pesos (Chile's national currency)"
+      },
+      {
+        "required_data": "ICP company name, tax ID (RUT), and address on invoice",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services, Utilities, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Mandatory",
+        "rule": "When making a purchase for work-related assets, if asked whether you would like an invoice and/or an electronic invoice or a similar document, you must confirm and request its issuance using: Company name: SGF GLOBAL CHILE SPA, RUT: 73173574-8, Address: CERRO EL PLOMO 5855 OF 1405 PS 14 LAS CONDES, SANTIAGO. If the invoice does not meet this requirement, it will not be possible to proceed with the requested reimbursement"
+      },
+      {
+        "required_data": "ICP company name, tax ID (RUT), and address on invoice",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Mileage",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoices must be issued in the name of SGF Global Chile, using: Company name: SGF GLOBAL CHILE SPA, RUT: 73173574-8, Address: CERRO EL PLOMO 5855 OF 1405 PS 14 LAS CONDES, SANTIAGO"
+      },
+      {
+        "required_data": "Employee name on invoice",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Mileage",
+        "icp_name": "SGF Global Chile SPA",
+        "mandatory_optional": "Optional",
+        "rule": "In cases such as transportation or similar expenses subject to the employer's final approval, if the invoice is issued in the employee's name, it may be accepted provided that its exclusive use for work-related purposes is demonstrated"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "gross_up": false,
+        "gross_up_rule": "No tax treatment, gross-up calculations, taxability rules, per diem limits, mileage rates, or taxation thresholds are mentioned in the source document"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Payment proof required: The employee must submit the corresponding invoice along with proof of bank payment or a bank statement reflecting the incurred expense. Both documents (invoice and payment proof) are essential for the reimbursement process"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Expense Sheet form required: The employee or, if necessary, their supervisor must complete the Expenses Sheet provided by the Human Resources Department. This form must be submitted along with the corresponding invoice and payment proof"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Supervisor approval required: All expenses reported by the employee must be duly approved by their direct supervisor. If the required approval is not obtained by the 10th of each month, SGF Global Chile will not process the reimbursement until such approval is received"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Train, Restaurant, Taxi, Office supplies, Software, Equipment, Telecommunications, Training, Mileage, Entertainment, Professional services, Utilities, Medical, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Exchange rate documentation for foreign currency: For expenses incurred in foreign currency, the employee must include the bank's exchange rate used at the time of the transaction in the Expenses Sheet, supported by the relevant bank receipt and an invoice in the name of SGF GLOBAL CHILE SPA"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Train, Taxi, Restaurant, Mileage",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Business purpose documentation: Travel expenses including lodging, transportation, and meals must be strictly and exclusively related to the performance of tasks and whose use is essential for their execution. If the invoice is issued in the employee's name, employee must demonstrate exclusive use for work-related purposes"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Telecommunications, Professional services, Utilities, Other",
+        "icp_name": "SGF Global Chile SPA",
+        "additional_info_required": true,
+        "additional_info_rule": "Business use justification: Only those monetary expenditures linked to the performance of the work and whose use is essential for carrying out tasks will be reimbursable"
+      }
+    ]
+  },
+  "Colombia": {
+    "receiptStandards": [
+      {
+        "required_data": "Invoice billed to ICP company name",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS",
+        "mandatory_optional": "Mandatory",
+        "rule": "When making a purchase, if asked whether you would like an invoice and/or an electronic invoice or a similar document, you confirm and request its issuance using the following information: Name of the company SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES SAS, NIT 900318723-8, Address Calle 109 14 b 60 PH, BOGOTA D.C."
+      },
+      {
+        "required_data": "Invoice billed to ICP company name",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "MSP COLOMBIA SAS",
+        "mandatory_optional": "Mandatory",
+        "rule": "When making a purchase, if asked whether you would like an invoice and/or an electronic invoice or a similar document, you confirm and request its issuance using the following information: Name of the company MSP COLOMBIA SAS, NIT 900209813-5, Address Calle 109 14 b 60 PH, BOGOTA D.C."
+      },
+      {
+        "required_data": "Invoice billed to ICP company name (or employee name with business justification)",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS, MSP COLOMBIA SAS",
+        "mandatory_optional": "Mandatory",
+        "rule": "Invoices must be issued in the name of SGF Global Colombia, with the information from the previous table. In cases such as transportation or similar expenses subject to the employer's final approval, if the invoice is issued in the employee's name, it may be accepted provided that its exclusive use for work-related purposes is demonstrated."
+      },
+      {
+        "required_data": "CUFE code (Código Único de Factura Electrónica)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Office supplies, Software, Equipment, Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS, MSP COLOMBIA SAS",
+        "mandatory_optional": "Mandatory",
+        "rule": "It is an indispensable requirement that all electronic invoices include the CUFE code (Unique Electronic Invoice Code) for validation and processing."
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Transportation",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS, MSP COLOMBIA SAS",
+        "additional_info_required": true,
+        "additional_info_rule": "The employee must submit the corresponding invoice along with proof of bank payment or a bank statement reflecting the incurred expense. Both documents are essential for the reimbursement process"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Transportation",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS, MSP COLOMBIA SAS",
+        "additional_info_required": true,
+        "additional_info_rule": "The employee or, if necessary, their supervisor must complete the Expenses Sheet provided by the Human Resources Department. This form must be submitted along with the corresponding invoice and payment proof"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Transportation",
+        "icp_name": "SGF GLOBAL EMPRESA DE SERVICIOS TEMPORALES S SAS, MSP COLOMBIA SAS",
+        "additional_info_required": true,
+        "additional_info_rule": "For expenses incurred in foreign currency, the employee must include the bank's exchange rate used at the time of the transaction in the Expenses Sheet, supported by the relevant bank receipt and an invoice in the name of the ICP company"
+      }
+    ]
+  },
+  "Malaysia": {
+    "receiptStandards": [
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "Date of the expense must be visible on receipt"
+      },
+      {
+        "required_data": "Expense type description",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "Expense type or description of goods/services must be visible on receipt"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "Total amount of the expense must be visible on receipt"
+      },
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "Name of the vendor/merchant must be visible on receipt"
+      },
+      {
+        "required_data": "VAT/GST amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Optional",
+        "rule": "VAT amount, listed clearly on the Invoice (if applicable)"
+      },
+      {
+        "required_data": "Employee name as traveler",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Flight",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING G SDN BHD, GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "Flight ticket should be supported with itinerary with the employee's name, or the invoice issued by travel agency in the name of employer"
+      },
+      {
+        "required_data": "ICP company name as billed party",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Equipment",
+        "icp_name": "AYP STAFFING PTE LTD",
+        "mandatory_optional": "Optional",
+        "rule": "Invoice in the name of AYP STAFFING PTE LTD, 114 Lavender Street, #03-78 CT HUB 2, Singapore 338729, Tel: +65 6820 8200 Fax: +65 6384 3988, Co.Reg./GST Reg. No.: 201100680R, Co. EA License No.: 11C5710 (wherever possible)"
+      },
+      {
+        "required_data": "ICP company name as billed party",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Equipment",
+        "icp_name": "TIGER CONSULTING G SDN BHD",
+        "mandatory_optional": "Optional",
+        "rule": "Invoice in the name of TIGER CONSULTING SDN BHD (no business address required) (wherever possible)"
+      },
+      {
+        "required_data": "ICP company name as billed party",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Equipment",
+        "icp_name": "GoGlobal",
+        "mandatory_optional": "Optional",
+        "rule": "Invoice in the name of the Employer (wherever possible) - the name of the employer is the name of local entity of GoGlobal that employs the worker"
+      },
+      {
+        "required_data": "Worker name on receipt",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "mandatory_optional": "Optional",
+        "rule": "For EOS, the workers name should be included on receipts/invoices for larger expenses"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD, GoGlobal",
+        "gross_up": true,
+        "gross_up_rule": "All approved expenses will be paid as NET to the employee and grossed up if they are not tax-free. Expenses that fall under taxable income will be treated as per the local regulations"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Equipment",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD, GoGlobal",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses related to workers completing their job might be tax-exempt. Only purely business-related elements of an expense will be tax-free, anything additional will be subject to tax"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Restaurant",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD, GoGlobal",
+        "gross_up": true,
+        "gross_up_rule": "Meal allowances received by an employee regularly (daily or monthly), given at a fixed same rate to all employees are exempt from tax, up to a reasonable amount"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD",
+        "gross_up": true,
+        "gross_up_rule": "Between RM 0.60 to RM 0.80 cents per kilometer is the common amount to reimburse. Mileage can be reimbursed using receipts together with a travel report. This must be approved by the worker's direct manager to be exempt from tax"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD, GoGlobal",
+        "gross_up": false,
+        "gross_up_rule": "Training and development expenses are accepted and tax-exempt when business-related"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD, GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Establish clear business purpose of all incurred expenses"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Convert amount in local currency and include currency & exchange rate used for foreign currency expenses"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Mileage",
+        "icp_name": "AYP STAFFING PTE LTD, TIGER CONSULTING SDN BHD",
+        "additional_info_required": true,
+        "additional_info_rule": "For mileage reimbursements, include To and Fro locations, distance travelled and per diem rates. Travel report on the distance of travel (per km) required"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Car rental, Office supplies, Equipment, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Submit expense claims with clear and legible copies of the receipts to Client line manager for approval preferably within the same month of the expense"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Official receipt issued by the hotel or a third-party sites (e.g; Agoda, Booking.com) required"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Employee engagement activity approved by the Manager in writing before the event"
+      }
+    ]
+  },
+  "Philippines": {
+    "receiptStandards": [
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Date of Transaction must be clearly visible on the receipt"
+      },
+      {
+        "required_data": "Item description",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Description of Goods or Services must be detailed on the receipt"
+      },
+      {
+        "required_data": "Total amount breakdown",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Total Amount Paid with breakdown of the total amount paid including VAT Sales, Zero-Rated Sales, VAT-Exempt Sales and 12% VAT"
+      },
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Name of the Vendor/Merchant must be shown on receipt"
+      },
+      {
+        "required_data": "Vendor TIN number",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Ensure the submitted documents are BIR registered and reflect the vendor's TIN, business name, and address"
+      },
+      {
+        "required_data": "Vendor business address",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Ensure the submitted documents are BIR registered and reflect the vendor's TIN, business name, and address"
+      },
+      {
+        "required_data": "VAT amount listed clearly",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "mandatory_optional": "Optional",
+        "rule": "VAT amount should be listed clearly on the Invoice if applicable"
+      },
+      {
+        "required_data": "Employee name on receipt",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz",
+        "mandatory_optional": "Mandatory",
+        "rule": "Under the Local Partner Procloz, the receipt and supporting documents should be in the name of the worker"
+      },
+      {
+        "required_data": "AYP company name on receipt",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi",
+        "icp_name": "AYP",
+        "mandatory_optional": "Mandatory",
+        "rule": "Laureoli Philippines Inc. TIN: 008-291-580-000 Unit 19 3rd Floor, Cedar Executive Building I, #1006 Arnaiz Ave (Pasay Road) Makati City"
+      },
+      {
+        "required_data": "GoGlobal company name on receipt",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "mandatory_optional": "Mandatory",
+        "rule": "GOGLOBAL PHILIPPINES, INC. TIN: 010-281-166-000 22/F Mega Tower, EDSA corner J. Vargas Avenue, Brgy. WackWack-Greenhills, Mandaluyong City"
+      },
+      {
+        "required_data": "Tiger company name on receipt",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Tiger",
+        "mandatory_optional": "Mandatory",
+        "rule": "Tiger Consulting PI Inc. 20th Floor, Zuellig Building Makati Avenue Corner Paseo De Roxas, Makati City Metro Manila, Philippines"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Equipment",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt. Only purely business related elements of an expense will be tax free, anything additional will be subject to tax. The corporate income tax rate is currently at 30% for domestic corporations and resident foreign corporations"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "gross_up": true,
+        "gross_up_rule": "Domestic and international business travel expenses follow the same process as reimbursement of non travel expenses. There are no set government per diem rates and employers can reimburse against receipts and invoices. The corporate income tax rate is currently at 30% for domestic corporations and resident foreign corporations"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "gross_up": true,
+        "gross_up_rule": "Mileage reimbursement rates and rules for workers who use their private vehicle for work purposes are not stipulated in the Labour Code. Reimbursement of mileage, fuel, parking and car expenses are done at the discretion of each employer"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "gross_up": true,
+        "gross_up_rule": "Reimbursements without valid receipts per BIR requirements, as well as online receipts from Grab, Food panda, will be treated as a taxable income"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "additional_info_required": true,
+        "additional_info_rule": "Receipts and invoices must be submitted with expenses. Online copies are sufficient, hard copy not required. Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before submission"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Office supplies",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "additional_info_required": true,
+        "additional_info_rule": "Goods = Sales Invoice required"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Taxi, Training",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "additional_info_required": true,
+        "additional_info_rule": "Services = Official Receipt required"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Convert amount in local currency and include currency & exchange rate used for foreign currency expenses"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Include details (date of expense, business purpose, and merchant name) with all submissions"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "For Mileage reimbursements, include To and Fro locations, distance travelled and per diem rates"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Client line manager must review and approve expenses before payroll cutoff date to process them in the same month"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "Expenses submitted without itemized reports or properly labeled receipts will be rejected or postponed"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "GoGlobal",
+        "additional_info_required": true,
+        "additional_info_rule": "The expense submission must have an itemized report along with clear receipts"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Equipment, Taxi, Training, Mileage",
+        "icp_name": "Procloz, AYP, GoGlobal, Tiger",
+        "additional_info_required": true,
+        "additional_info_rule": "Indicate in the reporting of expenses if you would like to gross up any items"
+      }
+    ]
+  },
+  "Singapore": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Car rental, Restaurant, Office supplies, Software, Equipment, Training, Mileage",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted with expenses. Documents must be actual tax receipts or invoices; booking confirmations will not suffice"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Car rental, Restaurant, Office supplies, Software, Equipment, Training, Mileage",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts must be from the same tax year in order to be processed. Invoices/receipts should be submitted as soon as possible, ideally within the month or the following month in which the expense occurred"
+      },
+      {
+        "required_data": "Total amount",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Car rental, Restaurant, Office supplies, Software, Equipment, Training, Mileage",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted with expenses. Receipts must be clear and readable, preferably scanned rather than photographed"
+      },
+      {
+        "required_data": "Employee full name",
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Car rental",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "Hotels, flights, car rentals, etc. should be addressed to the employee, stating their full name (no mentioning of end client)"
+      },
+      {
+        "required_data": "Local Employer details",
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment, Training",
+        "icp_name": "Global People",
+        "mandatory_optional": "Mandatory",
+        "rule": "The Local Employers details details should appear on invoices not the worker"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "Global People",
+        "gross_up": false,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant",
+        "icp_name": "Global People",
+        "gross_up": false,
+        "gross_up_rule": "Domestic business travel can be reimbursed by using the set per diem rate to cover subsistence costs"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Restaurant",
+        "icp_name": "Global People",
+        "gross_up": true,
+        "gross_up_rule": "Any amount spent over the set maximum per diem rate will be paid back to workers as a taxable bonus. When Per diem method is used, Central Provident Fund (CPF) contributions will be applied for local workers and income tax will be applied for foreign workers"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Training",
+        "icp_name": "Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Training and educational expenses - should include manager confirmation"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Milage expense – Workers should attach car details (model, year, etc.) and a map showing the relevant route (google maps is sufficient)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Car rental, Restaurant",
+        "icp_name": "Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "With our Partner People 2.0 (Global People), each business trip must be submitted separately, otherwise the expense report will be rejected"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Car rental, Restaurant, Office supplies, Software, Equipment, Training, Mileage",
+        "icp_name": "Global People",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted"
       }
     ]
   }
