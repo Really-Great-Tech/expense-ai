@@ -10,7 +10,7 @@ export const AGENT_PROFILES = {
   CLASSIFICATION: 'SONNET_4' as ProfileKey,
 
   // Data extraction - balanced performance
-  EXTRACTION: 'NOVA_PRO' as ProfileKey,
+  EXTRACTION: 'SONNET_4' as ProfileKey,
 
   // Citation generation - optimized for structured output
   CITATION: 'NOVA_MICRO' as ProfileKey,
@@ -19,14 +19,14 @@ export const AGENT_PROFILES = {
   QUALITY_ASSESSMENT: 'NOVA_PRO' as ProfileKey,
 
   // Compliance and issue detection
-  COMPLIANCE: 'NOVA_PRO' as ProfileKey,
+  COMPLIANCE: 'SONNET_4' as ProfileKey,
 
   // Document splitting
   DOCUMENT_SPLITTER: 'SONNET_4' as ProfileKey,
 } as const;
 
 // Judge panel profile
-export const JUDGE_PROFILE: ProfileKey = 'NOVA_PRO';
+export const JUDGE_PROFILE: ProfileKey = 'SONNET_4';
 
 /**
  * Default inference configuration
