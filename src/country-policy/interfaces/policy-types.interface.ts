@@ -82,8 +82,14 @@ export interface PolicyUploadResponse {
   success: boolean;
   country: string;
   countryCode?: string;
+  policyId?: number | string;
   versionId?: string;
   filesProcessed: number;
-  results: FileProcessingResult[];
+  /** List of files that contributed to the policy */
+  files: string[];
+  /** The unified extracted policy data (shown once, not duplicated per file) */
+  extractedData?: ExtractedPolicyData;
+  /** Individual file processing results (for error tracking) */
+  results: Array<{ fileName: string; status: 'success' | 'failed'; error?: string }>;
   timestamp: Date;
 }

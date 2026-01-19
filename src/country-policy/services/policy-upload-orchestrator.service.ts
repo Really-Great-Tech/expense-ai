@@ -7,6 +7,7 @@ import {
   PolicyUploadResponse,
   FileProcessingResult,
   StoredFileInfo,
+  ExtractedPolicyData,
 } from '../interfaces/policy-types.interface';
 
 /**
@@ -38,15 +39,15 @@ export class PolicyUploadOrchestrator {
   ) { }
 
   /**
-   * Process multiple uploaded policy documents
-   * 
-   * @param files - Array of uploaded files (PDF, DOCX, Excel)
-   * @param countryName - Country name for these policies
-   * @param countryCode - Optional country code
-   * @param description - Optional description
-   * @param updateSeedFile - Whether to update the seed file (default: true)
-   * @returns Complete upload result with per-file status
-   */
+ * Process multiple uploaded policy documents
+ * 
+ * @param files - Array of uploaded files (PDF, DOCX, Excel)
+ * @param countryName - Country name for these policies
+ * @param countryCode - Optional country code
+ * @param description - Optional description
+ * @param updateSeedFile - Whether to update the seed file (default: true)
+ * @returns Complete upload result with per-file status
+ */
   async processMultipleFiles(
     files: Express.Multer.File[],
     countryName: string,
@@ -61,68 +62,131 @@ export class PolicyUploadOrchestrator {
     this.logger.log(`🌍 Country: ${countryName}`);
     this.logger.log(`📁 Files to process: ${files.length}`);
     this.logger.log(`📝 Update seed file: ${updateSeedFile}`);
-    this.logger.log('');
+    this.logger.log('')
 
     const results: FileProcessingResult[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-    let lastSuccessfulVersionId: string | undefined;
+    let versionId: string | undefined;
+    let policyId: number | string | undefined;
+    let extractedData: ExtractedPolicyData | undefined;
 
-    // Process each file sequentially
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      this.logger.log(`📄 Processing file ${i + 1}/${files.length}: ${file.originalname}`);
+    try {
+      // STEP 1: Store all files to S3 (parallel processing for speed)
+      this.logger.log('📤 STEP 1: Storing files to S3...');
+      const storeStartTime = Date.now();
 
-      try {
-        // Process single file through the pipeline
-        const result = await this.processSingleFile(
-          file,
-          countryName,
-          countryCode,
-          description,
-          updateSeedFile,
-        );
+      const storePromises = files.map(async (file) => {
+        const fileInfo = await this.storeFile(file);
+        this.logger.log(`   ✓ ${file.originalname} → S3`);
+        return { file, fileInfo };
+      });
 
-        results.push(result);
+      const storedFiles = await Promise.all(storePromises);
+      this.logger.log(`   Completed in ${Date.now() - storeStartTime}ms`);
+      this.logger.log('');
 
-        if (result.status === 'success') {
-          successCount++;
-          lastSuccessfulVersionId = result.versionId;
-          this.logger.log(`✅ File ${i + 1} processed successfully`);
-        } else {
-          failureCount++;
-          this.logger.warn(`⚠️  File ${i + 1} processing failed: ${result.error}`);
+      // STEP 2: Extract unified policy from all documents
+      this.logger.log('🤖 STEP 2: Extracting unified policy from all documents...');
+      const extractStartTime = Date.now();
+
+      extractedData = await this.llmAgent.extractPolicyFromMultipleDocuments(
+        files.map(file => ({
+          buffer: file.buffer,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+        })),
+        countryName,
+      );
+
+      this.logger.log(`   Completed in ${Date.now() - extractStartTime}ms`);
+      this.logger.log('');
+
+      // STEP 3: Validate extracted data
+      this.logger.log('✅ STEP 3: Validating extracted data...');
+      const isValidForDb = this.persistenceService.validatePolicyData(extractedData);
+      if (!isValidForDb) {
+        throw new BadRequestException('Policy data does not meet database requirements');
+      }
+      this.logger.log('   ✓ Validation passed');
+      this.logger.log('');
+
+      // STEP 4: Save unified policy to database (with references to all source files)
+      this.logger.log('💾 STEP 4: Saving unified policy to database...');
+
+      // Use the first file's info as primary, but we'll create a combined file info
+      const primaryFileInfo = storedFiles[0].fileInfo;
+      const allFilePaths = storedFiles.map(sf => sf.fileInfo.filePath).join(', ');
+
+      const combinedFileInfo: StoredFileInfo = {
+        ...primaryFileInfo,
+        fileName: `${countryName} - Combined Policy (${files.length} documents)`,
+        filePath: allFilePaths,
+      };
+
+      const saveResult = await this.persistenceService.savePolicyToDatabase(
+        countryName,
+        extractedData,
+        combinedFileInfo,
+        countryCode,
+      );
+
+      policyId = saveResult.policyId;
+      versionId = saveResult.versionId;
+
+      this.logger.log(`   ✓ Policy saved (ID: ${policyId}, Version: ${versionId})`);
+      this.logger.log('');
+
+      // STEP 5: Update seed file (optional)
+      if (updateSeedFile) {
+        this.logger.log('📝 STEP 5: Updating seed file...');
+        try {
+          await this.seedWriterService.addCountryToSeedFile(countryName, extractedData);
+          this.logger.log('   ✓ Seed file updated');
+        } catch (error) {
+          // Log but don't fail - database is the source of truth
+          this.logger.warn(`   ⚠️  Seed file update failed (non-critical): ${error}`);
         }
+        this.logger.log('');
+      }
 
-      } catch (error) {
-        failureCount++;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Mark all files as successfully processed (they all contributed to one unified policy)
+      for (const { file } of storedFiles) {
+        results.push({
+          fileName: file.originalname,
+          status: 'success',
+        });
+      }
 
-        this.logger.error(`❌ File ${i + 1} processing failed:`, error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('❌ Pipeline failed:', error);
 
+      // Mark all files as failed since we process them as a group
+      for (const file of files) {
         results.push({
           fileName: file.originalname,
           status: 'failed',
           error: errorMessage,
         });
       }
-
-      this.logger.log('');
     }
 
     this.logger.log('========================================================');
     this.logger.log('📊 PIPELINE COMPLETE');
-    this.logger.log(`✅ Successful: ${successCount}`);
-    this.logger.log(`❌ Failed: ${failureCount}`);
+    this.logger.log(`✅ Success: ${results.every(r => r.status === 'success')}`);
+    this.logger.log(`📄 Files processed: ${files.length}`);
+    this.logger.log(`🎯 Unified policies generated: ${policyId ? 1 : 0}`);
     this.logger.log('========================================================');
     this.logger.log('');
 
     return {
-      success: successCount > 0,
+      success: results.every(r => r.status === 'success'),
       country: countryName,
       countryCode,
-      versionId: lastSuccessfulVersionId,
+      policyId,
+      versionId,
       filesProcessed: files.length,
+      files: files.map(f => f.originalname),
+      extractedData: results.every(r => r.status === 'success') ? extractedData : undefined,
       results,
       timestamp: new Date(),
     };

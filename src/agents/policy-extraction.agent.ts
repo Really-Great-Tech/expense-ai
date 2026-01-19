@@ -9,6 +9,7 @@ import {
 import {
   POLICY_EXTRACTION_SYSTEM_PROMPT,
   createPolicyExtractionUserPrompt,
+  createMultiDocumentPolicyExtractionPrompt,
 } from '../country-policy/prompts/policy-extraction.prompt';
 
 /**
@@ -105,6 +106,99 @@ export class PolicyExtractionAgent {
     this.logger.log(`   - Additional info policies: ${validatedData.compliancePoliciesAdditionalInfoRelated.length}`);
     this.logger.log('============================================');
     this.logger.log('POLICY EXTRACTION COMPLETE');
+    this.logger.log('============================================');
+    this.logger.log('');
+
+    return validatedData;
+  }
+
+  /**
+   * Extract policy data from multiple uploaded documents as a single context
+   * 
+   * @param files - Array of file information { buffer, fileName, mimeType }
+   * @param countryName - Country name for context
+   * @returns Extracted policy structure combining all documents
+   */
+  async extractPolicyFromMultipleDocuments(
+    files: Array<{ buffer: Buffer; fileName: string; mimeType: string }>,
+    countryName: string = 'Unknown',
+  ): Promise<ExtractedPolicyData> {
+
+    this.logger.log('============================================');
+    this.logger.log('MULTI-DOCUMENT POLICY EXTRACTION STARTING');
+    this.logger.log('============================================');
+    this.logger.log(`Country: ${countryName}`);
+    this.logger.log(`Files: ${files.length}`);
+    files.forEach((file, idx) => {
+      this.logger.log(`  ${idx + 1}. ${file.fileName} (${file.mimeType}, ${file.buffer.length} bytes)`);
+    });
+    this.logger.log('');
+
+    // Step 1: Extract text from all documents (can run in parallel)
+    this.logger.log('Step 1: Extracting text from all documents...');
+    const extractionStartTime = Date.now();
+
+    const extractionPromises = files.map(async (file) => {
+      const text = await this.extractTextFromDocument(file.buffer, file.fileName, file.mimeType);
+      return {
+        fileName: file.fileName,
+        content: text,
+      };
+    });
+
+    const extractedDocuments = await Promise.all(extractionPromises);
+    const extractionDuration = Date.now() - extractionStartTime;
+
+    // Validate all extractions
+    const totalCharacters = extractedDocuments.reduce((sum, doc) => sum + doc.content.length, 0);
+
+    for (const doc of extractedDocuments) {
+      if (!doc.content || doc.content.trim().length < 100) {
+        throw new Error(
+          `Failed to extract sufficient text from ${doc.fileName}. Extracted ${doc.content?.length || 0} characters.`
+        );
+      }
+    }
+
+    this.logger.log(`   Extracted ${totalCharacters} total characters from ${files.length} documents in ${extractionDuration}ms`);
+    extractedDocuments.forEach((doc, idx) => {
+      this.logger.log(`     - ${doc.fileName}: ${doc.content.length} characters`);
+    });
+    this.logger.log('');
+
+    // Step 2: Call LLM with combined context
+    this.logger.log('Step 2: Calling LLM for unified policy extraction...');
+    const llmStartTime = Date.now();
+
+    const response = await this.llm.chat({
+      messages: [
+        { role: 'system', content: POLICY_EXTRACTION_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: createMultiDocumentPolicyExtractionPrompt(extractedDocuments, countryName)
+        },
+      ],
+    });
+
+    const llmDuration = Date.now() - llmStartTime;
+    this.logger.log(`   LLM response received in ${llmDuration}ms`);
+    this.logger.log(`   Tokens: ${response.usage?.input_tokens || 'N/A'} input, ${response.usage?.output_tokens || 'N/A'} output`);
+    this.logger.log('');
+
+    // Step 3: Parse JSON response
+    this.logger.log('Step 3: Parsing LLM response...');
+    const extractedData = this.parseJsonResponse(response.message.content);
+    this.logger.log('');
+
+    // Step 4: Validate with Zod schema
+    this.logger.log('Step 4: Validating extracted data...');
+    const validatedData = this.validateExtractedData(extractedData);
+
+    this.logger.log(`   - Receipt standards: ${validatedData.receiptStandards.length}`);
+    this.logger.log(`   - Gross-up policies: ${validatedData.compliancePoliciesGrossUpRelated.length}`);
+    this.logger.log(`   - Additional info policies: ${validatedData.compliancePoliciesAdditionalInfoRelated.length}`);
+    this.logger.log('============================================');
+    this.logger.log('MULTI-DOCUMENT POLICY EXTRACTION COMPLETE');
     this.logger.log('============================================');
     this.logger.log('');
 
