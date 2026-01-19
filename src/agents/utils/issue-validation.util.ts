@@ -67,7 +67,7 @@ export function validateIssuesAgainstCompliance(issues: ComplianceIssue[], compl
       if (logger) {
         logger.debug(`Validation: INVALID - Empty reference`, {
           issue_type: issue.issue_type,
-          field: issue.field,
+          field_name: issue.field,
         });
       }
       continue;
@@ -81,7 +81,7 @@ export function validateIssuesAgainstCompliance(issues: ComplianceIssue[], compl
       if (logger) {
         logger.debug(`Validation: VALID - Found match`, {
           issue_type: issue.issue_type,
-          field: issue.field,
+          field_name: issue.field,
         });
       }
     } else {
@@ -93,7 +93,7 @@ export function validateIssuesAgainstCompliance(issues: ComplianceIssue[], compl
       if (logger) {
         logger.warn(`Validation: INVALID - No match found`, {
           issue_type: issue.issue_type,
-          field: issue.field,
+          field_name: issue.field,
         });
       }
     }
