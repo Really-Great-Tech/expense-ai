@@ -71,6 +71,8 @@ export interface FileProcessingResult {
   error?: string;
   policyId?: number | string;
   versionId?: string;
+  /** The extracted policy rules from the document */
+  extractedData?: ExtractedPolicyData;
 }
 
 /**
