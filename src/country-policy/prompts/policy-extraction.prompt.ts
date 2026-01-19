@@ -268,3 +268,40 @@ END DOCUMENT
 
 Analyze the above document and extract all expense policy rules into the required JSON format with the three arrays: receiptStandards, compliancePoliciesGrossUpRelated, and compliancePoliciesAdditionalInfoRelated.`;
 }
+
+/**
+ * User prompt template for multi-document policy extraction
+ * @param documents - Array of document contents with their filenames
+ * @param countryName - The name of the country for context
+ */
+export function createMultiDocumentPolicyExtractionPrompt(
+  documents: Array<{ fileName: string; content: string }>,
+  countryName: string
+): string {
+  const documentSections = documents
+    .map((doc, index) => {
+      return `---
+DOCUMENT ${index + 1}: ${doc.fileName}
+---
+
+${doc.content}
+
+---
+END DOCUMENT ${index + 1}
+---`;
+    })
+    .join('\n\n');
+
+  return `Extract expense policy information for ${countryName} from the following ${documents.length} document(s).
+
+IMPORTANT INSTRUCTIONS:
+- Analyze ALL ${documents.length} documents together as a single comprehensive source
+- Create ONE unified policy structure that combines information from all documents
+- Do NOT create separate policies for each document
+- If documents have overlapping or conflicting information, use the most specific or recent information
+- Return ONLY valid JSON. Do not include any explanatory text before or after the JSON.
+
+${documentSections}
+
+Analyze all the above documents together and extract all expense policy rules into the required JSON format with the three arrays: receiptStandards, compliancePoliciesGrossUpRelated, and compliancePoliciesAdditionalInfoRelated.`;
+}
