@@ -20,6 +20,7 @@ export interface InferenceProfile {
 export interface BedrockConfig {
   profile: ProfileKey;
   temperature?: number;
+  maxTokens?: number;
 }
 
 export interface ChatMessage {
@@ -84,6 +85,7 @@ export class BedrockLlmService {
   private readonly profile: InferenceProfile;
   private readonly profileKey: ProfileKey;
   private readonly temperature: number;
+  private readonly maxTokens: number;
   private readonly client: BedrockRuntimeClient;
 
   private static getConfig(): AppConfigType {
@@ -132,9 +134,10 @@ export class BedrockLlmService {
     this.profileKey = config.profile;
     this.profile = BedrockLlmService.getProfile(config.profile);
     this.temperature = config.temperature ?? BedrockLlmService.DEFAULT_TEMPERATURE;
+    this.maxTokens = config.maxTokens ?? BedrockLlmService.DEFAULT_MAX_TOKENS;
     this.client = BedrockLlmService.getClient();
 
-    BedrockLlmService.logger.log(`Initialized: ${this.profile.name}, temp=${this.temperature}`);
+    BedrockLlmService.logger.log(`Initialized: ${this.profile.name}, temp=${this.temperature}, maxTokens=${this.maxTokens}`);
   }
 
   // Unified chat - ConverseCommand works for all models
@@ -160,7 +163,7 @@ export class BedrockLlmService {
             messages,
             system: systemMessage ? [{ text: systemMessage }] : undefined,
             inferenceConfig: {
-              maxTokens: BedrockLlmService.DEFAULT_MAX_TOKENS,
+              maxTokens: this.maxTokens,
               temperature: this.temperature,
             },
           });
