@@ -185,6 +185,7 @@ export class PolicyUploadOrchestrator {
       status: 'success',
       policyId: saveResult.policyId,
       versionId: saveResult.versionId,
+      extractedData,
     };
   }
 
