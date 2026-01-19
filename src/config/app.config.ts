@@ -45,6 +45,11 @@ export interface AppConfigType {
   // AWS
   aws: {
     region: string;
+    bedrock: {
+      region: string;
+      accessKeyId: string | undefined;
+      secretAccessKey: string | undefined;
+    };
   };
 
   // Storage (S3 only)
@@ -149,6 +154,11 @@ export default registerAs('app', (): AppConfigType => {
     // ==========================================================================
     aws: {
       region: process.env.AWS_REGION || 'eu-west-1',
+      bedrock: {
+        region: process.env.BEDROCK_AWS_REGION || 'eu-west-1',
+        accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY,
+      },
     },
 
     // ==========================================================================

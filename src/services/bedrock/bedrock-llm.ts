@@ -111,21 +111,34 @@ export class BedrockLlmService {
 
   private static getClient(): BedrockRuntimeClient {
     const config = this.getConfig();
-    const region = config.aws.region;
+    const region = config.aws.bedrock.region;
 
-    if (!this.clientCache.has(region)) {
-      this.clientCache.set(
-        region,
-        new BedrockRuntimeClient({
-          region,
-          maxAttempts: 4,
-          retryMode: 'adaptive',
-        }),
-      );
+    const clientConfig: any = {
+      region,
+      maxAttempts: 4,
+      retryMode: 'adaptive',
+    };
+
+    // Use explicit Bedrock credentials if provided
+    if (config.aws.bedrock.accessKeyId && config.aws.bedrock.secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId: config.aws.bedrock.accessKeyId,
+        secretAccessKey: config.aws.bedrock.secretAccessKey,
+      };
+      this.logger.log('Using explicit Bedrock AWS credentials');
+    } else {
+      this.logger.log('Using default AWS credentials for Bedrock');
+    }
+
+    // Cache key includes region and credential presence to avoid conflicts
+    const cacheKey = `${region}-${!!clientConfig.credentials}`;
+
+    if (!this.clientCache.has(cacheKey)) {
+      this.clientCache.set(cacheKey, new BedrockRuntimeClient(clientConfig));
       this.logger.log(`Created Bedrock client for region: ${region}`);
     }
 
-    return this.clientCache.get(region)!;
+    return this.clientCache.get(cacheKey)!;
   }
 
   constructor(config: BedrockConfig) {
@@ -184,7 +197,7 @@ export class BedrockLlmService {
       if (error.name === 'ValidationException' || error.name === 'AccessDeniedException') {
         BedrockLlmService.logger.error(
           `Bedrock config error (permanent, not retryable): ${error.name} - ${error.message}. ` +
-            'Check: 1) Model enabled in AWS console, 2) IAM permissions, 3) Region availability',
+          'Check: 1) Model enabled in AWS console, 2) IAM permissions, 3) Region availability',
         );
         throw error;
       }
