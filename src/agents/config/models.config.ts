@@ -19,7 +19,7 @@ export const AGENT_PROFILES = {
   QUALITY_ASSESSMENT: 'NOVA_PRO' as ProfileKey,
 
   // Compliance and issue detection
-  COMPLIANCE: 'NOVA_PRO' as ProfileKey,
+  COMPLIANCE: 'SONNET_4' as ProfileKey,
 
   // Document splitting
   DOCUMENT_SPLITTER: 'SONNET_4' as ProfileKey,

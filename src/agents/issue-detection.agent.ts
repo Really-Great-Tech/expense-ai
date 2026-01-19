@@ -5,6 +5,9 @@ import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
 import { ServiceUnavailableError } from '../common/errors/service-errors';
+import { filterComplianceByIcp, getFilterStats } from './utils/compliance-filter.util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -43,13 +46,33 @@ export class IssueDetectionAgent extends BaseAgent {
     try {
       this.logger.log(`Starting compliance analysis for ${country}/${icp}`);
 
-      // Get the prompt and compile with variables
+      // Filter compliance data to include only rules for the specified ICP
+      const filteredComplianceData = filterComplianceByIcp(complianceData, icp);
+
+      // Save filtered compliance data to disk for debugging
+      const debugDir = path.join(process.cwd(), 'filtered-rules-debug');
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true });
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const debugFileName = `filtered-compliance-${country}-${icp}-${timestamp}.json`;
+      const debugFilePath = path.join(debugDir, debugFileName);
+      fs.writeFileSync(debugFilePath, JSON.stringify(filteredComplianceData, null, 2), 'utf-8');
+
+      // Log filtering statistics
+      const stats = getFilterStats(complianceData, filteredComplianceData);
+      this.logger.debug(`Filtered compliance rules for ICP '${icp}':`, stats);
+      this.logger.debug(`Receipt Standards: ${stats.receiptStandards.original} → ${stats.receiptStandards.filtered}`);
+      this.logger.debug(`Gross-Up Policies: ${stats.grossUpPolicies.original} → ${stats.grossUpPolicies.filtered}`);
+      this.logger.debug(`Additional Info Policies: ${stats.additionalInfoPolicies.original} → ${stats.additionalInfoPolicies.filtered}`);
+
+      // Get the prompt and compile with variables using filtered compliance data
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
         expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,
-        complianceData: JSON.stringify(complianceData, null, 2),
+        complianceData: JSON.stringify(filteredComplianceData, null, 2),
         extractedData: JSON.stringify(extractedData, null, 2),
       });
 
@@ -71,14 +94,38 @@ export class IssueDetectionAgent extends BaseAgent {
       const parsedResult = this.parseJsonResponse(rawContent);
       const result = IssueDetectionResultSchema.parse(parsedResult);
 
+      // Validate issues against FILTERED compliance data to filter hallucinations
+      const { validateIssuesAgainstCompliance } = await import('./utils/issue-validation.util');
+      const validation = validateIssuesAgainstCompliance(result.validation_result.issues, filteredComplianceData, this.logger);
+
+      // Log validation metrics
+      if (validation.metrics.invalidCount > 0) {
+        this.logger.warn(
+          `Filtered ${validation.metrics.invalidCount} hallucinated issues (${(validation.metrics.hallucinationRate * 100).toFixed(1)}%)`,
+        );
+      }
+
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
 
-      this.logger.log(`Compliance analysis completed: ${result.validation_result.issues_count} issues found in ${duration}ms`);
+      this.logger.log(`Compliance analysis completed: ${validation.validIssues.length} valid issues found in ${duration}ms`);
       this.logger.debug(`Model used: ${this.getActualModelUsed()}`);
       this.logger.debug(`Prompt metadata: ${JSON.stringify(this.getPromptMetadata())}`);
 
-      return result;
+      return {
+        ...result,
+        validation_result: {
+          ...result.validation_result,
+          issues: validation.validIssues,
+          issues_count: validation.validIssues.length,
+        },
+        validation_metadata: {
+          total_issues_flagged: validation.metrics.totalIssues,
+          valid_issues: validation.metrics.validCount,
+          hallucinated_issues_filtered: validation.metrics.invalidCount,
+          hallucination_rate: validation.metrics.hallucinationRate,
+        },
+      };
     } catch (error: any) {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
