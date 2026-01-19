@@ -33,7 +33,7 @@ export class PolicyExtractionAgent {
 
   constructor() {
     // Initialize LLM with policy extraction profile (Claude Sonnet)
-    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.POLICY_EXTRACTION });
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.POLICY_EXTRACTION, maxTokens: 64000 });
     this.textract = new TextractApiService();
 
     this.logger.log(`PolicyExtractionAgent initialized with profile: ${AGENT_PROFILES.POLICY_EXTRACTION}`);
@@ -56,27 +56,27 @@ export class PolicyExtractionAgent {
   ): Promise<ExtractedPolicyData> {
 
     this.logger.log('============================================');
-    this.logger.log('🤖 POLICY EXTRACTION STARTING');
+    this.logger.log('POLICY EXTRACTION STARTING');
     this.logger.log('============================================');
-    this.logger.log(`📄 File: ${fileName}`);
-    this.logger.log(`📋 Type: ${mimeType}`);
-    this.logger.log(`💾 Size: ${fileBuffer.length} bytes`);
-    this.logger.log(`🌍 Country: ${countryName}`);
+    this.logger.log(`File: ${fileName}`);
+    this.logger.log(`Type: ${mimeType}`);
+    this.logger.log(`Size: ${fileBuffer.length} bytes`);
+    this.logger.log(`Country: ${countryName}`);
     this.logger.log('');
 
     // Step 1: Extract text from document
-    this.logger.log('📝 Step 1: Extracting text from document...');
+    this.logger.log('Step 1: Extracting text from document...');
     const documentText = await this.extractTextFromDocument(fileBuffer, fileName, mimeType);
 
     if (!documentText || documentText.trim().length < 100) {
       throw new Error(`Failed to extract sufficient text from document. Extracted ${documentText?.length || 0} characters.`);
     }
 
-    this.logger.log(`   ✓ Extracted ${documentText.length} characters`);
+    this.logger.log(`   Extracted ${documentText.length} characters`);
     this.logger.log('');
 
     // Step 2: Call LLM to extract structured policies
-    this.logger.log('🧠 Step 2: Calling LLM for policy extraction...');
+    this.logger.log('Step 2: Calling LLM for policy extraction...');
     const startTime = Date.now();
 
     const response = await this.llm.chat({
@@ -87,24 +87,24 @@ export class PolicyExtractionAgent {
     });
 
     const llmDuration = Date.now() - startTime;
-    this.logger.log(`   ✓ LLM response received in ${llmDuration}ms`);
-    this.logger.log(`   ✓ Tokens: ${response.usage?.input_tokens || 'N/A'} input, ${response.usage?.output_tokens || 'N/A'} output`);
+    this.logger.log(`   LLM response received in ${llmDuration}ms`);
+    this.logger.log(`   Tokens: ${response.usage?.input_tokens || 'N/A'} input, ${response.usage?.output_tokens || 'N/A'} output`);
     this.logger.log('');
 
     // Step 3: Parse JSON response
-    this.logger.log('📊 Step 3: Parsing LLM response...');
+    this.logger.log('Step 3: Parsing LLM response...');
     const extractedData = this.parseJsonResponse(response.message.content);
     this.logger.log('');
 
     // Step 4: Validate with Zod schema
-    this.logger.log('✅ Step 4: Validating extracted data...');
+    this.logger.log('Step 4: Validating extracted data...');
     const validatedData = this.validateExtractedData(extractedData);
 
     this.logger.log(`   - Receipt standards: ${validatedData.receiptStandards.length}`);
     this.logger.log(`   - Gross-up policies: ${validatedData.compliancePoliciesGrossUpRelated.length}`);
     this.logger.log(`   - Additional info policies: ${validatedData.compliancePoliciesAdditionalInfoRelated.length}`);
     this.logger.log('============================================');
-    this.logger.log('✅ POLICY EXTRACTION COMPLETE');
+    this.logger.log('POLICY EXTRACTION COMPLETE');
     this.logger.log('============================================');
     this.logger.log('');
 
