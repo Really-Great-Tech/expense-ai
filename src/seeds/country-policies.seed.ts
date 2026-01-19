@@ -3735,5 +3735,373 @@ export const COUNTRY_POLICY_SEEDS: Record<string, {
         "additional_info_rule": "Review submitted expense reports and approve expense claims, ensuring all required supporting documents have been included by the agreed cutoff date"
       }
     ]
+  },
+  "Australia": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Professional services, Medical, Telecommunications, Utilities, Mileage, Entertainment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": ""
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Professional services, Medical, Telecommunications, Utilities, Mileage, Entertainment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Transaction date must appear on receipt or invoice"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Professional services, Medical, Telecommunications",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Total amount must be visible on receipt or invoice"
+      },
+      {
+        "required_data": "Consumer name (Employee name as recipient)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Professional services, Medical, Telecommunications, Utilities, Mileage, Entertainment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "The workers name and details should appear on invoices as the recipient/consumer, not the Local Employers details"
+      },
+      {
+        "required_data": "Tax information (Supplier tax registration details)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Training, Professional services, Medical, Telecommunications, Utilities, Mileage, Entertainment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipt or invoice must be actual tax receipt or invoice with supplier tax registration details to qualify for tax exemption processing"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses related to workers completing their job (laptops, office supplies etc.) are usually tax exempt when purely business-related. Any non-business or personal elements will be subject to tax"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Health insurance, Wellness benefits",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "Health insurance and wellness benefits are not tax exempt business expenses and must be processed as Fringe Benefits Tax (FBT) and subject to taxation"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": false,
+        "gross_up_rule": "Motor vehicle or car expenses when work-related can be claimed tax-free using either cents per kilometer method or logbook method per ATO guidelines"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Meals, Flight",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "Domestic business trips are non-taxable up to the daily per diem limit (covers lodging, meals, and incidentals) based on worker income level. Any expenditure exceeding the per diem rates will be taxed as ordinary income"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Meals, Flight",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "International business trips use ATO per diem method with set rates for subsistence costs (lodging, meals, incidentals) tax-free based on worker income and destination country. Any expenditure exceeding per diem rates will be taxed as ordinary income"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "If a receipt is not provided, the expense will be fully taxed. Without supporting documents, any applicable tax exemption cannot be applied"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "Manager approval required before expense reimbursement can be processed"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers must submit tax form each year (July to October) to claim any applicable tax deduction. Workers can use ATO myDeductions tool to track and manage expenses throughout the year"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "Workers must submit Mileage Expense Form when using logbook method for reimbursement"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "Distance records must be maintained and submitted within the monthly expense reimbursement report"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Meals, Flight",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "For domestic travel, workers must provide: (1) Travel proof in the form of tickets and hotel reservations, (2) Rough estimate of expenditure if actual receipts not available, (3) Proof of money spent (credit card statement or other banking records)"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Meals, Flight",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "For international travel exceeding 6 days, workers must keep copies of all receipts for the travel (incidental expenses, accommodation, etc.) as ATO might request them during tax return checks"
+      }
+    ]
+  },
+  "India": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be actual tax receipts or invoices showing supplier business name. Booking confirmations will not suffice"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Date of the expense must appear on receipts and invoices"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Amount as mentioned on the receipt must be visible, showing the local currency amount"
+      },
+      {
+        "required_data": "Item description",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Expense description must be clear on the receipt showing what goods or services were purchased"
+      },
+      {
+        "required_data": "Consumer name (Employee name as recipient)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "The workers name and details should appear on invoices, not the Local Employer. For Papaya Direct: not American EPAY Services Pvt Ltd (10th Floor, Corporate Park, Tower-A/2, Plot No.-7A/1, Sector-142, Noida-201301)"
+      },
+      {
+        "required_data": "Tax information (Supplier tax registration details)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "mandatory_optional": "Mandatory",
+        "rule": "Documents must be actual tax receipts or invoices with supplier tax registration details to qualify for tax exemption"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses related to workers completing their job will usually be tax exempt. Only purely business related elements of an expense will be tax free, anything additional will be subject to tax. Tax exemptions will only be applied providing sufficient proof is shared"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "gross_up": false,
+        "gross_up_rule": "Workers using private vehicles, including cars, vans, motorbikes and bicycles, for work purposes should be reimbursed tax free according to the mileage traveled"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "gross_up": false,
+        "gross_up_rule": "Domestic and international business travel expenses using per diem method or reimbursed against receipts are tax free"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "gross_up": true,
+        "gross_up_rule": "Without supporting documents any applicable tax exemption cannot be applied. If receipts or invoices are not provided, the expense will be subject to tax"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Manager must review submitted expense reports and approve expense claims, ensuring all required supporting documents (receipts, invoices) have been included by the agreed cutoff date"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Any personal information not required for reimbursement purposes should be removed before it is submitted"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Procloz",
+        "additional_info_required": true,
+        "additional_info_rule": "Submit expenses using template: India (Procloz) Expense Receipts Summary.xlsx. Template requires: Employee ID, Employee Name, Date of the Expense, Expense Description, Amount (in local currency), FX rate, Amount (in INR), File name of the receipt"
+      },
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Submit expenses using template: Expense report template INR.xlsx. Template requires: Employee Name, Department, Phone, Employee ID, Starting Date, Ending Date, Travel From, Travel To, Purpose"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Procloz",
+        "additional_info_required": true,
+        "additional_info_rule": "Minimum mileage rate: 20 INR per km (each employer can set their own specific rate). Mileage must be recorded and submitted within the monthly expense reimbursement report. Receipts must be provided for audit purposes"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Mileage rate: 14 INR per km. Mileage must be recorded and submitted within the monthly expense reimbursement report including: reimbursement rate, total miles, and total mileage reimbursement calculation"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "For each mileage expense: Date, Vehicle Type (Rental, Work, or Personal), Total KM, Comments must be documented. Map screenshot must be attached per ride showing distance traveled"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "Procloz",
+        "additional_info_required": true,
+        "additional_info_rule": "Domestic business travel: No set per diem rates. Each employer can set their own allowance and daily limit. The minimum rate that should be used is 2500 INR per day. Receipts must be provided for audit purposes when using this set daily limit. Alternatively, costs can be reimbursed as regular expenses against receipts and supporting documents"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "Procloz",
+        "additional_info_required": true,
+        "additional_info_rule": "International business travel minimum per diem rates: Europe – 55 EUR per day, UK – 50 GBP per day, Rest of the World – 60 USD per day. Receipts must be provided for audit purposes. Per diem can be paid upon the workers return, it does not need to be paid in advance. Alternatively, workers can provide receipts for reimbursement instead of using the per diem method"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "International business travel: 25 USD per day. Receipts must be provided for audit purposes. Per diem can be paid upon the workers return, it does not need to be paid in advance"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "Procloz, American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "For expenses in foreign currency: Document original currency amount, foreign exchange rate (FX rate), and converted amount in INR (payment currency) in the expense report"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant, Transportation",
+        "icp_name": "American EPAY Services Pvt Ltd",
+        "additional_info_required": true,
+        "additional_info_rule": "Travel information must be documented in expense report: Starting Date, Ending Date, Travel From location, Travel To location, and Purpose of trip"
+      }
+    ]
+  },
+  "UAE": {
+    "receiptStandards": [
+      {
+        "required_data": "Supplier business name",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must be submitted with expenses"
+      },
+      {
+        "required_data": "Transaction date",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must show transaction date"
+      },
+      {
+        "required_data": "Total amount in local currency",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "Receipts and invoices must show total amount"
+      },
+      {
+        "required_data": "Consumer name (Employee name as recipient)",
+        "travel_non_travel_both": "Both",
+        "expense_type": "Hotel, Flight, Restaurant, Office supplies, Software, Equipment, Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "mandatory_optional": "Mandatory",
+        "rule": "The workers name and details should appear on invoices, not the Local Employers details"
+      }
+    ],
+    "compliancePoliciesGrossUpRelated": [
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Office supplies, Software, Equipment",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": true,
+        "gross_up_rule": "Business expenses might be subject to VAT of 5%"
+      },
+      {
+        "travel_non_travel_both": "Non-Travel",
+        "expense_type": "Mileage",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": false,
+        "gross_up_rule": "There are no taxes applied to mileage reimbursements. Workers can submit reimbursements via expenses against receipts"
+      },
+      {
+        "travel_non_travel_both": "Travel",
+        "expense_type": "Hotel, Flight, Restaurant",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "gross_up": false,
+        "gross_up_rule": "Domestic and international business travel has no specific tax treatment mentioned. Workers can be reimbursed via expenses against receipts and invoices"
+      }
+    ],
+    "compliancePoliciesAdditionalInfoRelated": [
+      {
+        "travel_non_travel_both": "Both",
+        "expense_type": "All expense types",
+        "icp_name": "Local Employer (specific entity name not provided in document)",
+        "additional_info_required": true,
+        "additional_info_rule": "Manager approval required before expense reimbursement can be processed"
+      }
+    ]
   }
 };
