@@ -122,8 +122,6 @@ export class DocumentSplitterService {
         jobId: `split-${expenseDocument.id}`,
         attempts: this.defaultAttempts,
         backoff: { type: 'exponential', delay: this.backoffDelayMs, jitter: 0.5 },
-        removeOnComplete: { age: 86400, count: 1000 },
-        removeOnFail: { age: 604800 },
       });
 
       this.logger.log(`Document splitting job enqueued`, {

@@ -64,6 +64,10 @@ export class ResultAggregatorHandler {
       await job.updateProgress(100);
       await job.log(`Document processing completed in ${processingTime}ms`);
 
+      // Note: Job cleanup is handled by TTL configuration in redis.config.ts
+      // Successful jobs: 10 second TTL
+      // Failed jobs: 24 hour TTL for debugging
+
       return results;
     } catch (error: any) {
       await job.log(`Aggregation FAILED: ${error.message}`);
@@ -100,12 +104,14 @@ export class ResultAggregatorHandler {
             pages: receipt.pages,
             receiptNumber: receipt.receiptNumber,
             // Include extracted data summary if available
-            extractionSummary: receipt.results?.extraction ? {
-              hasSupplier: !!receipt.results.extraction.supplier,
-              hasAmount: !!receipt.results.extraction.transactionAmount,
-              hasDate: !!receipt.results.extraction.transactionDate,
-              issueCount: receipt.results.issues?.length || 0,
-            } : null,
+            extractionSummary: receipt.results?.extraction
+              ? {
+                  hasSupplier: !!receipt.results.extraction.supplier,
+                  hasAmount: !!receipt.results.extraction.transactionAmount,
+                  hasDate: !!receipt.results.extraction.transactionDate,
+                  issueCount: receipt.results.issues?.length || 0,
+                }
+              : null,
           })),
         },
       };

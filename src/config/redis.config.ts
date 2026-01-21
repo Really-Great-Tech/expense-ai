@@ -30,10 +30,11 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
           delay: 2000,
         },
         removeOnComplete: {
-          count: 10,
+          age: 10, // seconds - cleanup successful jobs after 10s
+          count: 1000,
         },
         removeOnFail: {
-          count: 5,
+          age: 86400, // 24 hours
         },
       },
     };

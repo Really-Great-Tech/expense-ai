@@ -81,13 +81,6 @@ export class FlowProducerService implements OnModuleDestroy {
           },
           // Allow parent to run even if this child fails (for partial success handling)
           ignoreDependencyOnFailure: true,
-          removeOnComplete: {
-            age: 86400, // 24 hours
-            count: 1000,
-          },
-          removeOnFail: {
-            age: 604800, // 7 days
-          },
         },
       };
     });
@@ -113,13 +106,6 @@ export class FlowProducerService implements OnModuleDestroy {
           type: 'exponential' as const,
           delay: this.backoffDelayMs,
           jitter: 0.5,
-        },
-        removeOnComplete: {
-          age: 86400,
-          count: 1000,
-        },
-        removeOnFail: {
-          age: 604800,
         },
       },
     };
