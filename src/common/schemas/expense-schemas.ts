@@ -53,18 +53,35 @@ export const CitationResultSchema = z.object({
   metadata: CitationMetadataSchema,
 }).strict();
 
-// Issue Detection Schemas
+// Grouped violation description for Category 1 issues
+export const GroupedViolationSchema = z.object({
+  reason: z.string(),
+  fields: z.array(z.string()),
+  message: z.string(),
+});
+
+// LLM-as-judge validation scores for individual issues
+export const IssueLLMValidationSchema = z.object({
+  overall_validation_score: z.number().min(0).max(100),
+  reliability_level: z.enum(['high', 'medium', 'low']),
+  dimension_breakdown: z.record(z.string(), z.number()).optional(),
+});
+
 export const ComplianceIssueSchema = z.object({
   issue_type: z.string(),
   field: z.string(),
-  description: z.string(),
+  // description can be a string OR an array of grouped violations (for Category 1)
+  description: z.union([z.string(), z.array(GroupedViolationSchema)]),
   recommendation: z.string(),
-  knowledge_base_reference: z.string(), // Reverted back to correct name
+  knowledge_base_reference: z.string(),
   confidence_score: z.number().min(0).max(1),
+  // LLM validation scores - populated after LLM-as-judge validation
+  llm_validation: IssueLLMValidationSchema.optional(),
 });
 
 export const ValidationResultSchema = z.object({
   is_valid: z.boolean(),
+  receipt_type_exists: z.boolean(),
   issues_count: z.number(),
   issues: z.array(ComplianceIssueSchema),
   corrected_receipt: z.null(),
@@ -236,6 +253,8 @@ export type CitationInfo = z.infer<typeof CitationInfoSchema>;
 export type FieldCitation = z.infer<typeof FieldCitationSchema>;
 export type CitationMetadata = z.infer<typeof CitationMetadataSchema>;
 export type CitationResult = z.infer<typeof CitationResultSchema>;
+export type GroupedViolation = z.infer<typeof GroupedViolationSchema>;
+export type IssueLLMValidation = z.infer<typeof IssueLLMValidationSchema>;
 export type ComplianceIssue = z.infer<typeof ComplianceIssueSchema>;
 export type ValidationResult = z.infer<typeof ValidationResultSchema>;
 export type TechnicalDetails = z.infer<typeof TechnicalDetailsSchema>;

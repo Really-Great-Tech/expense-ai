@@ -76,10 +76,10 @@ export class ExpenseComplianceUQLMValidator {
       for (const dimension of dimensions) {
         const dimensionStartTime = Date.now();
         const dimensionStartTimeISO = new Date(dimensionStartTime).toISOString();
-        
+
         try {
           this.logger.log(`Validating dimension: ${ValidationUtils.dimensionToString(dimension)}`);
-          
+
           const validationPrompt = this._createValidationPrompt(
             aiResponse,
             parsedResponse,
@@ -93,26 +93,26 @@ export class ExpenseComplianceUQLMValidator {
 
           const result = await this._validateDimensionWithPanel(validationPrompt, dimension, extractedIssues);
           validationResults.push(result);
-          
+
           const dimensionEndTime = Date.now();
           const dimensionEndTimeISO = new Date(dimensionEndTime).toISOString();
           const dimensionDuration = ((dimensionEndTime - dimensionStartTime) / 1000).toFixed(1);
-          
+
           dimensionTimings[dimension] = {
             start_time: dimensionStartTimeISO,
             end_time: dimensionEndTimeISO,
             duration_seconds: dimensionDuration,
             judge_models_used: this.bedrockServices.map(service => service.getCurrentModelName())
           };
-          
+
         } catch (error) {
           this.logger.error(`Error validating ${dimension}: ${error.message}`);
           validationResults.push(this._createErrorResult(dimension, error.message));
-          
+
           const dimensionEndTime = Date.now();
           const dimensionEndTimeISO = new Date(dimensionEndTime).toISOString();
           const dimensionDuration = ((dimensionEndTime - dimensionStartTime) / 1000).toFixed(1);
-          
+
           dimensionTimings[dimension] = {
             start_time: dimensionStartTimeISO,
             end_time: dimensionEndTimeISO,
@@ -126,7 +126,7 @@ export class ExpenseComplianceUQLMValidator {
       const endTime = Date.now();
       const endTimeISO = new Date(endTime).toISOString();
       const totalDuration = ((endTime - startTime) / 1000).toFixed(1);
-      
+
       const overallAssessment = this._calculateOverallAssessment(
         validationResults,
         startTime,
@@ -136,7 +136,7 @@ export class ExpenseComplianceUQLMValidator {
         totalDuration,
         dimensionTimings
       );
-      
+
       const processingTime = endTime - startTime;
       this.logger.log(`Validation completed in ${processingTime}ms`);
 
@@ -168,7 +168,7 @@ export class ExpenseComplianceUQLMValidator {
   ): string {
     // Extract issues from the AI response for issue-level evaluation
     const extractedIssues = this._extractIssuesFromAIResponse(parsedResponse);
-    
+
     const baseContext = `
 Country: ${country}
 Receipt Type: ${receiptType}
@@ -326,16 +326,33 @@ SUMMARY: [Brief assessment]`;
   /**
    * Extract issues from AI response for issue-level evaluation
    */
-  private _extractIssuesFromAIResponse(parsedResponse: any): Array<{issue_type: string, description: string}> {
+  private _extractIssuesFromAIResponse(parsedResponse: any): Array<{ issue_type: string, description: string }> {
     try {
       // Try to extract issues from the parsed response
       if (parsedResponse?.validation_result?.issues && Array.isArray(parsedResponse.validation_result.issues)) {
-        return parsedResponse.validation_result.issues.map((issue: any, index: number) => ({
-          issue_type: issue.issue_type || `Issue ${index + 1}`,
-          description: issue.description || issue.toString()
-        }));
+        return parsedResponse.validation_result.issues.map((issue: any, index: number) => {
+          let description: string;
+
+          // Handle polymorphic description field
+          // For Category 1 issues, description can be an array of grouped violations
+          if (Array.isArray(issue.description)) {
+            // Convert grouped violations array to a readable string
+            description = issue.description.map((group: any) => {
+              const fields = Array.isArray(group.fields) ? group.fields.join(', ') : '';
+              return `${group.reason || 'Issue'}: ${group.message || fields}`;
+            }).join('; ');
+          } else {
+            // Standard string description
+            description = issue.description || issue.toString();
+          }
+
+          return {
+            issue_type: issue.issue_type || `Issue ${index + 1}`,
+            description
+          };
+        });
       }
-      
+
       // Fallback: if no structured issues found, return a generic placeholder
       return [{
         issue_type: 'General Validation',
@@ -353,19 +370,19 @@ SUMMARY: [Brief assessment]`;
   /**
    * Extract issue validation scores from judge response text
    */
-  private _extractIssueValidationScores(text: string, dimension: ValidationDimension, extractedIssues: Array<{issue_type: string, description: string}>): IssueValidationScore[] {
+  private _extractIssueValidationScores(text: string, dimension: ValidationDimension, extractedIssues: Array<{ issue_type: string, description: string }>): IssueValidationScore[] {
     const validationScores: IssueValidationScore[] = [];
-    
+
     try {
       // Look for ISSUE_X_VALIDATION_SCORE patterns
       extractedIssues.forEach((issue, index) => {
         const issuePattern = new RegExp(`ISSUE_${index + 1}_VALIDATION_SCORE:\\s*(\\d+)\\s*-\\s*(.+?)(?=\\n|ISSUE_|CONFIDENCE:|$)`, 'is');
         const match = text.match(issuePattern);
-        
+
         if (match) {
           const score = parseInt(match[1]);
           const explanation = match[2].trim();
-          
+
           if (score >= 0 && score <= 100) {
             validationScores.push({
               issue_index: index,
@@ -390,7 +407,7 @@ SUMMARY: [Brief assessment]`;
       });
     } catch (error) {
       this.logger.warn(`Failed to extract issue validation scores for ${dimension}: ${error.message}`);
-      
+
       // Fallback: create neutral validation scores for all issues
       extractedIssues.forEach((issue, index) => {
         validationScores.push({
@@ -403,7 +420,7 @@ SUMMARY: [Brief assessment]`;
         });
       });
     }
-    
+
     return validationScores;
   }
 
@@ -413,7 +430,7 @@ SUMMARY: [Brief assessment]`;
   private async _validateDimensionWithPanel(
     validationPrompt: string,
     dimension: ValidationDimension,
-    extractedIssues?: Array<{issue_type: string, description: string}>
+    extractedIssues?: Array<{ issue_type: string, description: string }>
   ): Promise<ComplianceValidationResult> {
     try {
       const judgeResponses: string[] = [];
@@ -423,24 +440,24 @@ SUMMARY: [Brief assessment]`;
       // Get responses from all judge models
       for (let i = 0; i < this.bedrockServices.length; i++) {
         const modelName = this.bedrockServices[i].getCurrentModelName();
-        
+
         try {
           const response = await this.bedrockServices[i].chat({
             messages: [{ role: 'user', content: validationPrompt }]
           });
-          
+
           const responseText = response.message.content;
           judgeResponses.push(responseText);
-          
+
           const confidence = this._extractConfidenceScore(responseText);
           confidenceScores.push(confidence);
-          
+
           judgeDetails.push({
             model_name: modelName,
             confidence_score: confidence,
             response: responseText
           });
-          
+
         } catch (error: any) {
           this.logger.warn(`Judge ${i + 1} (${modelName}) failed for ${dimension}: ${error.message}`);
           const errorResponse = `Error: ${error.message}`;
@@ -465,20 +482,20 @@ SUMMARY: [Brief assessment]`;
 
       // Use the first successful response as primary
       const primaryResponse = judgeResponses.find((r) => !r.startsWith('Error:')) || judgeResponses[0];
-      
+
       // Calculate average confidence score
       const avgConfidence = confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length;
-      
+
       // Extract issues and summary from primary response
       const issues = this._extractIssuesFromText(primaryResponse);
       const summary = this._extractSummaryFromText(primaryResponse);
-      
+
       // Extract issue validation scores if extractedIssues provided
       let issueValidationScores: IssueValidationScore[] | undefined;
       if (extractedIssues && extractedIssues.length > 0) {
         issueValidationScores = this._extractIssueValidationScores(primaryResponse, dimension, extractedIssues);
       }
-      
+
       // Determine reliability based on consensus
       const reliability = this._determineReliabilityFromScores(confidenceScores);
 
@@ -532,7 +549,7 @@ SUMMARY: [Brief assessment]`;
    */
   private _extractIssuesFromText(text: string): string[] {
     const issues: string[] = [];
-    
+
     // Look for ISSUES: section
     const issuesMatch = text.match(/ISSUES:\s*(.*?)(?=\n[A-Z]+:|$)/i);
     if (issuesMatch) {
@@ -543,7 +560,7 @@ SUMMARY: [Brief assessment]`;
           .split(/[,;\n]/)
           .map(issue => issue.trim())
           .filter(issue => issue.length > 0 && !issue.match(/^\[.*\]$/));
-        
+
         issues.push(...issueList);
       }
     }
@@ -571,16 +588,16 @@ SUMMARY: [Brief assessment]`;
    */
   private _determineReliabilityFromScores(scores: number[]): ReliabilityLevel {
     if (scores.length === 0) return 'low';
-    
+
     const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
     const variance = this._calculateVariance(scores);
-    
+
     // High reliability: high average score and low variance
     if (avgScore >= 0.8 && variance <= 0.04) return 'high'; // variance of 0.2^2
-    
+
     // Low reliability: low average score or high variance
     if (avgScore <= 0.3 || variance >= 0.25) return 'low'; // variance of 0.5^2
-    
+
     // Medium reliability: everything else
     return 'medium';
   }
@@ -590,7 +607,7 @@ SUMMARY: [Brief assessment]`;
    */
   private _calculateVariance(scores: number[]): number {
     if (scores.length <= 1) return 0;
-    
+
     const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
     const squaredDiffs = scores.map(score => Math.pow(score - mean, 2));
     return squaredDiffs.reduce((sum, diff) => sum + diff, 0) / scores.length;
@@ -611,7 +628,7 @@ SUMMARY: [Brief assessment]`;
     const overallScore = ValidationUtils.calculateOverallScore(validationResults);
     const overallReliability = ValidationUtils.calculateOverallReliability(validationResults);
     const criticalIssues = ValidationUtils.extractCriticalIssues(validationResults);
-    
+
     // Generate recommendations based on results
     const recommendations = this._generateRecommendations(validationResults);
 
@@ -658,14 +675,14 @@ SUMMARY: [Brief assessment]`;
    */
   private _generateRecommendations(results: ComplianceValidationResult[]): string[] {
     const recommendations: string[] = [];
-    
+
     results.forEach(result => {
       if (result.confidence_score < 0.7) {
         recommendations.push(
           `Improve ${ValidationUtils.dimensionToString(result.dimension).toLowerCase()}: ${result.summary}`
         );
       }
-      
+
       if (result.issues.length > 0) {
         recommendations.push(
           `Address issues in ${ValidationUtils.dimensionToString(result.dimension).toLowerCase()}: ${result.issues.join(', ')}`

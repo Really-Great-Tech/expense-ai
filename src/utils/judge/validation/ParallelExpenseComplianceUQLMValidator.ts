@@ -270,10 +270,27 @@ export class ParallelExpenseComplianceUQLMValidator {
     try {
       // Try to extract issues from the parsed response
       if (parsedResponse?.validation_result?.issues && Array.isArray(parsedResponse.validation_result.issues)) {
-        return parsedResponse.validation_result.issues.map((issue: any, index: number) => ({
-          issue_type: issue.issue_type || `Issue ${index + 1}`,
-          description: issue.description || issue.toString(),
-        }));
+        return parsedResponse.validation_result.issues.map((issue: any, index: number) => {
+          let description: string;
+
+          // Handle polymorphic description field
+          // For Category 1 issues, description can be an array of grouped violations
+          if (Array.isArray(issue.description)) {
+            // Convert grouped violations array to a readable string
+            description = issue.description.map((group: any) => {
+              const fields = Array.isArray(group.fields) ? group.fields.join(', ') : '';
+              return `${group.reason || 'Issue'}: ${group.message || fields}`;
+            }).join('; ');
+          } else {
+            // Standard string description
+            description = issue.description || issue.toString();
+          }
+
+          return {
+            issue_type: issue.issue_type || `Issue ${index + 1}`,
+            description,
+          };
+        });
       }
 
       // Fallback: if no structured issues found, return a generic placeholder
