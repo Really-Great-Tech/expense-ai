@@ -71,6 +71,7 @@ export class ReceiptProcessingResult {
   complianceValidation: {
     validation_result: {
       is_valid: boolean;
+      receipt_type_exists?: boolean;
       issues_count: number;
       issues: Array<{
         issue_type: string;

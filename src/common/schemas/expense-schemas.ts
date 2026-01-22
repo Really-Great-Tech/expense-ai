@@ -64,7 +64,6 @@ export const GroupedViolationSchema = z.object({
 export const IssueLLMValidationSchema = z.object({
   overall_validation_score: z.number().min(0).max(100),
   reliability_level: z.enum(['high', 'medium', 'low']),
-  dimension_breakdown: z.record(z.string(), z.number()).optional(),
 });
 
 export const ComplianceIssueSchema = z.object({
@@ -73,7 +72,8 @@ export const ComplianceIssueSchema = z.object({
   // description can be a string OR an array of grouped violations (for Category 1)
   description: z.union([z.string(), z.array(GroupedViolationSchema)]),
   recommendation: z.string(),
-  knowledge_base_reference: z.string(),
+  // knowledge_base_reference can be a string OR an array of strings
+  knowledge_base_reference: z.union([z.string(), z.array(z.string())]),
   confidence_score: z.number().min(0).max(1),
   // LLM validation scores - populated after LLM-as-judge validation
   llm_validation: IssueLLMValidationSchema.optional(),

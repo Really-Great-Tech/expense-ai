@@ -121,7 +121,6 @@ export class ExpenseProcessingService {
               llm_validation: {
                 overall_validation_score: validationScore.overall_validation_score,
                 reliability_level: validationScore.reliability_level,
-                dimension_breakdown: validationScore.dimension_breakdown,
               },
             };
           }

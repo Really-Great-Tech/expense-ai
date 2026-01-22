@@ -134,7 +134,7 @@ export class ExpenseStatusService {
     private receiptRepo: Repository<Receipt>,
     @InjectRepository(ReceiptProcessingResult)
     private receiptProcessingResultRepo: Repository<ReceiptProcessingResult>,
-  ) {}
+  ) { }
 
   /**
    * Get comprehensive status for an expense document
@@ -473,6 +473,10 @@ export class ExpenseStatusService {
               processingCompletedAt: result.processingCompletedAt,
               processingTime: result.processingMetadata?.processingTime,
               processed_at: result.processingMetadata?.processedAt,
+              // Classification result - expense type from file classification
+              expense_type: result.classificationResult?.expense_type || 'unknown',
+              // Whether the receipt type exists in compliance requirements
+              receipt_type_exists: result.complianceValidation?.validation_result?.receipt_type_exists ?? null,
             },
             issues: mergedIssues,
           };
