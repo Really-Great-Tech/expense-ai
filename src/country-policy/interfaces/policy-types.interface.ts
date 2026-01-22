@@ -97,12 +97,12 @@ export interface PolicyUploadResponse {
     critical_issues: string[];
     icp_entities_identified: string[];
     problematic_rules_count: number;
-    problematic_rules?: Array<{
-      table: string;
-      rule: string;
-      score: number;
-      judgment: string;
-    }>;
+    /** Extracted data with validation scores and judgments appended to each rule */
+    extractedDataWithValidation?: {
+      receiptStandards: Array<any>;
+      compliancePoliciesGrossUpRelated: Array<any>;
+      compliancePoliciesAdditionalInfoRelated: Array<any>;
+    };
   };
   /** Individual file processing results (for error tracking) */
   results: Array<{ fileName: string; status: 'success' | 'failed'; error?: string }>;
