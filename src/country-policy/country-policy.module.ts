@@ -12,6 +12,8 @@ import { PolicySeedWriterService } from './services/policy-seed-writer.service';
 import { PolicyUploadOrchestrator } from './services/policy-upload-orchestrator.service';
 import { PolicyUploadController } from './controllers/policy-upload.controller';
 import { PolicyExtractionAgent } from '../agents/policy-extraction.agent';
+import { PolicyValidationAgent } from '../agents/policy-validation.agent';
+import { PolicyValidationService } from './services/policy-validation.service';
 import { IsValidCountryConstraint } from '../common/validators/is-valid-country.validator';
 import { IsValidIcpConstraint } from '../common/validators/is-valid-icp.validator';
 import { StorageModule } from '../storage/storage.module';
@@ -35,7 +37,10 @@ import { CountryPolicyController } from './controllers/country-policy.controller
     PolicyPersistenceService,
     PolicySeedWriterService,
     PolicyUploadOrchestrator,
+    // Policy agents
     PolicyExtractionAgent,
+    PolicyValidationAgent,
+    PolicyValidationService,
     // Validators
     IsValidCountryConstraint,
     IsValidIcpConstraint,

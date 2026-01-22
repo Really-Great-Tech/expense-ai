@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PolicyExtractionAgent } from '../../agents/policy-extraction.agent';
+import { PolicyValidationService } from './policy-validation.service';
 import { PolicyPersistenceService } from './policy-persistence.service';
 import { PolicySeedWriterService } from './policy-seed-writer.service';
 import { S3StorageService } from '../../storage/s3-storage.service';
@@ -33,6 +34,7 @@ export class PolicyUploadOrchestrator {
 
   constructor(
     private readonly llmAgent: PolicyExtractionAgent,
+    private readonly validationService: PolicyValidationService,
     private readonly persistenceService: PolicyPersistenceService,
     private readonly seedWriterService: PolicySeedWriterService,
     private readonly storageService: S3StorageService,
@@ -68,6 +70,7 @@ export class PolicyUploadOrchestrator {
     let versionId: string | undefined;
     let policyId: number | string | undefined;
     let extractedData: ExtractedPolicyData | undefined;
+    let validationSummary: any = undefined;
 
     try {
       // STEP 1: Store all files to S3 (parallel processing for speed)
@@ -100,17 +103,70 @@ export class PolicyUploadOrchestrator {
       this.logger.log(`   Completed in ${Date.now() - extractStartTime}ms`);
       this.logger.log('');
 
-      // STEP 3: Validate extracted data
-      this.logger.log('✅ STEP 3: Validating extracted data...');
+      // STEP 3: LLM-based validation of extracted policies against source documents
+      this.logger.log('🔍 STEP 3: Validating extracted policies against source documents...');
+      const validationStartTime = Date.now();
+
+      const validationResult = await this.validationService.validateExtractedPoliciesMultiDocument(
+        extractedData as any, // Type cast needed - extracted data is compatible
+        files.map((file) => ({
+          fileName: file.originalname,
+          content: file.buffer.toString('utf-8'),
+        })),
+        countryName,
+      );
+
+      const avgScore = this.validationService.getAverageValidationScore(validationResult);
+      const problematicRules = this.validationService.getProblematicRules(validationResult);
+
+      // Store validation summary for response (NOT for database)
+      validationSummary = {
+        overall_validation_status: validationResult.overall_validation_status,
+        overall_summary: validationResult.overall_summary,
+        average_score: avgScore,
+        critical_issues: validationResult.critical_issues,
+        icp_entities_identified: validationResult.icp_entities_identified,
+        problematic_rules_count: problematicRules.length,
+        problematic_rules: problematicRules,
+      };
+
+      this.logger.log(`   Completed in ${Date.now() - validationStartTime}ms`);
+      this.logger.log(`   Overall Status: ${validationResult.overall_validation_status}`);
+      this.logger.log(`   Average Score: ${avgScore.toFixed(2)}/10`);
+      this.logger.log(`   Critical Issues: ${validationResult.critical_issues.length}`);
+      
+      if (problematicRules.length > 0) {
+        this.logger.warn(`   ⚠️  Found ${problematicRules.length} rules with score < 7`);
+        problematicRules.forEach((rule, index) => {
+          if (index < 3) { // Show first 3
+            this.logger.warn(`      - ${rule.table}: Score ${rule.score}/10`);
+          }
+        });
+        if (problematicRules.length > 3) {
+          this.logger.warn(`      ... and ${problematicRules.length - 3} more`);
+        }
+      }
+
+      if (validationResult.critical_issues.length > 0) {
+        this.logger.error(`   ❌ Critical validation issues found:`);
+        validationResult.critical_issues.forEach(issue => {
+          this.logger.error(`      - ${issue}`);
+        });
+      }
+
+      this.logger.log('');
+
+      // STEP 4: Schema validation for database compatibility
+      this.logger.log('✅ STEP 4: Validating schema for database...');
       const isValidForDb = this.persistenceService.validatePolicyData(extractedData);
       if (!isValidForDb) {
         throw new BadRequestException('Policy data does not meet database requirements');
       }
-      this.logger.log('   ✓ Validation passed');
+      this.logger.log('   ✓ Schema validation passed');
       this.logger.log('');
 
-      // STEP 4: Save unified policy to database (with references to all source files)
-      this.logger.log('💾 STEP 4: Saving unified policy to database...');
+      // STEP 5: Save unified policy to database (with references to all source files)
+      this.logger.log('💾 STEP 5: Saving unified policy to database...');
 
       // Use the first file's info as primary, but we'll create a combined file info
       const primaryFileInfo = storedFiles[0].fileInfo;
@@ -135,9 +191,9 @@ export class PolicyUploadOrchestrator {
       this.logger.log(`   ✓ Policy saved (ID: ${policyId}, Version: ${versionId})`);
       this.logger.log('');
 
-      // STEP 5: Update seed file (optional)
+      // STEP 6: Update seed file (optional)
       if (updateSeedFile) {
-        this.logger.log('📝 STEP 5: Updating seed file...');
+        this.logger.log('📝 STEP 6: Updating seed file...');
         try {
           await this.seedWriterService.addCountryToSeedFile(countryName, extractedData);
           this.logger.log('   ✓ Seed file updated');
@@ -187,6 +243,7 @@ export class PolicyUploadOrchestrator {
       filesProcessed: files.length,
       files: files.map(f => f.originalname),
       extractedData: results.every(r => r.status === 'success') ? extractedData : undefined,
+      validationResult: validationSummary, // Validation results - only in response, NOT persisted to database
       results,
       timestamp: new Date(),
     };
