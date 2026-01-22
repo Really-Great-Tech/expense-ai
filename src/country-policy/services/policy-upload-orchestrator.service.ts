@@ -119,6 +119,25 @@ export class PolicyUploadOrchestrator {
       const avgScore = this.validationService.getAverageValidationScore(validationResult);
       const problematicRules = this.validationService.getProblematicRules(validationResult);
 
+      // Merge validation results INTO extracted data for human-readable output
+      const extractedDataWithValidation = {
+        receiptStandards: extractedData.receiptStandards.map((rule, index) => ({
+          ...rule,
+          validation_score: validationResult.receiptStandards[index]?.validation_score,
+          validation_judgment: validationResult.receiptStandards[index]?.validation_judgment,
+        })),
+        compliancePoliciesGrossUpRelated: extractedData.compliancePoliciesGrossUpRelated.map((rule, index) => ({
+          ...rule,
+          validation_score: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_score,
+          validation_judgment: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_judgment,
+        })),
+        compliancePoliciesAdditionalInfoRelated: extractedData.compliancePoliciesAdditionalInfoRelated.map((rule, index) => ({
+          ...rule,
+          validation_score: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_score,
+          validation_judgment: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_judgment,
+        })),
+      };
+
       // Store validation summary for response (NOT for database)
       validationSummary = {
         overall_validation_status: validationResult.overall_validation_status,
@@ -127,7 +146,8 @@ export class PolicyUploadOrchestrator {
         critical_issues: validationResult.critical_issues,
         icp_entities_identified: validationResult.icp_entities_identified,
         problematic_rules_count: problematicRules.length,
-        problematic_rules: problematicRules,
+        // Include the merged data with validation
+        extractedDataWithValidation,
       };
 
       this.logger.log(`   Completed in ${Date.now() - validationStartTime}ms`);
