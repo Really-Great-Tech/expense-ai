@@ -89,6 +89,21 @@ export interface PolicyUploadResponse {
   files: string[];
   /** The unified extracted policy data (shown once, not duplicated per file) */
   extractedData?: ExtractedPolicyData;
+  /** Validation results - only in response, not persisted to database */
+  validationResult?: {
+    overall_validation_status: 'APPROVED' | 'NEEDS_REVISION';
+    overall_summary: string;
+    average_score: number;
+    critical_issues: string[];
+    icp_entities_identified: string[];
+    problematic_rules_count: number;
+    problematic_rules?: Array<{
+      table: string;
+      rule: string;
+      score: number;
+      judgment: string;
+    }>;
+  };
   /** Individual file processing results (for error tracking) */
   results: Array<{ fileName: string; status: 'success' | 'failed'; error?: string }>;
   timestamp: Date;
