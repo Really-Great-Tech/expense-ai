@@ -1,6 +1,13 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { COUNTRY_POLICY_SEEDS } from '../seeds/country-policies.seed';
 
+/**
+ * Seeds country policies from the COUNTRY_POLICY_SEEDS.
+ * 
+ * Note: With the new markdown-based policy architecture, this migration
+ * seeds countries from the seed file. Policies with markdown content
+ * should be ingested via the policy ingestion endpoint.
+ */
 export class SeedCountryPolicies1736504407000 implements MigrationInterface {
   name = 'SeedCountryPolicies1736504407000';
 
@@ -8,7 +15,7 @@ export class SeedCountryPolicies1736504407000 implements MigrationInterface {
     const versionId = this.generateVersionId();
 
     for (const [countryName, policyData] of Object.entries(COUNTRY_POLICY_SEEDS)) {
-      const countryCode = this.getCountryCode(countryName);
+      const countryCode = policyData.code || this.getCountryCode(countryName);
 
       // Insert country
       await queryRunner.query('INSERT INTO countries (name, code, active) VALUES (?, ?, ?)', [countryName, countryCode, 1]);
@@ -19,28 +26,29 @@ export class SeedCountryPolicies1736504407000 implements MigrationInterface {
       // Insert version
       await queryRunner.query('INSERT INTO versions (country_id, version_id) VALUES (?, ?)', [countryId, versionId]);
 
-      // Transform policy data to rules format
-      const rules = {
-        receiptStandards: policyData.receiptStandards || [],
-        compliancePoliciesGrossUpRelated: policyData.compliancePoliciesGrossUpRelated || [],
-        compliancePoliciesAdditionalInfoRelated: policyData.compliancePoliciesAdditionalInfoRelated || [],
-      };
+      // If policy has markdown content, insert it
+      if (policyData.policyMarkdown && policyData.policyMarkdown.trim()) {
+        await queryRunner.query(
+          'INSERT INTO country_policies (policy_markdown, page_count, icps, policy_metadata, version_country_id, version_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            policyData.policyMarkdown,
+            policyData.pageCount,
+            JSON.stringify(policyData.icps),
+            JSON.stringify(policyData.metadata || {}),
+            countryId,
+            versionId,
+          ],
+        );
 
-      // Insert country policy
-      await queryRunner.query('INSERT INTO country_policies (rules, version_country_id, version_id) VALUES (?, ?, ?)', [
-        JSON.stringify(rules),
-        countryId,
-        versionId,
-      ]);
+        const policyResult = await queryRunner.query(
+          'SELECT id FROM country_policies WHERE version_country_id = ? AND version_id = ?',
+          [countryId, versionId],
+        );
+        const policyId = policyResult[0].id;
 
-      const policyResult = await queryRunner.query('SELECT id FROM country_policies WHERE version_country_id = ? AND version_id = ?', [
-        countryId,
-        versionId,
-      ]);
-      const policyId = policyResult[0].id;
-
-      // Update country with active policy
-      await queryRunner.query('UPDATE countries SET active_policy_id = ? WHERE id = ?', [policyId, countryId]);
+        // Update country with active policy
+        await queryRunner.query('UPDATE countries SET active_policy_id = ? WHERE id = ?', [policyId, countryId]);
+      }
     }
   }
 

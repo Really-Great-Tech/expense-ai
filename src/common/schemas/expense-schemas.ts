@@ -53,14 +53,22 @@ export const CitationResultSchema = z.object({
   metadata: CitationMetadataSchema,
 }).strict();
 
+// Policy Citation Schema for issue detection
+export const PolicyCitationSchema = z.object({
+  page: z.string(),
+  section: z.string(),
+  quote: z.string(),
+  is_verified: z.boolean().optional(), // Added by citation verification service
+});
+
 // Issue Detection Schemas
 export const ComplianceIssueSchema = z.object({
   issue_type: z.string(),
   field: z.string(),
   description: z.string(),
   recommendation: z.string(),
-  knowledge_base_reference: z.string(), // Reverted back to correct name
   confidence_score: z.number().min(0).max(1),
+  citation: PolicyCitationSchema.optional(), // New: citation with page reference and verbatim quote
 });
 
 export const ValidationResultSchema = z.object({
@@ -237,6 +245,7 @@ export type FieldCitation = z.infer<typeof FieldCitationSchema>;
 export type CitationMetadata = z.infer<typeof CitationMetadataSchema>;
 export type CitationResult = z.infer<typeof CitationResultSchema>;
 export type ComplianceIssue = z.infer<typeof ComplianceIssueSchema>;
+export type PolicyCitation = z.infer<typeof PolicyCitationSchema>;
 export type ValidationResult = z.infer<typeof ValidationResultSchema>;
 export type TechnicalDetails = z.infer<typeof TechnicalDetailsSchema>;
 export type IssueDetectionResult = z.infer<typeof IssueDetectionResultSchema>;

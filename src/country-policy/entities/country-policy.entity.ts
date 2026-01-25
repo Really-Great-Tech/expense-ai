@@ -2,35 +2,16 @@
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Version } from './version.entity';
 
-interface ReceiptStandard {
-  description: string;
-  travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
-  expenseType: string;
-  icpName: string;
-  mandatoryOptional: 'Mandatory' | 'Optional';
-  rule: string;
-}
-
-interface CompliancePolicyGrossUp {
-  travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
-  expenseType: string;
-  icpName: string;
-  grossUp: 'Yes' | 'No';
-  grossUpRule: string;
-}
-
-interface CompliancePolicyAdditionalInfo {
-  travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
-  expenseType: string;
-  icpName: string;
-  additionalInfoRequired: 'Yes' | 'No';
-  additionalInfoRule: string;
-}
-
-interface PolicyRules {
-  receiptStandards: ReceiptStandard[];
-  compliancePoliciesGrossUpRelated: CompliancePolicyGrossUp[];
-  compliancePoliciesAdditionalInfoRelated: CompliancePolicyAdditionalInfo[];
+/**
+ * Policy metadata from the source document
+ */
+export interface PolicyMetadata {
+  title?: string;
+  effectiveDate?: string;
+  version?: string;
+  sourceFile?: string;
+  parsedDate?: string;
+  parserUsed?: string;
 }
 
 @Entity('country_policies')
@@ -38,8 +19,30 @@ export class CountryPolicy {
   @PrimaryGeneratedColumn()
   id: number;
 
+  /**
+   * Full policy document in markdown format with [[PAGE_X]] markers
+   * for citation and verification purposes.
+   */
+  @Column({ name: 'policy_markdown', type: 'longtext' })
+  policyMarkdown: string;
+
+  /**
+   * Number of pages in the source document
+   */
+  @Column({ name: 'page_count', type: 'int', default: 0 })
+  pageCount: number;
+
+  /**
+   * List of ICP (Internal Control Policy) identifiers found in the document
+   */
   @Column({ type: 'json' })
-  rules: PolicyRules;
+  icps: string[];
+
+  /**
+   * Metadata about the policy document source and parsing
+   */
+  @Column({ name: 'policy_metadata', type: 'json', nullable: true })
+  policyMetadata: PolicyMetadata;
 
   @Column({ name: 'version_country_id' })
   versionCountryId: number;

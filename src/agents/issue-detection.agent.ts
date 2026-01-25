@@ -1,6 +1,7 @@
 import { IssueDetectionResultSchema, type IssueDetectionResult } from '../common/schemas/expense-schemas';
 import { EXPENSE_SCHEMA } from '../common/types';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
+import { CitationVerificationService } from '../services/citation-verification.service';
 import { BaseAgent } from './base.agent';
 import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
@@ -8,15 +9,18 @@ import { ServiceUnavailableError } from '../common/errors/service-errors';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
- * Validates extracted data against country-specific compliance requirements
+ * Validates extracted data against country-specific policy documents in markdown format
+ * with page markers for citation and verification purposes.
  */
 export class IssueDetectionAgent extends BaseAgent {
   protected llm: ILLMService;
+  private citationVerifier: CitationVerificationService;
 
   constructor() {
     super();
     this.logger.log('Initializing IssueDetectionAgent');
     this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.COMPLIANCE });
+    this.citationVerifier = new CitationVerificationService();
   }
 
   /**
@@ -28,20 +32,27 @@ export class IssueDetectionAgent extends BaseAgent {
   }
 
   /**
-   * Analyze compliance of extracted expense data against country-specific requirements
+   * Analyze compliance of extracted expense data against country-specific policy document
    * @param country Country code for compliance rules
    * @param receiptType Type of receipt/invoice
    * @param icp Internal control policy identifier
-   * @param complianceData Country-specific compliance requirements
+   * @param policyMarkdown Full policy document in markdown format with [[PAGE_X]] markers
    * @param extractedData Previously extracted expense data
-   * @returns Issue detection result with validation status and identified issues
+   * @returns Issue detection result with validation status, identified issues, and verified citations
    * @throws Error if compliance analysis fails critically
    */
-  async analyzeCompliance(country: string, receiptType: string, icp: string, complianceData: any, extractedData: any): Promise<IssueDetectionResult> {
+  async analyzeCompliance(
+    country: string,
+    receiptType: string,
+    icp: string,
+    policyMarkdown: string,
+    extractedData: any
+  ): Promise<IssueDetectionResult> {
     const startTime = new Date();
 
     try {
       this.logger.log(`Starting compliance analysis for ${country}/${icp}`);
+      this.logger.debug(`Policy document length: ${policyMarkdown.length} characters`);
 
       // Get the prompt and compile with variables
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
@@ -49,7 +60,7 @@ export class IssueDetectionAgent extends BaseAgent {
         country,
         receiptType,
         icp,
-        complianceData: JSON.stringify(complianceData, null, 2),
+        policyDocument: policyMarkdown,
         extractedData: JSON.stringify(extractedData, null, 2),
       });
 
@@ -70,6 +81,15 @@ export class IssueDetectionAgent extends BaseAgent {
 
       const parsedResult = this.parseJsonResponse(rawContent);
       const result = IssueDetectionResultSchema.parse(parsedResult);
+
+      // Verify citations against the policy document
+      if (result.validation_result.issues && result.validation_result.issues.length > 0) {
+        this.logger.log(`Verifying citations for ${result.validation_result.issues.length} issues`);
+        result.validation_result.issues = this.citationVerifier.verifyAndEnrichIssues(
+          result.validation_result.issues as any,
+          policyMarkdown
+        ) as typeof result.validation_result.issues;
+      }
 
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
@@ -106,7 +126,6 @@ export class IssueDetectionAgent extends BaseAgent {
               field: 'system_error',
               description: `Compliance analysis failed: ${error.message}`,
               recommendation: 'Please retry the compliance analysis or contact support.',
-              knowledge_base_reference: 'System error during analysis',
               confidence_score: 0.5,
             },
           ],

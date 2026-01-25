@@ -42,7 +42,7 @@ export class ValidationOrchestratorService {
     country: string,
     expenseType: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     extraction: any,
     timing: ProcessingTiming,
   ): Promise<any> {
@@ -82,7 +82,7 @@ export class ValidationOrchestratorService {
         country,
         expenseType,
         icp,
-        complianceData,
+        policyMarkdown,
         extraction,
       );
       const validationEnd = Date.now();
@@ -149,7 +149,7 @@ export class ValidationOrchestratorService {
     country: string,
     receiptType: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     extractedData: any,
   ): Promise<any> {
     if (!this.complianceValidator) {
@@ -164,7 +164,7 @@ export class ValidationOrchestratorService {
         country,
         receiptType,
         icp,
-        complianceData,
+        policyMarkdown,
         extractedData,
       );
 

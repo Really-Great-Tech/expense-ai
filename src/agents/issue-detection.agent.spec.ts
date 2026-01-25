@@ -9,6 +9,7 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
 }));
 
 jest.mock('../services/bedrock/bedrock-llm');
+jest.mock('../services/citation-verification.service');
 
 describe('IssueDetectionAgent', () => {
   let agent: IssueDetectionAgent;
@@ -23,6 +24,10 @@ describe('IssueDetectionAgent', () => {
 
     agent = new IssueDetectionAgent();
     agent['llm'] = mockLlmService;
+    // Mock the citation verifier to pass through issues unchanged
+    agent['citationVerifier'] = {
+      verifyAndEnrichIssues: jest.fn().mockImplementation((issues) => issues),
+    } as any;
   });
 
   afterEach(() => {
@@ -47,12 +52,22 @@ describe('IssueDetectionAgent', () => {
       },
     };
 
-    const complianceDataMock = {
-      country: 'USA',
-      receipt_standards: {
-        required_fields: ['vendor_name', 'total_amount', 'date'],
-      },
-    };
+    // Policy markdown mock - full policy document with page markers
+    const policyMarkdownMock = `[[PAGE_1]]
+# USA Expense Policy
+
+## Receipt Standards
+
+All receipts must include:
+- Vendor name
+- Total amount
+- Date of transaction
+
+[[PAGE_2]]
+## Tax Requirements
+
+All receipts over $25 must include tax identification.
+`;
 
     const extractedDataMock = {
       vendor_name: 'Restaurant ABC',
@@ -66,7 +81,7 @@ describe('IssueDetectionAgent', () => {
         usage: { input_tokens: 250, output_tokens: 80 },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(true);
       expect(result.validation_result.issues_count).toBe(0);
@@ -74,27 +89,35 @@ describe('IssueDetectionAgent', () => {
       expect(mockLlmService.chat).toHaveBeenCalledTimes(1);
     });
 
-    it('should identify compliance issues', async () => {
+    it('should identify compliance issues with citations', async () => {
       const issuesResponse = {
         validation_result: {
           is_valid: false,
           issues_count: 2,
           issues: [
             {
-              issue_type: 'Missing Required Field',
+              issue_type: 'Standards & Compliance | Fix Identified',
               field: 'tax_id',
               description: 'Tax ID is required but missing',
               recommendation: 'Add supplier tax identification number',
-              knowledge_base_reference: 'USA Tax Compliance Guide',
               confidence_score: 0.95,
+              citation: {
+                page: 'PAGE_2',
+                section: 'Tax Requirements',
+                quote: 'All receipts over $25 must include tax identification.',
+              },
             },
             {
-              issue_type: 'Format Error',
+              issue_type: 'Standards & Compliance | Fix Identified',
               field: 'date_of_issue',
               description: 'Date format does not match required format',
               recommendation: 'Use YYYY-MM-DD format',
-              knowledge_base_reference: 'Date Format Standards',
               confidence_score: 0.88,
+              citation: {
+                page: 'PAGE_1',
+                section: 'Receipt Standards',
+                quote: 'Date of transaction',
+              },
             },
           ],
           corrected_receipt: null,
@@ -113,7 +136,7 @@ describe('IssueDetectionAgent', () => {
         message: { content: JSON.stringify(issuesResponse) },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(false);
       expect(result.validation_result.issues_count).toBe(2);
@@ -128,7 +151,7 @@ describe('IssueDetectionAgent', () => {
         },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(true);
     });
@@ -140,7 +163,7 @@ describe('IssueDetectionAgent', () => {
         },
       } as any);
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(true);
     });
@@ -148,7 +171,7 @@ describe('IssueDetectionAgent', () => {
     it('should return fallback result on LLM error', async () => {
       mockLlmService.chat.mockRejectedValue(new Error('Connection timeout'));
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(false);
       expect(result.validation_result.issues_count).toBe(1);
@@ -161,7 +184,7 @@ describe('IssueDetectionAgent', () => {
         message: { content: 'Invalid JSON response' },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.is_valid).toBe(false);
       expect(result.validation_result.issues_count).toBeGreaterThan(0);
@@ -172,7 +195,7 @@ describe('IssueDetectionAgent', () => {
         message: { content: JSON.stringify(validComplianceResponse) },
       });
 
-      const result = await agent.analyzeCompliance('Germany', 'invoice', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('Germany', 'invoice', 'standard', policyMarkdownMock, extractedDataMock);
 
       const callArgs = mockLlmService.chat.mock.calls[0][0];
       expect(callArgs.messages[0].content).toContain('Germany');
@@ -185,12 +208,16 @@ describe('IssueDetectionAgent', () => {
           issues_count: 1,
           issues: [
             {
-              issue_type: 'Data Quality',
+              issue_type: 'Standards & Compliance | Fix Identified',
               field: 'vendor_name',
               description: 'Vendor name appears incomplete',
               recommendation: 'Verify vendor name spelling',
-              knowledge_base_reference: 'Data Quality Standards',
               confidence_score: 0.75,
+              citation: {
+                page: 'PAGE_1',
+                section: 'Receipt Standards',
+                quote: 'Vendor name',
+              },
             },
           ],
           corrected_receipt: null,
@@ -209,7 +236,7 @@ describe('IssueDetectionAgent', () => {
         message: { content: JSON.stringify(issuesResponse) },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', complianceDataMock, extractedDataMock);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'standard', policyMarkdownMock, extractedDataMock);
 
       expect(result.validation_result.issues[0].confidence_score).toBe(0.75);
     });
@@ -224,12 +251,23 @@ describe('IssueDetectionAgent', () => {
 
   describe('Integration: Full compliance workflow', () => {
     it('should analyze complete receipt against compliance rules', async () => {
-      const complianceData = {
-        country: 'USA',
-        receipt_standards: {
-          required_fields: ['vendor_name', 'total_amount', 'date', 'tax_id'],
-        },
-      };
+      const policyMarkdown = `[[PAGE_1]]
+# Corporate Expense Policy
+
+## Required Fields
+
+All expense receipts must include:
+- Vendor name
+- Total amount
+- Date
+- Tax ID (for amounts over $25)
+
+[[PAGE_2]]
+## Receipt Format
+
+Receipt number should follow format: XXX-YYYY-NNNNN
+Full vendor address including postal code is required.
+`;
 
       const extractedData = {
         vendor_name: 'Restaurant ABC',
@@ -243,28 +281,40 @@ describe('IssueDetectionAgent', () => {
           issues_count: 3,
           issues: [
             {
-              issue_type: 'Missing Required Field',
+              issue_type: 'Standards & Compliance | Fix Identified',
               field: 'tax_id',
               description: 'Supplier tax ID is required for amounts over $25',
               recommendation: 'Request updated receipt with tax ID',
-              knowledge_base_reference: 'USA Expense Policy Section 3.2',
               confidence_score: 0.98,
+              citation: {
+                page: 'PAGE_1',
+                section: 'Required Fields',
+                quote: 'Tax ID (for amounts over $25)',
+              },
             },
             {
               issue_type: 'Standards & Compliance | Fix Identified',
               field: 'receipt_number',
               description: 'Receipt number format invalid',
               recommendation: 'Receipt number should follow format: XXX-YYYY-NNNNN',
-              knowledge_base_reference: 'Receipt Standards v2.0',
               confidence_score: 0.85,
+              citation: {
+                page: 'PAGE_2',
+                section: 'Receipt Format',
+                quote: 'Receipt number should follow format: XXX-YYYY-NNNNN',
+              },
             },
             {
-              issue_type: 'Data Quality',
+              issue_type: 'Standards & Compliance | Follow-up Action Identified',
               field: 'vendor_address',
               description: 'Vendor address incomplete',
               recommendation: 'Full address including postal code required',
-              knowledge_base_reference: 'Vendor Information Requirements',
               confidence_score: 0.72,
+              citation: {
+                page: 'PAGE_2',
+                section: 'Receipt Format',
+                quote: 'Full vendor address including postal code is required.',
+              },
             },
           ],
           corrected_receipt: null,
@@ -285,7 +335,7 @@ describe('IssueDetectionAgent', () => {
         usage: { input_tokens: 400, output_tokens: 200 },
       });
 
-      const result = await agent.analyzeCompliance('USA', 'restaurant', 'corporate_standard', complianceData, extractedData);
+      const result = await agent.analyzeCompliance('USA', 'restaurant', 'corporate_standard', policyMarkdown, extractedData);
 
       // Verify comprehensive issue detection
       expect(result.validation_result.is_valid).toBe(false);
@@ -294,8 +344,8 @@ describe('IssueDetectionAgent', () => {
 
       // Verify issue categorization
       const issueTypes = result.validation_result.issues.map((i) => i.issue_type);
-      expect(issueTypes).toContain('Missing Required Field');
-      expect(issueTypes).toContain('Data Quality');
+      expect(issueTypes).toContain('Standards & Compliance | Fix Identified');
+      expect(issueTypes).toContain('Standards & Compliance | Follow-up Action Identified');
 
       // Verify all issues have required fields
       result.validation_result.issues.forEach((issue) => {

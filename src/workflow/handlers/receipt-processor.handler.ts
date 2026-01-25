@@ -31,7 +31,7 @@ export class ReceiptProcessorHandler {
     private readonly countryPolicyService: CountryPolicyService,
     private readonly s3Storage: S3StorageService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async handle(job: Job<ProcessReceiptJobData>): Promise<{ receiptId: string; success: boolean }> {
     const startTime = Date.now();
@@ -76,9 +76,9 @@ export class ReceiptProcessorHandler {
       await job.log(`Markdown ${mdSource} (${markdownContent.length} chars) in ${markdownExtractionTime}ms`);
       this.logger.log(`Markdown ${mdSource} in ${markdownExtractionTime}ms`);
 
-      // Load compliance data
-      await job.log(`Loading compliance data for ${country}...`);
-      const complianceData = await this.loadComplianceData(country, icp);
+      // Load policy markdown for compliance analysis
+      await job.log(`Loading policy markdown for ${country}...`);
+      const policyMarkdown = await this.loadPolicyMarkdown(country);
       await job.updateProgress(30);
 
       // Process the document through all agents
@@ -90,7 +90,7 @@ export class ReceiptProcessorHandler {
         receipt.storageKey,
         country,
         icp,
-        complianceData,
+        policyMarkdown,
         EXPENSE_SCHEMA,
         image,
         {
@@ -156,7 +156,7 @@ export class ReceiptProcessorHandler {
     storageKey: string,
     country: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     expenseSchema: any,
     image: { pageNumber: number; imageBase64: string } | undefined,
     markdownExtractionInfo: { markdownExtractionTime: number; documentReader: string; markdownSource?: 'stored' | 'extracted' },
@@ -177,7 +177,7 @@ export class ReceiptProcessorHandler {
       storageKey,
       country,
       icp,
-      complianceData,
+      policyMarkdown,
       expenseSchema,
       undefined, // progressCallback - not needed for handler
       markdownExtractionInfo,
@@ -217,47 +217,25 @@ export class ReceiptProcessorHandler {
   }
 
   /**
-   * Load compliance data for a country
+   * Load policy markdown for a country
    */
-  private async loadComplianceData(country: string, icp: string): Promise<any> {
+  private async loadPolicyMarkdown(country: string): Promise<string> {
     try {
-      // Try to load from database
-      try {
-        const countryRecord = await this.countryPolicyService.findCountryByName(country);
+      const countryRecord = await this.countryPolicyService.findCountryByName(country);
 
-        if (countryRecord && countryRecord.activePolicy && countryRecord.activePolicy.rules) {
-          this.logger.log(`Loaded compliance data for ${country} from database (Policy ID: ${countryRecord.activePolicyId})`);
-          return countryRecord.activePolicy.rules;
-        } else if (countryRecord) {
-          this.logger.warn(`Country ${country} found in database but has no active policy set`);
-        }
-      } catch (dbError: any) {
-        this.logger.warn(`Database lookup failed for ${country}: ${dbError.message}`);
+      if (countryRecord?.activePolicy?.policyMarkdown) {
+        this.logger.log(`Loaded policy markdown for ${country} from database (Policy ID: ${countryRecord.activePolicyId}, ${countryRecord.activePolicy.pageCount} pages)`);
+        return countryRecord.activePolicy.policyMarkdown;
       }
 
-      // Fall back to JSON file
-      this.logger.log(`Attempting to load compliance data from country_seed/${country.toLowerCase()}.json`);
-
-      const seedFilePath = path.join(process.cwd(), 'country_seed', `${country.toLowerCase()}.json`);
-
-      if (fs.existsSync(seedFilePath)) {
-        const fileContent = fs.readFileSync(seedFilePath, 'utf-8');
-        const complianceData = JSON.parse(fileContent);
-
-        if (complianceData && typeof complianceData === 'object') {
-          const sections = Object.keys(complianceData).length;
-          this.logger.log(`Loaded compliance data for ${country} from JSON file (${sections} sections)`);
-          return complianceData;
-        }
-      } else {
-        this.logger.warn(`Seed file not found: ${seedFilePath}`);
+      if (countryRecord) {
+        this.logger.warn(`Country ${country} found in database but has no active policy with markdown`);
       }
 
-      this.logger.error(`No compliance data found for ${country}`);
-      return {};
+      throw new Error(`No policy markdown found for country: ${country}. Please ingest a policy document first.`);
     } catch (error: any) {
-      this.logger.error(`Failed to load compliance data for ${country}: ${error.message}`);
-      return {};
+      this.logger.error(`Failed to load policy markdown for ${country}: ${error.message}`);
+      throw error;
     }
   }
 }

@@ -27,7 +27,7 @@ export class ExpenseProcessingService {
     storageKey: string,
     country: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     expenseSchema: any,
     progressCallback?: (stage: string, progress: number) => void,
     markdownExtractionInfo?: { markdownExtractionTime: number; documentReader: string; markdownSource?: 'stored' | 'extracted' },
@@ -56,7 +56,7 @@ export class ExpenseProcessingService {
       const [formattedQualityAssessment, classification, extraction] = await Promise.all([
         this.runImageQualityAssessmentFromBuffer(fileBuffer, filename, timing, agents.imageQualityAssessmentAgent),
         this.runFileClassification(markdownContent, country, expenseSchema, timing, agents.fileClassificationAgent),
-        this.runDataExtraction(markdownContent, complianceData, timing, agents.dataExtractionAgent),
+        this.runDataExtraction(markdownContent, timing, agents.dataExtractionAgent),
       ]);
 
       const parallelGroup1End = Date.now();
@@ -75,13 +75,13 @@ export class ExpenseProcessingService {
         country,
         classification.expense_type || 'unknown',
         icp,
-        complianceData,
+        policyMarkdown,
         extraction,
         timing,
         agents.issueDetectionAgent,
       );
 
-      const citations={}
+      const citations = {}
       // const citations = await this.runCitationGeneration(
       //   extraction,
       //   markdownContent,
@@ -103,7 +103,7 @@ export class ExpenseProcessingService {
         country,
         classification.expense_type || 'unknown',
         icp,
-        complianceData,
+        policyMarkdown,
         extraction,
         timing,
       );
@@ -183,11 +183,11 @@ export class ExpenseProcessingService {
     return result;
   }
 
-  private async runDataExtraction(markdownContent: string, complianceData: any, timing: any, agent: any) {
+  private async runDataExtraction(markdownContent: string, timing: any, agent: any) {
     const start = Date.now();
     this.logger.log(' Phase 2: Data Extraction (parallel)');
 
-    const result = await agent.extractData(markdownContent, complianceData);
+    const result = await agent.extractData(markdownContent);
 
     const end = Date.now();
     this.metricsService.recordPhase(timing, 'data_extraction', start, end, {
@@ -201,7 +201,7 @@ export class ExpenseProcessingService {
     country: string,
     receiptType: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     extractedData: any,
     timing: any,
     agent: any,
@@ -209,7 +209,7 @@ export class ExpenseProcessingService {
     const start = Date.now();
     this.logger.log('️ Phase 3: Issue Detection (parallel)');
 
-    const result = await agent.analyzeCompliance(country, receiptType, icp, complianceData, extractedData);
+    const result = await agent.analyzeCompliance(country, receiptType, icp, policyMarkdown, extractedData);
 
     const end = Date.now();
     this.metricsService.recordPhase(timing, 'issue_detection', start, end, {
@@ -239,7 +239,7 @@ export class ExpenseProcessingService {
     country: string,
     receiptType: string,
     icp: string,
-    complianceData: any,
+    policyMarkdown: string,
     extractedData: any,
     filename?: string,
   ): Promise<any> {
@@ -248,7 +248,7 @@ export class ExpenseProcessingService {
       country,
       receiptType,
       icp,
-      complianceData,
+      policyMarkdown,
       extractedData,
     );
 
