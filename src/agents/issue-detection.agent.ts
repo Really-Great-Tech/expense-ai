@@ -1,5 +1,4 @@
 import { IssueDetectionResultSchema, type IssueDetectionResult } from '../common/schemas/expense-schemas';
-import { EXPENSE_SCHEMA } from '../common/types';
 import { BedrockLlmService } from '../services/bedrock/bedrock-llm';
 import { CitationVerificationService } from '../services/citation-verification.service';
 import { BaseAgent } from './base.agent';
@@ -56,7 +55,6 @@ export class IssueDetectionAgent extends BaseAgent {
 
       // Get the prompt and compile with variables
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
-        expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,

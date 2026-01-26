@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -19,6 +20,20 @@ export class PolicyIngestionDto {
         type: [String]
     })
     @IsOptional()
+    @Transform(({ value }) => {
+        if (typeof value === 'string') {
+            try {
+                // Try to parse as JSON first
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return parsed;
+                return [value];
+            } catch {
+                // Split by comma if not JSON
+                return value.split(',').map(s => s.trim()).filter(s => s);
+            }
+        }
+        return value;
+    })
     @IsArray()
     @IsString({ each: true })
     icps?: string[];

@@ -134,7 +134,7 @@ export class ExpenseStatusService {
     private receiptRepo: Repository<Receipt>,
     @InjectRepository(ReceiptProcessingResult)
     private receiptProcessingResultRepo: Repository<ReceiptProcessingResult>,
-  ) {}
+  ) { }
 
   /**
    * Get comprehensive status for an expense document
@@ -530,105 +530,102 @@ export class ExpenseStatusService {
 
   /**
    * Extract image quality issues from quality assessment
-   * Converts quality problems into compliance issue format
+   * Returns grouped format matching compliance issue structure
    */
   private extractImageQualityIssues(qualityAssessment: any): Array<any> {
     if (!qualityAssessment) return [];
 
-    const issues: Array<any> = [];
+    const detectedIssues: Array<{
+      issue: string;
+      severity: string;
+      recommendation: string;
+      confidence_score: number;
+    }> = [];
 
     // Check blur detection
     if (qualityAssessment.blur_detection?.detected) {
-      issues.push({
-        issue_type: 'Image related | Blur Detection',
-        field: 'image_quality',
-        description: qualityAssessment.blur_detection.description || 'Document shows blur affecting readability',
-        recommendation: qualityAssessment.blur_detection.recommendation || 'Rescan document with better focus',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.blur_detection.description || 'Document shows blur affecting readability',
         severity: qualityAssessment.blur_detection.severity_level || 'medium',
-        confidence: qualityAssessment.blur_detection.confidence_score || 0.5,
+        recommendation: qualityAssessment.blur_detection.recommendation || 'Rescan document with better focus',
+        confidence_score: qualityAssessment.blur_detection.confidence_score || 0.5,
       });
     }
 
     // Check glare
     if (qualityAssessment.glare_identification?.detected) {
-      issues.push({
-        issue_type: 'Image related | Glare Detection',
-        field: 'image_quality',
-        description: qualityAssessment.glare_identification.description || 'Document has glare affecting visibility',
-        recommendation: qualityAssessment.glare_identification.recommendation || 'Rescan without glare or reflection',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.glare_identification.description || 'Document has glare affecting visibility',
         severity: qualityAssessment.glare_identification.severity_level || 'medium',
-        confidence: qualityAssessment.glare_identification.confidence_score || 0.5,
+        recommendation: qualityAssessment.glare_identification.recommendation || 'Rescan without glare or reflection',
+        confidence_score: qualityAssessment.glare_identification.confidence_score || 0.5,
       });
     }
 
     // Check water stains
     if (qualityAssessment.water_stains?.detected) {
-      issues.push({
-        issue_type: 'Image related | Water Damage',
-        field: 'image_quality',
-        description: qualityAssessment.water_stains.description || 'Document shows water stains',
-        recommendation: qualityAssessment.water_stains.recommendation || 'Request original or undamaged copy',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.water_stains.description || 'Document shows water stains',
         severity: qualityAssessment.water_stains.severity_level || 'high',
-        confidence: qualityAssessment.water_stains.confidence_score || 0.5,
+        recommendation: qualityAssessment.water_stains.recommendation || 'Request original or undamaged copy',
+        confidence_score: qualityAssessment.water_stains.confidence_score || 0.5,
       });
     }
 
     // Check tears or folds
     if (qualityAssessment.tears_or_folds?.detected) {
-      issues.push({
-        issue_type: 'Image related | Physical Damage',
-        field: 'image_quality',
-        description: qualityAssessment.tears_or_folds.description || 'Document has tears or folds',
-        recommendation: qualityAssessment.tears_or_folds.recommendation || 'Request undamaged copy or flatten document',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.tears_or_folds.description || 'Document has tears or folds',
         severity: qualityAssessment.tears_or_folds.severity_level || 'medium',
-        confidence: qualityAssessment.tears_or_folds.confidence_score || 0.5,
+        recommendation: qualityAssessment.tears_or_folds.recommendation || 'Request undamaged copy or flatten document',
+        confidence_score: qualityAssessment.tears_or_folds.confidence_score || 0.5,
       });
     }
 
     // Check cut-off sections
     if (qualityAssessment.cut_off_detection?.detected) {
-      issues.push({
-        issue_type: 'Image related | Incomplete Scan',
-        field: 'image_quality',
-        description: qualityAssessment.cut_off_detection.description || 'Parts of document are cut off',
-        recommendation: qualityAssessment.cut_off_detection.recommendation || 'Rescan complete document',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.cut_off_detection.description || 'Parts of document are cut off',
         severity: qualityAssessment.cut_off_detection.severity_level || 'high',
-        confidence: qualityAssessment.cut_off_detection.confidence_score || 0.5,
+        recommendation: qualityAssessment.cut_off_detection.recommendation || 'Rescan complete document',
+        confidence_score: qualityAssessment.cut_off_detection.confidence_score || 0.5,
       });
     }
 
     // Check missing sections
     if (qualityAssessment.missing_sections?.detected) {
-      issues.push({
-        issue_type: 'Image related | Missing Content',
-        field: 'image_quality',
-        description: qualityAssessment.missing_sections.description || 'Document appears incomplete',
-        recommendation: qualityAssessment.missing_sections.recommendation || 'Provide complete document',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.missing_sections.description || 'Document appears incomplete',
         severity: qualityAssessment.missing_sections.severity_level || 'high',
-        confidence: qualityAssessment.missing_sections.confidence_score || 0.5,
+        recommendation: qualityAssessment.missing_sections.recommendation || 'Provide complete document',
+        confidence_score: qualityAssessment.missing_sections.confidence_score || 0.5,
       });
     }
 
     // Check obstructions
     if (qualityAssessment.obstructions?.detected) {
-      issues.push({
-        issue_type: 'Image related | Obstruction',
-        field: 'image_quality',
-        description: qualityAssessment.obstructions.description || 'Document has obstructions covering content',
-        recommendation: qualityAssessment.obstructions.recommendation || 'Remove obstructions and rescan',
-        knowledge_base_reference: 'Image Quality Standards',
+      detectedIssues.push({
+        issue: qualityAssessment.obstructions.description || 'Document has obstructions covering content',
         severity: qualityAssessment.obstructions.severity_level || 'high',
-        confidence: qualityAssessment.obstructions.confidence_score || 0.5,
+        recommendation: qualityAssessment.obstructions.recommendation || 'Remove obstructions and rescan',
+        confidence_score: qualityAssessment.obstructions.confidence_score || 0.5,
       });
     }
 
-    return issues;
+    // If no issues detected, return empty array
+    if (detectedIssues.length === 0) return [];
+
+    // Calculate average confidence score
+    const avgConfidence = detectedIssues.reduce((sum, i) => sum + i.confidence_score, 0) / detectedIssues.length;
+
+    // Return single grouped issue
+    return [{
+      issue_type: 'Image related | Quality Assessment',
+      field: 'image_quality',
+      description: detectedIssues,
+      recommendation: 'Address the identified image quality issues to improve document processing accuracy.',
+      confidence_score: parseFloat(avgConfidence.toFixed(2)),
+    }];
   }
 
   /**

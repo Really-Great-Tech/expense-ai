@@ -104,6 +104,7 @@ export interface AppConfigType {
 
   // Validation (Judge configuration)
   validation: {
+    llmValidationEnabled: boolean;
     judgeCount: number;
     judgeTemperatures: number[];
   };
@@ -228,6 +229,7 @@ export default registerAs('app', (): AppConfigType => {
     // VALIDATION (Judge configuration)
     // ==========================================================================
     validation: {
+      llmValidationEnabled: (process.env.LLM_VALIDATION_ENABLED ?? 'true') !== 'false',
       judgeCount: parseInt(process.env.VALIDATION_JUDGE_COUNT || '1', 10),
       judgeTemperatures: (process.env.VALIDATION_JUDGE_TEMPERATURES || '0.3,0.7,0.5').split(',').map((t) => parseFloat(t.trim())),
     },

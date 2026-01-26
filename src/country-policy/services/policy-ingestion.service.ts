@@ -9,6 +9,8 @@ import { DocumentReaderFactory } from '../../utils/documentReaderFactory';
 import { PolicyIngestionDto, PolicyIngestionResponseDto } from '../dto/policy-ingestion.dto';
 import { BedrockLlmService } from '../../services/bedrock/bedrock-llm';
 import { AGENT_PROFILES } from '../../agents/config/models.config';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Service for ingesting policy documents and converting them to markdown format
@@ -110,7 +112,7 @@ export class PolicyIngestionService {
         await this.countryRepository.save(country);
         this.logger.log(`Set policy ${savedPolicy.id} as active for ${dto.country}`);
 
-        return {
+        const response = {
             success: true,
             countryId: country.id,
             policyId: savedPolicy.id,
@@ -119,6 +121,68 @@ export class PolicyIngestionService {
             pageCount,
             sourceFile: file.originalname,
         };
+
+        // Sync seeds file in development mode
+        if (process.env.NODE_ENV !== 'production') {
+            this.syncSeeds().catch(err =>
+                this.logger.error(`Failed to sync seeds: ${err.message}`)
+            );
+        }
+
+        return response;
+    }
+
+    /**
+     * Update the seeds file with current database state
+     */
+    async syncSeeds(): Promise<void> {
+        try {
+            const countries = await this.countryRepository.find({
+                relations: ['activePolicy'],
+            });
+
+            const seeds: Record<string, any> = {};
+
+            for (const country of countries) {
+                if (country.activePolicy) {
+                    seeds[country.name] = {
+                        name: country.name,
+                        code: country.code,
+                        policyMarkdown: country.activePolicy.policyMarkdown,
+                        pageCount: country.activePolicy.pageCount,
+                        icps: country.activePolicy.icps,
+                        metadata: country.activePolicy.policyMetadata,
+                    };
+                }
+            }
+
+            const seedFilePath = path.join(process.cwd(), 'src/seeds/country-policies.seed.ts');
+
+            if (fs.existsSync(seedFilePath)) {
+                let content = fs.readFileSync(seedFilePath, 'utf8');
+
+                // Find the start of the export object
+                const startMarker = 'export const COUNTRY_POLICY_SEEDS: Record<string, CountryPolicySeed> = {';
+                const startIndex = content.indexOf(startMarker);
+
+                if (startIndex !== -1) {
+                    const startContent = content.substring(0, startIndex + startMarker.length);
+                    // Generate formatted JSON content for the object body
+                    // Remove opening brace since it's in startContent and closing brace for end
+                    const jsonContent = JSON.stringify(seeds, null, 2);
+                    // Remove first "{" and last "}" to fit into the variable declaration
+                    const innerContent = jsonContent.substring(1, jsonContent.length - 1);
+
+                    const newContent = `${startContent}\n${innerContent}\n};`;
+
+                    fs.writeFileSync(seedFilePath, newContent);
+                    this.logger.log(`Synced ${Object.keys(seeds).length} policies to seeds file`);
+                }
+            }
+        } catch (error) {
+            this.logger.error('Error syncing seeds file:', error);
+            throw error;
+        }
     }
 
     /**

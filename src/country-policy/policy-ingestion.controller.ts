@@ -169,4 +169,22 @@ export class PolicyIngestionController {
             metadata: policy.policyMetadata,
         };
     }
+
+    /**
+     * Trigger synchronization of DB policies to seeds file (Dev only)
+     */
+    @Post('sync-seeds')
+    @ApiOperation({
+        summary: 'Sync policies to seeds file',
+        description: 'Updates the src/seeds/country-policies.seed.ts file with current DB state (Development only)'
+    })
+    @ApiResponse({ status: 200, description: 'Seeds synced successfully' })
+    async syncSeeds(): Promise<{ success: boolean; message: string }> {
+        if (process.env.NODE_ENV === 'production') {
+            return { success: false, message: 'Not available in production' };
+        }
+
+        await this.policyIngestionService.syncSeeds();
+        return { success: true, message: 'Seeds synced successfully' };
+    }
 }

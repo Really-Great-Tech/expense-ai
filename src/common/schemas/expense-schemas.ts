@@ -55,20 +55,34 @@ export const CitationResultSchema = z.object({
 
 // Policy Citation Schema for issue detection
 export const PolicyCitationSchema = z.object({
+  field: z.string().optional(), // Field this citation applies to (for grouped issues)
   page: z.string(),
   section: z.string(),
   quote: z.string(),
   is_verified: z.boolean().optional(), // Added by citation verification service
+  verification_failure_reason: z.enum(['quote_not_found', 'page_not_found', 'both']).optional(),
+  verification_details: z.string().optional(),
+});
+
+// Grouped description item for Category 1 issues
+export const GroupedDescriptionSchema = z.object({
+  reason: z.enum(['Missing / Incomplete details', 'Wrong / Invalid details']),
+  fields: z.array(z.string()),
+  message: z.string(),
 });
 
 // Issue Detection Schemas
+// Supports both:
+// - Category 1: grouped issues with description as array and citations array
+// - Category 2 & 3: individual issues with description as string and single citation
 export const ComplianceIssueSchema = z.object({
   issue_type: z.string(),
   field: z.string(),
-  description: z.string(),
+  description: z.union([z.string(), z.array(GroupedDescriptionSchema)]), // String for Cat 2&3, Array for Cat 1
   recommendation: z.string(),
   confidence_score: z.number().min(0).max(1),
-  citation: PolicyCitationSchema.optional(), // New: citation with page reference and verbatim quote
+  citation: PolicyCitationSchema.optional(), // Single citation for Category 2 & 3
+  citations: z.array(PolicyCitationSchema).optional(), // Multiple citations for Category 1
 });
 
 export const ValidationResultSchema = z.object({

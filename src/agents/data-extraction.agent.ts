@@ -33,22 +33,23 @@ export class DataExtractionAgent extends BaseAgent {
   /**
    * Extract structured expense data from a document
    * @param markdownContent OCR-extracted text in markdown format
-   * @param _complianceRequirements Deprecated parameter, kept for API compatibility
+   * @param receiptType Optional receipt type from classification (e.g., "Restaurant Receipt")
    * @returns Extracted expense data including vendor, amounts, dates, line items, etc.
    * @throws Error if extraction fails critically
    */
   async extractData(
     markdownContent: string,
-    _complianceRequirements?: any, // Kept for API compatibility - not used
+    receiptType?: string,
   ): Promise<ExpenseData> {
     const startTime = new Date();
 
     try {
-      this.logger.log('Starting data extraction with standard receipt/invoice schema');
+      this.logger.log(`Starting data extraction${receiptType ? ` for ${receiptType}` : ''}`);
 
       // Get the prompt and compile with variables
       const combinedPrompt = await this.getPromptTemplate('data-extraction-prompt', {
         markdownContent,
+        receiptType: receiptType || 'Unknown',
       });
 
       this.logger.debug(`Using prompt: ${this.lastPromptInfo?.name} (version: ${this.lastPromptInfo?.version || 'unknown'})`);
@@ -67,6 +68,7 @@ export class DataExtractionAgent extends BaseAgent {
       this.logger.debug(`Extracted content: ${rawContent.substring(0, 200)}...`);
 
       const parsedResult = this.parseJsonResponse(rawContent);
+
       const result = ExpenseDataSchema.parse(parsedResult);
 
       const endTime = new Date();

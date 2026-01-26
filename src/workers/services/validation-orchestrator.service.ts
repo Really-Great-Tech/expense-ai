@@ -15,6 +15,14 @@ export class ValidationOrchestratorService {
 
   private initializeValidator(): void {
     try {
+      const validationEnabled = (process.env.LLM_VALIDATION_ENABLED ?? 'true') !== 'false';
+
+      if (!validationEnabled) {
+        this.logger.warn(' LLM-as-judge validation DISABLED by configuration');
+        this.complianceValidator = null as any;
+        return;
+      }
+
       const useParallelValidation = (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') !== 'false';
 
       if (useParallelValidation) {

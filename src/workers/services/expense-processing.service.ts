@@ -47,17 +47,25 @@ export class ExpenseProcessingService {
     this.logger.debug(`Downloaded file from S3: ${storageKey} (${fileBuffer.length} bytes)`);
 
     try {
-      // PARALLEL GROUP 1: Independent phases that can run simultaneously
+      // PARALLEL GROUP 1: Image Quality runs parallel, Classification runs first for receipt type
       progressCallback?.('parallelPhase1', 10);
-      this.logger.log(' Starting Parallel Group 1: Image Quality + Classification + Data Extraction');
+      this.logger.log(' Starting Parallel Group 1: Image Quality + Classification');
 
       const parallelGroup1Start = Date.now();
 
-      const [formattedQualityAssessment, classification, extraction] = await Promise.all([
+      // Run Image Quality and Classification in parallel
+      const [formattedQualityAssessment, classification] = await Promise.all([
         this.runImageQualityAssessmentFromBuffer(fileBuffer, filename, timing, agents.imageQualityAssessmentAgent),
         this.runFileClassification(markdownContent, country, expenseSchema, timing, agents.fileClassificationAgent),
-        this.runDataExtraction(markdownContent, timing, agents.dataExtractionAgent),
       ]);
+
+      // Get receipt type from classification
+      const receiptType = classification.expense_type || 'unknown';
+      this.logger.log(` Receipt type identified: ${receiptType}`);
+
+      // Now run extraction with the receipt type
+      this.logger.log(' Starting Data Extraction with receipt type context');
+      const extraction = await this.runDataExtraction(markdownContent, receiptType, timing, agents.dataExtractionAgent);
 
       const parallelGroup1End = Date.now();
       const parallelGroup1Duration = (parallelGroup1End - parallelGroup1Start) / 1000;
@@ -183,11 +191,11 @@ export class ExpenseProcessingService {
     return result;
   }
 
-  private async runDataExtraction(markdownContent: string, timing: any, agent: any) {
+  private async runDataExtraction(markdownContent: string, receiptType: string, timing: any, agent: any) {
     const start = Date.now();
-    this.logger.log(' Phase 2: Data Extraction (parallel)');
+    this.logger.log(' Phase 2: Data Extraction');
 
-    const result = await agent.extractData(markdownContent);
+    const result = await agent.extractData(markdownContent, receiptType);
 
     const end = Date.now();
     this.metricsService.recordPhase(timing, 'data_extraction', start, end, {
