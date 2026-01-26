@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ExpenseComplianceUQLMValidator';
 import { ParallelExpenseComplianceUQLMValidator } from '../../utils/judge/validation/ParallelExpenseComplianceUQLMValidator';
 import { ProcessingTiming } from './processing-metrics.service';
@@ -9,13 +10,13 @@ export class ValidationOrchestratorService {
   private readonly logger = new Logger(ValidationOrchestratorService.name);
   private complianceValidator: ExpenseComplianceUQLMValidator | ParallelExpenseComplianceUQLMValidator;
 
-  constructor() {
+  constructor(private configService: ConfigService) {
     this.initializeValidator();
   }
 
   private initializeValidator(): void {
     try {
-      const validationEnabled = (process.env.LLM_VALIDATION_ENABLED ?? 'true') !== 'false';
+      const validationEnabled = this.configService.get<boolean>('app.validation.llmValidationEnabled');
 
       if (!validationEnabled) {
         this.logger.warn(' LLM-as-judge validation DISABLED by configuration');
