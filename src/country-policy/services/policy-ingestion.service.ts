@@ -168,10 +168,26 @@ export class PolicyIngestionService {
                 if (startIndex !== -1) {
                     const startContent = content.substring(0, startIndex + startMarker.length);
                     // Generate formatted JSON content for the object body
-                    // Remove opening brace since it's in startContent and closing brace for end
                     const jsonContent = JSON.stringify(seeds, null, 2);
+
+                    // Post-process to use template literals for policyMarkdown
+                    // This avoids the "long line" issue and makes the seed file readable
+                    // Regex matches: "policyMarkdown": "content..." 
+                    const formattedJson = jsonContent.replace(/"policyMarkdown": "((?:[^"\\]|\\.)*)"/g, (match, p1) => {
+                        try {
+                            // Unescape the JSON string to get raw content
+                            const raw = JSON.parse(`"${p1}"`);
+                            // Escape backticks and ${} for template literal
+                            const escaped = raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+                            return `"policyMarkdown": \`\n${escaped}\``;
+                        } catch (e) {
+                            return match; // Fallback if parsing fails
+                        }
+                    });
+
+                    // Remove opening brace since it's in startContent and closing brace for end
                     // Remove first "{" and last "}" to fit into the variable declaration
-                    const innerContent = jsonContent.substring(1, jsonContent.length - 1);
+                    const innerContent = formattedJson.substring(1, formattedJson.length - 1);
 
                     const newContent = `${startContent}\n${innerContent}\n};`;
 
