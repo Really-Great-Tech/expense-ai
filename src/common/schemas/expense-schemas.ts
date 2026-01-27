@@ -57,18 +57,36 @@ export const CitationResultSchema = z
   })
   .strict();
 
-// Issue Detection Schemas
+// Grouped violation description for Category 1 issues
+export const GroupedViolationSchema = z.object({
+  reason: z.string(),
+  fields: z.array(z.string()),
+  message: z.string(),
+});
+
+// LLM-as-judge validation scores for individual issues
+export const IssueLLMValidationSchema = z.object({
+  overall_validation_score: z.number().min(0).max(100),
+  reliability_level: z.enum(['high', 'medium', 'low']),
+});
+
 export const ComplianceIssueSchema = z.object({
   issue_type: z.string(),
   field: z.string(),
-  description: z.string(),
+  // description can be a string OR an array of grouped violations (for Category 1)
+  description: z.union([z.string(), z.array(GroupedViolationSchema)]),
   recommendation: z.string(),
-  knowledge_base_reference: z.string(), // Reverted back to correct name
+  // knowledge_base_reference can be a string OR an array of strings
+  knowledge_base_reference: z.union([z.string(), z.array(z.string())]),
   confidence_score: z.number().min(0).max(1),
+  // LLM validation scores - populated after LLM-as-judge validation
+  llm_validation: IssueLLMValidationSchema.optional(),
 });
 
 export const ValidationResultSchema = z.object({
   is_valid: z.boolean(),
+  /** Indicates whether the receipt_type provided exists in the compliance requirements for the specified country/ICP */
+  receipt_type_exists: z.boolean(),
   issues_count: z.number(),
   issues: z.array(ComplianceIssueSchema),
   corrected_receipt: z.null(),
@@ -86,14 +104,6 @@ export const TechnicalDetailsSchema = z.object({
 export const IssueDetectionResultSchema = z.object({
   validation_result: ValidationResultSchema,
   technical_details: TechnicalDetailsSchema,
-  validation_metadata: z
-    .object({
-      total_issues_flagged: z.number(),
-      valid_issues: z.number(),
-      hallucinated_issues_filtered: z.number(),
-      hallucination_rate: z.number(),
-    })
-    .optional(),
 });
 
 // Data Extraction Schema - Flexible schema to handle any extracted data

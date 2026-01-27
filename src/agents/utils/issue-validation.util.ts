@@ -56,9 +56,13 @@ export function validateIssuesAgainstCompliance(issues: ComplianceIssue[], compl
   const invalidIssues: Array<{ issue: ComplianceIssue; reason: string }> = [];
 
   for (const issue of issues) {
-    const reference = issue.knowledge_base_reference || '';
+    const reference = issue.knowledge_base_reference;
 
-    if (!reference || reference.trim().length === 0) {
+    // Convert to array for consistent processing
+    const references = Array.isArray(reference) ? reference : [reference || ''];
+
+    // Consolidate empty reference check
+    if (references.length === 0 || references.every((ref) => !ref || ref.trim().length === 0)) {
       invalidIssues.push({
         issue,
         reason: 'Empty or missing knowledge_base_reference',
@@ -74,7 +78,8 @@ export function validateIssuesAgainstCompliance(issues: ComplianceIssue[], compl
     }
 
     // Check if reference text exists in compliance data
-    const isValid = findMatchingRule(reference, complianceTexts);
+    // If it's an array, all items must be valid
+    const isValid = references.every((ref) => findMatchingRule(ref, complianceTexts));
 
     if (isValid) {
       validIssues.push(issue);

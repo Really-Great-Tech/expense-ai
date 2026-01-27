@@ -33,6 +33,7 @@ describe('IssueDetectionAgent', () => {
     const validComplianceResponse = {
       validation_result: {
         is_valid: true,
+        receipt_type_exists: true,
         issues_count: 0,
         issues: [],
         corrected_receipt: null,
@@ -78,6 +79,7 @@ describe('IssueDetectionAgent', () => {
       const issuesResponse = {
         validation_result: {
           is_valid: false,
+          receipt_type_exists: true,
           issues_count: 2,
           issues: [
             {
@@ -182,6 +184,7 @@ describe('IssueDetectionAgent', () => {
       const issuesResponse = {
         validation_result: {
           is_valid: false,
+          receipt_type_exists: true,
           issues_count: 1,
           issues: [
             {
@@ -240,6 +243,7 @@ describe('IssueDetectionAgent', () => {
       const complexIssuesResponse = {
         validation_result: {
           is_valid: false,
+          receipt_type_exists: true,
           issues_count: 3,
           issues: [
             {
@@ -268,8 +272,7 @@ describe('IssueDetectionAgent', () => {
             },
           ],
           corrected_receipt: null,
-          compliance_summary:
-            '3 issues found: 1 missing field, 1 format error, 1 data quality issue. Manual review recommended.',
+          compliance_summary: '3 issues found: 1 missing field, 1 format error, 1 data quality issue. Manual review recommended.',
         },
         technical_details: {
           content_type: 'expense_receipt',

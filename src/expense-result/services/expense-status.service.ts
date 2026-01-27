@@ -105,9 +105,9 @@ export interface DocumentResultsResponse {
         index: number;
         issue_type: string;
         field: string;
-        description: string;
+        description: string | any[];
         recommendation: string;
-        knowledge_base_reference: string;
+        knowledge_base_reference: string | string[];
         severity: string;
         confidence: number;
       }>;
@@ -188,11 +188,7 @@ export class ExpenseStatusService {
    * Derive overall status from document and child receipt states
    * Logic: If no child is actively processing, consider master complete/failed
    */
-  private deriveOverallStatus(
-    document: ExpenseDocument,
-    receipts: Receipt[],
-    processingResults: ReceiptProcessingResult[],
-  ): OverallExpenseStatus {
+  private deriveOverallStatus(document: ExpenseDocument, receipts: Receipt[], processingResults: ReceiptProcessingResult[]): OverallExpenseStatus {
     // If document splitting failed
     if (document.status === DocumentStatus.FAILED) {
       return OverallExpenseStatus.FAILED;
@@ -209,17 +205,11 @@ export class ExpenseStatusService {
     }
 
     // Check if any receipt is actively processing
-    const hasActiveProcessing = processingResults.some((result) =>
-      this.isActiveProcessingStatus(result.status),
-    );
+    const hasActiveProcessing = processingResults.some((result) => this.isActiveProcessingStatus(result.status));
 
     // Count completed and failed
-    const completedCount = processingResults.filter(
-      (r) => r.status === ProcessingStatus.COMPLETED,
-    ).length;
-    const failedCount = processingResults.filter(
-      (r) => r.status === ProcessingStatus.FAILED,
-    ).length;
+    const completedCount = processingResults.filter((r) => r.status === ProcessingStatus.COMPLETED).length;
+    const failedCount = processingResults.filter((r) => r.status === ProcessingStatus.FAILED).length;
 
     // If there are active processing jobs, status is PROCESSING_RECEIPTS
     if (hasActiveProcessing) {
@@ -276,10 +266,7 @@ export class ExpenseStatusService {
   /**
    * Calculate receipt status breakdown
    */
-  private calculateReceiptBreakdown(
-    receipts: Receipt[],
-    processingResults: ReceiptProcessingResult[],
-  ) {
+  private calculateReceiptBreakdown(receipts: Receipt[], processingResults: ReceiptProcessingResult[]) {
     const breakdown = {
       total: receipts.length,
       created: 0,
@@ -311,11 +298,7 @@ export class ExpenseStatusService {
   /**
    * Calculate progress percentages
    */
-  private calculateProgress(
-    document: ExpenseDocument,
-    receipts: Receipt[],
-    processingResults: ReceiptProcessingResult[],
-  ) {
+  private calculateProgress(document: ExpenseDocument, receipts: Receipt[], processingResults: ReceiptProcessingResult[]) {
     // Upload/splitting progress based on document status
     const uploadProgress = this.getDocumentStatusProgress(document.status);
 
@@ -378,10 +361,7 @@ export class ExpenseStatusService {
   /**
    * Extract relevant timestamps
    */
-  private extractTimestamps(
-    document: ExpenseDocument,
-    processingResults: ReceiptProcessingResult[],
-  ) {
+  private extractTimestamps(document: ExpenseDocument, processingResults: ReceiptProcessingResult[]) {
     const timestamps: any = {
       uploadedAt: document.createdAt,
     };
@@ -400,9 +380,7 @@ export class ExpenseStatusService {
     }
 
     // Processing completed when all receipts finished (either completed or failed)
-    const allFinished = processingResults.every(
-      (r) => r.status === ProcessingStatus.COMPLETED || r.status === ProcessingStatus.FAILED,
-    );
+    const allFinished = processingResults.every((r) => r.status === ProcessingStatus.COMPLETED || r.status === ProcessingStatus.FAILED);
     if (allFinished && processingResults.length > 0) {
       const lastCompleted = processingResults
         .filter((r) => r.processingCompletedAt)
@@ -421,7 +399,7 @@ export class ExpenseStatusService {
    */
   async getDocumentResults(documentId: string): Promise<DocumentResultsResponse> {
     const document = await this.expenseDocumentRepo.findOne({
-      where: { id: documentId }
+      where: { id: documentId },
     });
 
     if (!document) {
@@ -429,10 +407,10 @@ export class ExpenseStatusService {
     }
 
     const receipts = await this.receiptRepo.find({
-      where: { sourceDocumentId: documentId }
+      where: { sourceDocumentId: documentId },
     });
     const results = await this.receiptProcessingResultRepo.find({
-      where: { sourceDocumentId: documentId }
+      where: { sourceDocumentId: documentId },
     });
 
     // Calculate overall status
@@ -460,10 +438,7 @@ export class ExpenseStatusService {
           const imageQualityIssues = this.extractImageQualityIssues(result.qualityAssessment);
 
           // Merge all issues
-          const mergedIssues = this.mergeComplianceIssues(
-            result.complianceValidation?.validation_result?.issues || [],
-            imageQualityIssues
-          );
+          const mergedIssues = this.mergeComplianceIssues(result.complianceValidation?.validation_result?.issues || [], imageQualityIssues);
 
           complianceResults = {
             extraction: result.extractedData || {},
@@ -505,10 +480,7 @@ export class ExpenseStatusService {
         completed: results.filter((r) => r.status === ProcessingStatus.COMPLETED).length,
         failed: results.filter((r) => r.status === ProcessingStatus.FAILED).length,
         processing: results.filter(
-          (r) =>
-            r.status !== ProcessingStatus.COMPLETED &&
-            r.status !== ProcessingStatus.FAILED &&
-            r.status !== ProcessingStatus.QUEUED,
+          (r) => r.status !== ProcessingStatus.COMPLETED && r.status !== ProcessingStatus.FAILED && r.status !== ProcessingStatus.QUEUED,
         ).length,
         queued: results.filter((r) => r.status === ProcessingStatus.QUEUED).length,
       },

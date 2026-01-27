@@ -6,8 +6,6 @@ import type { ILLMService } from './types/llm.types';
 import { AGENT_PROFILES } from './config/models.config';
 import { ServiceUnavailableError } from '../common/errors/service-errors';
 import { filterComplianceByIcp, getFilterStats } from './utils/compliance-filter.util';
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Agent responsible for detecting compliance issues in expense documents
@@ -49,22 +47,6 @@ export class IssueDetectionAgent extends BaseAgent {
       // Filter compliance data to include only rules for the specified ICP
       const filteredComplianceData = filterComplianceByIcp(complianceData, icp);
 
-      // Save filtered compliance data to disk for debugging (development only)
-      if (process.env.NODE_ENV === 'development') {
-        try {
-          const debugDir = path.join(process.cwd(), 'filtered-rules-debug');
-          if (!fs.existsSync(debugDir)) {
-            fs.mkdirSync(debugDir, { recursive: true });
-          }
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const debugFileName = `filtered-compliance-${country}-${icp}-${timestamp}.json`;
-          const debugFilePath = path.join(debugDir, debugFileName);
-          fs.writeFileSync(debugFilePath, JSON.stringify(filteredComplianceData, null, 2), 'utf-8');
-        } catch (error) {
-          this.logger.warn(`Failed to write debug file: ${error.message}`);
-        }
-      }
-
       // Log filtering statistics
       const stats = getFilterStats(complianceData, filteredComplianceData);
       this.logger.log(`Filtered compliance rules for ICP '${icp}':`, stats);
@@ -74,7 +56,6 @@ export class IssueDetectionAgent extends BaseAgent {
 
       // Get the prompt and compile with variables using filtered compliance data
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {
-        expenseTaxonomyDescription: JSON.stringify(EXPENSE_SCHEMA.properties, null, 2),
         country,
         receiptType,
         icp,
@@ -112,7 +93,7 @@ export class IssueDetectionAgent extends BaseAgent {
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
 
-      this.logger.error(`Compliance analysis failed after ${duration}ms:`, error);
+      this.logger.error(`Compliance analysis failed for ${country}/${icp}/${receiptType} after ${duration}ms:`, error);
 
       // Re-throw ServiceUnavailableError to trigger job retry
       if (error instanceof ServiceUnavailableError) {
