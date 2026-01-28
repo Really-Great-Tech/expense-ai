@@ -18,6 +18,8 @@ import { IsValidCountryConstraint } from '../common/validators/is-valid-country.
 import { IsValidIcpConstraint } from '../common/validators/is-valid-icp.validator';
 import { StorageModule } from '../storage/storage.module';
 
+import { CountryPolicyController } from './controllers/country-policy.controller';
+
 @Module({
   imports: [
     // Keep all entities for migrations seeding
@@ -25,7 +27,7 @@ import { StorageModule } from '../storage/storage.module';
     // Import storage for file uploads
     StorageModule,
   ],
-  controllers: [PolicyUploadController],
+  controllers: [PolicyUploadController, CountryPolicyController],
   providers: [
     // Existing services
     CountryPolicyService,
