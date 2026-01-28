@@ -109,7 +109,7 @@ export interface DocumentResultsResponse {
         recommendation: string;
         knowledge_base_reference: string;
         severity: string;
-        confidence: number;
+        confidence?: number;
       }>;
     } | null;
   }>;
@@ -638,9 +638,17 @@ export class ExpenseStatusService {
   /**
    * Merge compliance issues with image quality issues
    * Adds index numbers to all issues for consistent display
+   * Removes confidence_score from compliance issues as per requirement
    */
   private mergeComplianceIssues(complianceIssues: Array<any>, imageQualityIssues: Array<any>): Array<any> {
-    const allIssues = [...complianceIssues, ...imageQualityIssues];
+    // Remove confidence_score from compliance issues (but keep llm_validation)
+    const processedComplianceIssues = complianceIssues.map(issue => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confidence_score, ...rest } = issue;
+      return rest;
+    });
+
+    const allIssues = [...processedComplianceIssues, ...imageQualityIssues];
 
     // Add index to each issue for easy reference
     return allIssues.map((issue, index) => ({
