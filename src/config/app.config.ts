@@ -40,6 +40,7 @@ export interface AppConfigType {
   redis: {
     host: string;
     port: number;
+    clusterMode: boolean;
   };
 
   // AWS
@@ -142,6 +143,7 @@ export default registerAs('app', (): AppConfigType => {
     redis: {
       host: process.env.REDIS_HOST || '',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      clusterMode: process.env.REDIS_CLUSTER_MODE === 'true',
     },
 
     // ==========================================================================

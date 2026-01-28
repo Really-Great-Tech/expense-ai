@@ -43,12 +43,25 @@ export class RedisConfigService implements SharedBullConfigurationFactory {
   /**
    * Create Redis connection for BullMQ (AWS ElastiCache)
    * BullMQ requires maxRetriesPerRequest: null
+   * Supports both standard Redis (Dev/Staging) and Cluster mode (Production)
    */
   private createBullMQRedisConnection(): Redis {
-    const { host: endpoint, port } = this.appConfig.redis;
+    const { host: endpoint, port, clusterMode } = this.appConfig.redis;
 
     if (!endpoint) {
       throw new Error('REDIS_HOST is required');
+    }
+
+    if (clusterMode) {
+      this.logger.log(`Creating BullMQ Redis Cluster connection to ${endpoint}:${port}`, CONTEXT);
+
+      return new Redis.Cluster([{ host: endpoint, port }], {
+        redisOptions: {
+          maxRetriesPerRequest: null, // Required by BullMQ
+          enableReadyCheck: false,
+          connectTimeout: 10000,
+        },
+      }) as any; // BullMQ accepts Cluster as connection
     }
 
     this.logger.log(`Creating BullMQ Redis connection to ${endpoint}:${port}`, CONTEXT);
