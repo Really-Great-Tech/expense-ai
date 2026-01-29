@@ -61,10 +61,10 @@ export class PolicyUploadOrchestrator {
   ): Promise<PolicyUploadResponse> {
 
     this.logger.log('========================================================');
-    this.logger.log('🚀 POLICY UPLOAD PIPELINE STARTING');
+    this.logger.log('POLICY UPLOAD PIPELINE STARTING');
     this.logger.log('========================================================');
-    this.logger.log(`🌍 Country: ${countryName}`);
-    this.logger.log(`📁 Files to process: ${files.length}`);
+    this.logger.log(`Country: ${countryName}`);
+    this.logger.log(`Files to process: ${files.length}`);
 
     this.logger.log('')
 
@@ -76,12 +76,12 @@ export class PolicyUploadOrchestrator {
 
     try {
       // STEP 1: Store all files to S3 (parallel processing for speed)
-      this.logger.log('📤 STEP 1: Storing files to S3...');
+      this.logger.log('STEP 1: Storing files to S3...');
       const storeStartTime = Date.now();
 
       const storePromises = files.map(async (file) => {
         const fileInfo = await this.storeFile(file);
-        this.logger.log(`   ✓ ${file.originalname} → S3`);
+        this.logger.log(`   ${file.originalname} -> S3`);
         return { file, fileInfo };
       });
 
@@ -90,7 +90,7 @@ export class PolicyUploadOrchestrator {
       this.logger.log('');
 
       // STEP 2: Extract unified policy from all documents
-      this.logger.log('🤖 STEP 2: Extracting unified policy from all documents...');
+      this.logger.log('STEP 2: Extracting unified policy from all documents...');
       const extractStartTime = Date.now();
 
       extractedData = await this.llmAgent.extractPolicyFromMultipleDocuments(
@@ -110,7 +110,7 @@ export class PolicyUploadOrchestrator {
       const validationEnabled = false; // Temporarily disabled manually in code
 
       if (validationEnabled) {
-        this.logger.log('🔍 STEP 3: Validating extracted policies against source documents...');
+        this.logger.log('STEP 3: Validating extracted policies against source documents...');
         const validationStartTime = Date.now();
 
         const validationResult = await this.validationService.validateExtractedPoliciesMultiDocument(
@@ -162,7 +162,7 @@ export class PolicyUploadOrchestrator {
         this.logger.log(`   Critical Issues: ${validationResult.critical_issues.length}`);
 
         if (problematicRules.length > 0) {
-          this.logger.warn(`   ⚠️  Found ${problematicRules.length} rules with score < 7`);
+          this.logger.warn(`   Found ${problematicRules.length} rules with score < 7`);
           problematicRules.forEach((rule, index) => {
             if (index < 3) { // Show first 3
               this.logger.warn(`      - ${rule.table}: Score ${rule.score}/10`);
@@ -174,28 +174,28 @@ export class PolicyUploadOrchestrator {
         }
 
         if (validationResult.critical_issues.length > 0) {
-          this.logger.error(`   ❌ Critical validation issues found:`);
+          this.logger.error(`   Critical validation issues found:`);
           validationResult.critical_issues.forEach(issue => {
             this.logger.error(`      - ${issue}`);
           });
         }
       } else {
-        this.logger.log('⏩ STEP 3: Validation skipped due to configuration (POLICY_VALIDATION_ENABLED=false)');
+        this.logger.log('STEP 3: Validation skipped due to configuration (POLICY_VALIDATION_ENABLED=false)');
       }
 
       this.logger.log('');
 
       // STEP 4: Schema validation for database compatibility
-      this.logger.log('✅ STEP 4: Validating schema for database...');
+      this.logger.log('STEP 4: Validating schema for database...');
       const isValidForDb = this.persistenceService.validatePolicyData(extractedData);
       if (!isValidForDb) {
         throw new BadRequestException('Policy data does not meet database requirements');
       }
-      this.logger.log('   ✓ Schema validation passed');
+      this.logger.log('   Schema validation passed');
       this.logger.log('');
 
       // STEP 5: Save unified policy to database (with references to all source files)
-      this.logger.log('💾 STEP 5: Saving unified policy to database...');
+      this.logger.log('STEP 5: Saving unified policy to database...');
 
       // Use the first file's info as primary, but we'll create a combined file info
       const primaryFileInfo = storedFiles[0].fileInfo;
@@ -217,7 +217,7 @@ export class PolicyUploadOrchestrator {
       policyId = saveResult.policyId;
       versionId = saveResult.versionId;
 
-      this.logger.log(`   ✓ Policy saved (ID: ${policyId}, Version: ${versionId})`);
+      this.logger.log(`   Policy saved (ID: ${policyId}, Version: ${versionId})`);
       this.logger.log('');
 
 
@@ -232,7 +232,7 @@ export class PolicyUploadOrchestrator {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('❌ Pipeline failed:', error);
+      this.logger.error('Pipeline failed:', error);
 
       // Mark all files as failed since we process them as a group
       for (const file of files) {
@@ -245,10 +245,10 @@ export class PolicyUploadOrchestrator {
     }
 
     this.logger.log('========================================================');
-    this.logger.log('📊 PIPELINE COMPLETE');
-    this.logger.log(`✅ Success: ${results.every(r => r.status === 'success')}`);
-    this.logger.log(`📄 Files processed: ${files.length}`);
-    this.logger.log(`🎯 Unified policies generated: ${policyId ? 1 : 0}`);
+    this.logger.log('PIPELINE COMPLETE');
+    this.logger.log(`Success: ${results.every(r => r.status === 'success')}`);
+    this.logger.log(`Files processed: ${files.length}`);
+    this.logger.log(`Unified policies generated: ${policyId ? 1 : 0}`);
     this.logger.log('========================================================');
     this.logger.log('');
 
@@ -346,7 +346,7 @@ export class PolicyUploadOrchestrator {
       // Upload to S3 - returns the s3Key as string
       const uploadedKey = await this.storageService.uploadFile(file.buffer, s3Key);
 
-      this.logger.log(`   ✓ File stored to S3: ${uploadedKey}`);
+      this.logger.log(`   File stored to S3: ${uploadedKey}`);
 
       return {
         fileName: file.originalname,
@@ -358,7 +358,7 @@ export class PolicyUploadOrchestrator {
       };
     } catch (error) {
       // Fallback to local storage indication if S3 fails
-      this.logger.warn(`   ⚠️ S3 upload failed, using local reference: ${error}`);
+      this.logger.warn(`   S3 upload failed, using local reference: ${error}`);
 
       return {
         fileName: file.originalname,
