@@ -49,10 +49,10 @@ export class IssueDetectionAgent extends BaseAgent {
 
       // Log filtering statistics
       const stats = getFilterStats(complianceData, filteredComplianceData);
-      this.logger.log(`Filtered compliance rules for ICP '${icp}':`, stats);
-      this.logger.log(`Receipt Standards: ${stats.receiptStandards.original} → ${stats.receiptStandards.filtered}`);
-      this.logger.log(`Gross-Up Policies: ${stats.grossUpPolicies.original} → ${stats.grossUpPolicies.filtered}`);
-      this.logger.log(`Additional Info Policies: ${stats.additionalInfoPolicies.original} → ${stats.additionalInfoPolicies.filtered}`);
+      this.logger.debug(`Filtered compliance rules for ICP '${icp}':`, stats);
+      this.logger.debug(`Receipt Standards: ${stats.receiptStandards.original} → ${stats.receiptStandards.filtered}`);
+      this.logger.debug(`Gross-Up Policies: ${stats.grossUpPolicies.original} → ${stats.grossUpPolicies.filtered}`);
+      this.logger.debug(`Additional Info Policies: ${stats.additionalInfoPolicies.original} → ${stats.additionalInfoPolicies.filtered}`);
 
       // Get the prompt and compile with variables using filtered compliance data
       const combinedPrompt = await this.getPromptTemplate('issue-detection-prompt', {

@@ -10,11 +10,14 @@ import { IcpValidationService } from './services/icp-validation.service';
 import { IsValidCountryConstraint } from '../common/validators/is-valid-country.validator';
 import { IsValidIcpConstraint } from '../common/validators/is-valid-icp.validator';
 
+import { CountryPolicyController } from './controllers/country-policy.controller';
+
 @Module({
   imports: [
     // Keep all entities for migrations seeding
     TypeOrmModule.forFeature([Country, Version, CountryPolicy, Datasource]),
   ],
+  controllers: [CountryPolicyController],
   providers: [CountryPolicyService, CountryValidationService, IcpValidationService, IsValidCountryConstraint, IsValidIcpConstraint],
   exports: [CountryPolicyService, CountryValidationService, IcpValidationService, IsValidCountryConstraint, IsValidIcpConstraint, TypeOrmModule],
 })

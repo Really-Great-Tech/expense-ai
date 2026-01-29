@@ -81,7 +81,7 @@ export class ExpenseProcessingService {
         agents.issueDetectionAgent,
       );
 
-      const citations={}
+      const citations = {};
       // const citations = await this.runCitationGeneration(
       //   extraction,
       //   markdownContent,
@@ -108,6 +108,24 @@ export class ExpenseProcessingService {
         timing,
       );
       progressCallback?.('llmValidation', 98);
+
+      // Merge LLM validation scores into compliance issues
+      if (llmValidationResult?.issue_validation_scores && compliance?.validation_result?.issues) {
+        compliance.validation_result.issues = compliance.validation_result.issues.map((issue: any, index: number) => {
+          const validationScore = llmValidationResult.issue_validation_scores.find((score: any) => score.issue_index === index);
+          if (validationScore) {
+            return {
+              ...issue,
+              llm_validation: {
+                overall_validation_score: validationScore.overall_validation_score,
+                reliability_level: validationScore.reliability_level,
+              },
+            };
+          }
+          return issue;
+        });
+        this.logger.log(`Merged LLM validation scores into ${llmValidationResult.issue_validation_scores.length} issues`);
+      }
 
       // Finalize metrics
       this.metricsService.addParallelGroupMetrics(timing, parallelGroup1Duration, parallelGroup2Duration);

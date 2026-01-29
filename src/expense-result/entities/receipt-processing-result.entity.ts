@@ -1,13 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { Receipt } from '@/expense-document/entities/receipt.entity';
 import { ExpenseDocument } from '@/expense-document/entities/expense-document.entity';
 
@@ -71,6 +62,7 @@ export class ReceiptProcessingResult {
   complianceValidation: {
     validation_result: {
       is_valid: boolean;
+      receipt_type_exists?: boolean;
       issues_count: number;
       issues: Array<{
         issue_type: string;

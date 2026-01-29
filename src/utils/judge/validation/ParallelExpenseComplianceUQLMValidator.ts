@@ -135,10 +135,10 @@ export class ParallelExpenseComplianceUQLMValidator {
   private loadParallelConfig(): ParallelValidationConfig {
     return {
       parallelValidationEnabled: (process.env.PARALLEL_VALIDATION_ENABLED ?? 'true') === 'true',
-      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '2', 10),
+      dimensionConcurrency: parseInt(process.env.VALIDATION_DIMENSION_CONCURRENCY ?? '6', 10),
       judgeConcurrency: parseInt(process.env.VALIDATION_JUDGE_CONCURRENCY ?? '3', 10),
-      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '2', 10),
-      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '2', 10),
+      jobConcurrency: parseInt(process.env.VALIDATION_JOB_CONCURRENCY ?? '5', 10),
+      bedrockRateLimitPerSecond: parseInt(process.env.BEDROCK_RATE_LIMIT_PER_SECOND ?? '10', 10),
       fallbackToSequential: true,
       minSuccessfulDimensions: 3, // Minimum 50% success rate
     };
@@ -270,10 +270,29 @@ export class ParallelExpenseComplianceUQLMValidator {
     try {
       // Try to extract issues from the parsed response
       if (parsedResponse?.validation_result?.issues && Array.isArray(parsedResponse.validation_result.issues)) {
-        return parsedResponse.validation_result.issues.map((issue: any, index: number) => ({
-          issue_type: issue.issue_type || `Issue ${index + 1}`,
-          description: issue.description || issue.toString(),
-        }));
+        return parsedResponse.validation_result.issues.map((issue: any, index: number) => {
+          let description: string;
+
+          // Handle polymorphic description field
+          // For Category 1 issues, description can be an array of grouped violations
+          if (Array.isArray(issue.description)) {
+            // Convert grouped violations array to a readable string
+            description = issue.description
+              .map((group: any) => {
+                const fields = Array.isArray(group.fields) ? group.fields.join(', ') : '';
+                return `${group.reason || 'Issue'}: ${group.message || fields}`;
+              })
+              .join('; ');
+          } else {
+            // Standard string description
+            description = issue.description || issue.toString();
+          }
+
+          return {
+            issue_type: issue.issue_type || `Issue ${index + 1}`,
+            description,
+          };
+        });
       }
 
       // Fallback: if no structured issues found, return a generic placeholder
@@ -1064,11 +1083,9 @@ SUMMARY: [Brief assessment]`;
    * Parallel dimensions can run with 1+ judges (6 dimensions in parallel)
    */
   isParallelValidationReady(): boolean {
-    return (
-      this.config.parallelValidationEnabled
-      // this.bedrockServices.length >= 1 &&
-      // this.config.dimensionConcurrency > 1
-    );
+    return this.config.parallelValidationEnabled;
+    // this.bedrockServices.length >= 1 &&
+    // this.config.dimensionConcurrency > 1
   }
 
   /**
