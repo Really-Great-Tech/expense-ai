@@ -8,7 +8,7 @@ import { CountryPolicyService } from './services/country-policy.service';
 import { CountryValidationService } from './services/country-validation.service';
 import { IcpValidationService } from './services/icp-validation.service';
 import { PolicyPersistenceService } from './services/policy-persistence.service';
-import { PolicySeedWriterService } from './services/policy-seed-writer.service';
+
 import { PolicyUploadOrchestrator } from './services/policy-upload-orchestrator.service';
 import { PolicyUploadController } from './controllers/policy-upload.controller';
 import { PolicyExtractionAgent } from '../agents/policy-extraction.agent';
@@ -35,7 +35,7 @@ import { CountryPolicyController } from './controllers/country-policy.controller
     IcpValidationService,
     // Policy upload pipeline services
     PolicyPersistenceService,
-    PolicySeedWriterService,
+
     PolicyUploadOrchestrator,
     // Policy agents
     PolicyExtractionAgent,

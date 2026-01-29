@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PolicyExtractionAgent } from '../../agents/policy-extraction.agent';
 import { PolicyValidationService } from './policy-validation.service';
 import { PolicyPersistenceService } from './policy-persistence.service';
-import { PolicySeedWriterService } from './policy-seed-writer.service';
+
 import { S3StorageService } from '../../storage/s3-storage.service';
 import {
   PolicyUploadResponse,
@@ -37,7 +37,7 @@ export class PolicyUploadOrchestrator {
     private readonly llmAgent: PolicyExtractionAgent,
     private readonly validationService: PolicyValidationService,
     private readonly persistenceService: PolicyPersistenceService,
-    private readonly seedWriterService: PolicySeedWriterService,
+
     private readonly storageService: S3StorageService,
     private readonly configService: ConfigService,
   ) { }
@@ -57,7 +57,7 @@ export class PolicyUploadOrchestrator {
     countryName: string,
     countryCode?: string,
     description?: string,
-    updateSeedFile: boolean = true,
+
   ): Promise<PolicyUploadResponse> {
 
     this.logger.log('========================================================');
@@ -65,7 +65,7 @@ export class PolicyUploadOrchestrator {
     this.logger.log('========================================================');
     this.logger.log(`🌍 Country: ${countryName}`);
     this.logger.log(`📁 Files to process: ${files.length}`);
-    this.logger.log(`📝 Update seed file: ${updateSeedFile}`);
+
     this.logger.log('')
 
     const results: FileProcessingResult[] = [];
@@ -220,18 +220,7 @@ export class PolicyUploadOrchestrator {
       this.logger.log(`   ✓ Policy saved (ID: ${policyId}, Version: ${versionId})`);
       this.logger.log('');
 
-      // STEP 6: Update seed file (optional)
-      if (updateSeedFile) {
-        this.logger.log('📝 STEP 6: Updating seed file...');
-        try {
-          await this.seedWriterService.addCountryToSeedFile(countryName, extractedData);
-          this.logger.log('   ✓ Seed file updated');
-        } catch (error) {
-          // Log but don't fail - database is the source of truth
-          this.logger.warn(`   ⚠️  Seed file update failed (non-critical): ${error}`);
-        }
-        this.logger.log('');
-      }
+
 
       // Mark all files as successfully processed (they all contributed to one unified policy)
       for (const { file } of storedFiles) {
@@ -292,7 +281,7 @@ export class PolicyUploadOrchestrator {
     countryName: string,
     countryCode?: string,
     description?: string,
-    updateSeedFile: boolean = true,
+
   ): Promise<FileProcessingResult> {
 
     // STEP 1: Store file to S3
@@ -320,15 +309,7 @@ export class PolicyUploadOrchestrator {
       countryCode,
     );
 
-    // STEP 5: Update seed file (optional)
-    if (updateSeedFile) {
-      try {
-        await this.seedWriterService.addCountryToSeedFile(countryName, extractedData);
-      } catch (error) {
-        // Log but don't fail - database is the source of truth
-        this.logger.warn(`Seed file update failed (non-critical): ${error}`);
-      }
-    }
+
 
     return {
       fileName: file.originalname,
