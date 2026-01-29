@@ -22,7 +22,7 @@ export class PolicyValidationAgent {
 
   constructor() {
     // Initialize LLM with policy extraction profile (Claude Sonnet)
-    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.POLICY_EXTRACTION, maxTokens: 8000 });
+    this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.POLICY_EXTRACTION, maxTokens: 64000 });
     this.logger.log(`PolicyValidationAgent initialized with profile: ${AGENT_PROFILES.POLICY_EXTRACTION}`);
   }
 
