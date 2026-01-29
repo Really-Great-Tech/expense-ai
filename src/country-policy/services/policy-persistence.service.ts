@@ -55,14 +55,14 @@ export class PolicyPersistenceService {
   ): Promise<PolicySaveResult> {
 
     this.logger.log('============================================');
-    this.logger.log('💾 DATABASE SAVE STARTING');
+    this.logger.log('DATABASE SAVE STARTING');
     this.logger.log('============================================');
-    this.logger.log(`🌍 Country: ${countryName}`);
-    this.logger.log(`🏷️  Code: ${countryCode || 'auto-derived'}`);
-    this.logger.log(`📄 Source file: ${fileInfo.fileName}`);
-    this.logger.log(`📋 Receipt standards: ${policyData.receiptStandards.length}`);
-    this.logger.log(`💰 Gross-up policies: ${policyData.compliancePoliciesGrossUpRelated.length}`);
-    this.logger.log(`📝 Additional info policies: ${policyData.compliancePoliciesAdditionalInfoRelated.length}`);
+    this.logger.log(`Country: ${countryName}`);
+    this.logger.log(`Code: ${countryCode || 'auto-derived'}`);
+    this.logger.log(`Source file: ${fileInfo.fileName}`);
+    this.logger.log(`Receipt standards: ${policyData.receiptStandards.length}`);
+    this.logger.log(`Gross-up policies: ${policyData.compliancePoliciesGrossUpRelated.length}`);
+    this.logger.log(`Additional info policies: ${policyData.compliancePoliciesAdditionalInfoRelated.length}`);
     this.logger.log('');
 
     // Generate version ID (same format as migration)
@@ -81,7 +81,7 @@ export class PolicyPersistenceService {
       });
 
       if (country) {
-        this.logger.log(`   ✓ Found existing country: ${countryName} (ID: ${country.id})`);
+        this.logger.log(`   Found existing country: ${countryName} (ID: ${country.id})`);
       } else {
         // Create new country
         country = queryRunner.manager.create(Country, {
@@ -90,7 +90,7 @@ export class PolicyPersistenceService {
           active: true,
         });
         country = await queryRunner.manager.save(Country, country);
-        this.logger.log(`   ✓ Created new country: ${countryName} (ID: ${country.id})`);
+        this.logger.log(`   Created new country: ${countryName} (ID: ${country.id})`);
       }
 
       // Step 2: Create version
@@ -99,7 +99,7 @@ export class PolicyPersistenceService {
         versionId: versionId,
       });
       await queryRunner.manager.save(Version, version);
-      this.logger.log(`   ✓ Created version: ${versionId}`);
+      this.logger.log(`   Created version: ${versionId}`);
 
       // Step 3: Create policy with JSON rules
       // TypeORM handles JSON serialization automatically for JSON columns
@@ -115,7 +115,7 @@ export class PolicyPersistenceService {
         versionId: versionId,
       });
       const savedPolicy = await queryRunner.manager.save(CountryPolicy, policy);
-      this.logger.log(`   ✓ Created policy (ID: ${savedPolicy.id})`);
+      this.logger.log(`   Created policy (ID: ${savedPolicy.id})`);
 
       // Step 4: Create datasource record
       const datasource = queryRunner.manager.create(Datasource, {
@@ -127,20 +127,20 @@ export class PolicyPersistenceService {
         versionId: versionId,
       });
       const savedDatasource = await queryRunner.manager.save(Datasource, datasource);
-      this.logger.log(`   ✓ Created datasource (ID: ${savedDatasource.id})`);
+      this.logger.log(`   Created datasource (ID: ${savedDatasource.id})`);
 
       // Step 5: Update country's active policy
       await queryRunner.manager.update(Country, country.id, {
         activePolicyId: savedPolicy.id,
       });
-      this.logger.log(`   ✓ Updated country active policy`);
+      this.logger.log(`   Updated country active policy`);
 
       // Commit transaction
       await queryRunner.commitTransaction();
 
       this.logger.log('');
       this.logger.log('============================================');
-      this.logger.log('✅ DATABASE SAVE COMPLETE');
+      this.logger.log('DATABASE SAVE COMPLETE');
       this.logger.log('============================================');
       this.logger.log('');
 
@@ -156,7 +156,7 @@ export class PolicyPersistenceService {
     } catch (error) {
       // Rollback on any error
       await queryRunner.rollbackTransaction();
-      this.logger.error('❌ Database save failed, transaction rolled back:', error);
+      this.logger.error('Database save failed, transaction rolled back:', error);
       throw error;
     } finally {
       await queryRunner.release();
