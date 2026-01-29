@@ -13,6 +13,7 @@ export const ReceiptStandardSchema = z.object({
     icp_name: z.string().min(1, 'icp_name cannot be empty'),
     mandatory_optional: z.enum(['Mandatory', 'Optional']),
     rule: z.string().min(1, 'rule cannot be empty'),
+    citation: z.string().optional(),
 });
 
 // Receipt standard with validation - includes validation score and judgment
@@ -28,6 +29,7 @@ export const CompliancePolicyGrossUpSchema = z.object({
     icp_name: z.string().min(1, 'icp_name cannot be empty'),
     gross_up: z.boolean(),
     gross_up_rule: z.string().min(1, 'gross_up_rule cannot be empty'),
+    citation: z.string().optional(),
 });
 
 // Gross-up policy with validation
@@ -43,6 +45,7 @@ export const CompliancePolicyAdditionalInfoSchema = z.object({
     icp_name: z.string().min(1, 'icp_name cannot be empty'),
     additional_info_required: z.boolean(),
     additional_info_rule: z.string().min(1, 'additional_info_rule cannot be empty'),
+    citation: z.string().optional(),
 });
 
 // Additional info policy with validation

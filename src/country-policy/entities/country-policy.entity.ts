@@ -9,6 +9,7 @@ interface ReceiptStandard {
   icpName: string;
   mandatoryOptional: 'Mandatory' | 'Optional';
   rule: string;
+  citation?: string;
 }
 
 interface CompliancePolicyGrossUp {
@@ -17,6 +18,7 @@ interface CompliancePolicyGrossUp {
   icpName: string;
   grossUp: 'Yes' | 'No';
   grossUpRule: string;
+  citation?: string;
 }
 
 interface CompliancePolicyAdditionalInfo {
@@ -25,6 +27,7 @@ interface CompliancePolicyAdditionalInfo {
   icpName: string;
   additionalInfoRequired: 'Yes' | 'No';
   additionalInfoRule: string;
+  citation?: string;
 }
 
 interface PolicyRules {

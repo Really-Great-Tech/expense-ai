@@ -10,6 +10,7 @@ export interface ReceiptStandard {
   icp_name: string;
   mandatory_optional: string;
   rule: string;
+  citation?: string;
 }
 
 export interface CompliancePolicyGrossUp {
@@ -18,6 +19,7 @@ export interface CompliancePolicyGrossUp {
   icp_name: string;
   gross_up: boolean;
   gross_up_rule: string;
+  citation?: string;
 }
 
 export interface CompliancePolicyAdditionalInfo {
@@ -26,6 +28,7 @@ export interface CompliancePolicyAdditionalInfo {
   icp_name: string;
   additional_info_required: boolean;
   additional_info_rule: string;
+  citation?: string;
 }
 
 /**
