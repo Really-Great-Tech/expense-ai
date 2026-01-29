@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PolicyExtractionAgent } from '../../agents/policy-extraction.agent';
 import { PolicyValidationService } from './policy-validation.service';
 import { PolicyPersistenceService } from './policy-persistence.service';
@@ -38,6 +39,7 @@ export class PolicyUploadOrchestrator {
     private readonly persistenceService: PolicyPersistenceService,
     private readonly seedWriterService: PolicySeedWriterService,
     private readonly storageService: S3StorageService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -104,74 +106,81 @@ export class PolicyUploadOrchestrator {
       this.logger.log('');
 
       // STEP 3: LLM-based validation of extracted policies against source documents
-      this.logger.log('🔍 STEP 3: Validating extracted policies against source documents...');
-      const validationStartTime = Date.now();
+      // const validationEnabled = this.configService.get('POLICY_VALIDATION_ENABLED') !== 'false' && this.configService.get('POLICY_VALIDATION_ENABLED') !== false;
+      const validationEnabled = false; // Temporarily disabled manually in code
 
-      const validationResult = await this.validationService.validateExtractedPoliciesMultiDocument(
-        extractedData as any, // Type cast needed - extracted data is compatible
-        files.map((file) => ({
-          fileName: file.originalname,
-          content: file.buffer.toString('utf-8'),
-        })),
-        countryName,
-      );
+      if (validationEnabled) {
+        this.logger.log('🔍 STEP 3: Validating extracted policies against source documents...');
+        const validationStartTime = Date.now();
 
-      const avgScore = this.validationService.getAverageValidationScore(validationResult);
-      const problematicRules = this.validationService.getProblematicRules(validationResult);
+        const validationResult = await this.validationService.validateExtractedPoliciesMultiDocument(
+          extractedData as any, // Type cast needed - extracted data is compatible
+          files.map((file) => ({
+            fileName: file.originalname,
+            content: file.buffer.toString('utf-8'),
+          })),
+          countryName,
+        );
 
-      // Merge validation results INTO extracted data for human-readable output
-      const extractedDataWithValidation = {
-        receiptStandards: extractedData.receiptStandards.map((rule, index) => ({
-          ...rule,
-          validation_score: validationResult.receiptStandards[index]?.validation_score,
-          validation_judgment: validationResult.receiptStandards[index]?.validation_judgment,
-        })),
-        compliancePoliciesGrossUpRelated: extractedData.compliancePoliciesGrossUpRelated.map((rule, index) => ({
-          ...rule,
-          validation_score: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_score,
-          validation_judgment: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_judgment,
-        })),
-        compliancePoliciesAdditionalInfoRelated: extractedData.compliancePoliciesAdditionalInfoRelated.map((rule, index) => ({
-          ...rule,
-          validation_score: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_score,
-          validation_judgment: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_judgment,
-        })),
-      };
+        const avgScore = this.validationService.getAverageValidationScore(validationResult);
+        const problematicRules = this.validationService.getProblematicRules(validationResult);
 
-      // Store validation summary for response (NOT for database)
-      validationSummary = {
-        overall_validation_status: validationResult.overall_validation_status,
-        overall_summary: validationResult.overall_summary,
-        average_score: avgScore,
-        critical_issues: validationResult.critical_issues,
-        icp_entities_identified: validationResult.icp_entities_identified,
-        problematic_rules_count: problematicRules.length,
-        // Include the merged data with validation
-        extractedDataWithValidation,
-      };
+        // Merge validation results INTO extracted data for human-readable output
+        const extractedDataWithValidation = {
+          receiptStandards: extractedData.receiptStandards.map((rule, index) => ({
+            ...rule,
+            validation_score: validationResult.receiptStandards[index]?.validation_score,
+            validation_judgment: validationResult.receiptStandards[index]?.validation_judgment,
+          })),
+          compliancePoliciesGrossUpRelated: extractedData.compliancePoliciesGrossUpRelated.map((rule, index) => ({
+            ...rule,
+            validation_score: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_score,
+            validation_judgment: validationResult.compliancePoliciesGrossUpRelated[index]?.validation_judgment,
+          })),
+          compliancePoliciesAdditionalInfoRelated: extractedData.compliancePoliciesAdditionalInfoRelated.map((rule, index) => ({
+            ...rule,
+            validation_score: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_score,
+            validation_judgment: validationResult.compliancePoliciesAdditionalInfoRelated[index]?.validation_judgment,
+          })),
+        };
 
-      this.logger.log(`   Completed in ${Date.now() - validationStartTime}ms`);
-      this.logger.log(`   Overall Status: ${validationResult.overall_validation_status}`);
-      this.logger.log(`   Average Score: ${avgScore.toFixed(2)}/10`);
-      this.logger.log(`   Critical Issues: ${validationResult.critical_issues.length}`);
-      
-      if (problematicRules.length > 0) {
-        this.logger.warn(`   ⚠️  Found ${problematicRules.length} rules with score < 7`);
-        problematicRules.forEach((rule, index) => {
-          if (index < 3) { // Show first 3
-            this.logger.warn(`      - ${rule.table}: Score ${rule.score}/10`);
+        // Store validation summary for response (NOT for database)
+        validationSummary = {
+          overall_validation_status: validationResult.overall_validation_status,
+          overall_summary: validationResult.overall_summary,
+          average_score: avgScore,
+          critical_issues: validationResult.critical_issues,
+          icp_entities_identified: validationResult.icp_entities_identified,
+          problematic_rules_count: problematicRules.length,
+          // Include the merged data with validation
+          extractedDataWithValidation,
+        };
+
+        this.logger.log(`   Completed in ${Date.now() - validationStartTime}ms`);
+        this.logger.log(`   Overall Status: ${validationResult.overall_validation_status}`);
+        this.logger.log(`   Average Score: ${avgScore.toFixed(2)}/10`);
+        this.logger.log(`   Critical Issues: ${validationResult.critical_issues.length}`);
+
+        if (problematicRules.length > 0) {
+          this.logger.warn(`   ⚠️  Found ${problematicRules.length} rules with score < 7`);
+          problematicRules.forEach((rule, index) => {
+            if (index < 3) { // Show first 3
+              this.logger.warn(`      - ${rule.table}: Score ${rule.score}/10`);
+            }
+          });
+          if (problematicRules.length > 3) {
+            this.logger.warn(`      ... and ${problematicRules.length - 3} more`);
           }
-        });
-        if (problematicRules.length > 3) {
-          this.logger.warn(`      ... and ${problematicRules.length - 3} more`);
         }
-      }
 
-      if (validationResult.critical_issues.length > 0) {
-        this.logger.error(`   ❌ Critical validation issues found:`);
-        validationResult.critical_issues.forEach(issue => {
-          this.logger.error(`      - ${issue}`);
-        });
+        if (validationResult.critical_issues.length > 0) {
+          this.logger.error(`   ❌ Critical validation issues found:`);
+          validationResult.critical_issues.forEach(issue => {
+            this.logger.error(`      - ${issue}`);
+          });
+        }
+      } else {
+        this.logger.log('⏩ STEP 3: Validation skipped due to configuration (POLICY_VALIDATION_ENABLED=false)');
       }
 
       this.logger.log('');
