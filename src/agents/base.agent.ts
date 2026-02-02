@@ -159,24 +159,21 @@ export abstract class BaseAgent {
       // If direct parsing fails, try to extract JSON from the response
       // This handles cases where LLM adds preamble text like "Looking at this receipt..."
 
-      // Try to find a JSON object (starts with { and ends with })
-      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        const extracted = jsonObjectMatch[0];
+      // Try to extract a complete JSON object using brace counting
+      const extractedObject = this.extractJsonStructure(cleanContent, '{', '}');
+      if (extractedObject) {
         try {
-          return JSON.parse(extracted);
+          return JSON.parse(extractedObject);
         } catch {
-          // Log but continue to try other patterns
-          this.logger.debug('Failed to parse extracted JSON object, trying other patterns');
+          this.logger.debug('Failed to parse extracted JSON object, trying array pattern');
         }
       }
 
-      // Try to find a JSON array (starts with [ and ends with ])
-      const jsonArrayMatch = cleanContent.match(/\[[\s\S]*\]/);
-      if (jsonArrayMatch) {
-        const extracted = jsonArrayMatch[0];
+      // Try to extract a complete JSON array using bracket counting
+      const extractedArray = this.extractJsonStructure(cleanContent, '[', ']');
+      if (extractedArray) {
         try {
-          return JSON.parse(extracted);
+          return JSON.parse(extractedArray);
         } catch {
           this.logger.debug('Failed to parse extracted JSON array');
         }
@@ -188,6 +185,62 @@ export abstract class BaseAgent {
       this.logger.error('Failed to parse JSON response:', error);
       throw new Error(`Invalid JSON response: ${error.message}`);
     }
+  }
+
+  /**
+   * Extract a complete JSON structure using brace/bracket counting
+   * Handles nested structures correctly by tracking depth
+   * @param content The string to extract JSON from
+   * @param openChar Opening character ('{' or '[')
+   * @param closeChar Closing character ('}' or ']')
+   * @returns Extracted JSON string or null if not found
+   */
+  private extractJsonStructure(content: string, openChar: string, closeChar: string): string | null {
+    const startIndex = content.indexOf(openChar);
+    if (startIndex === -1) {
+      return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i];
+
+      // Handle escape sequences inside strings
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        escapeNext = true;
+        continue;
+      }
+
+      // Track string boundaries (only double quotes for JSON)
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      // Only count braces/brackets outside of strings
+      if (!inString) {
+        if (char === openChar) {
+          depth++;
+        } else if (char === closeChar) {
+          depth--;
+          if (depth === 0) {
+            // Found the matching closing character
+            return content.substring(startIndex, i + 1);
+          }
+        }
+      }
+    }
+
+    // No matching close found
+    return null;
   }
 
   /**
