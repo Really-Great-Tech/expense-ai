@@ -59,7 +59,7 @@ export abstract class BaseAgent {
   protected lastPromptInfo?: PromptInfo;
   protected llm?: ILLMService;
 
-  constructor() {}
+  constructor() { }
 
   /**
    * Get a prompt template from local JSON files
@@ -136,7 +136,7 @@ export abstract class BaseAgent {
 
   /**
    * Parse JSON response from LLM
-   * Removes markdown code blocks and parses the content
+   * Removes markdown code blocks and extracts JSON even if there's preamble text
    * @param content Raw content string from LLM
    * @returns Parsed JSON object
    * @throws Error if JSON parsing fails
@@ -144,12 +144,46 @@ export abstract class BaseAgent {
   protected parseJsonResponse(content: string): any {
     try {
       // Remove markdown code blocks if present
-      const cleanContent = content
+      let cleanContent = content
         .replace(/```json\s*/g, '')
         .replace(/```\s*/g, '')
         .trim();
 
-      return JSON.parse(cleanContent);
+      // First, try direct parsing (most common case)
+      try {
+        return JSON.parse(cleanContent);
+      } catch {
+        // Continue to extraction attempts
+      }
+
+      // If direct parsing fails, try to extract JSON from the response
+      // This handles cases where LLM adds preamble text like "Looking at this receipt..."
+
+      // Try to find a JSON object (starts with { and ends with })
+      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        const extracted = jsonObjectMatch[0];
+        try {
+          return JSON.parse(extracted);
+        } catch {
+          // Log but continue to try other patterns
+          this.logger.debug('Failed to parse extracted JSON object, trying other patterns');
+        }
+      }
+
+      // Try to find a JSON array (starts with [ and ends with ])
+      const jsonArrayMatch = cleanContent.match(/\[[\s\S]*\]/);
+      if (jsonArrayMatch) {
+        const extracted = jsonArrayMatch[0];
+        try {
+          return JSON.parse(extracted);
+        } catch {
+          this.logger.debug('Failed to parse extracted JSON array');
+        }
+      }
+
+      // If all extraction attempts fail, throw with original error
+      throw new Error('Could not extract valid JSON from response');
     } catch (error) {
       this.logger.error('Failed to parse JSON response:', error);
       throw new Error(`Invalid JSON response: ${error.message}`);
