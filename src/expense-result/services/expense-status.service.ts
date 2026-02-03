@@ -134,7 +134,7 @@ export class ExpenseStatusService {
     private receiptRepo: Repository<Receipt>,
     @InjectRepository(ReceiptProcessingResult)
     private receiptProcessingResultRepo: Repository<ReceiptProcessingResult>,
-  ) {}
+  ) { }
 
   /**
    * Get comprehensive status for an expense document
@@ -413,6 +413,14 @@ export class ExpenseStatusService {
       where: { sourceDocumentId: documentId },
     });
 
+    // Sort receipts by their original position in the document (invoiceNumber stored as receiptNumber)
+    // This preserves the order from the original expense document after Expensify pages are filtered
+    receipts.sort((a, b) => {
+      const aNum = a.metadata?.receiptNumber ?? Infinity;
+      const bNum = b.metadata?.receiptNumber ?? Infinity;
+      return aNum - bNum;
+    });
+
     // Calculate overall status
     const overallStatus = this.deriveOverallStatus(document, receipts, results);
 
@@ -473,7 +481,8 @@ export class ExpenseStatusService {
           hasErrors: !!result?.errorMessage,
           // Page boundary information from receipt metadata
           pages,
-          receiptNumber: receipt.metadata?.receiptNumber ?? index + 1,
+          // Sequential number for user display (1, 2, 3...) since receipts are sorted by original document order
+          receiptNumber: index + 1,
           totalPages: receipt.metadata?.totalPages ?? pages.length,
           results: complianceResults,
         };

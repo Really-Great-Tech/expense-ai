@@ -32,7 +32,7 @@ export class DocumentPersistenceService {
     private readonly receiptRepository: Repository<Receipt>,
     @InjectRepository(Country)
     private readonly countryRepository: Repository<Country>,
-  ) {}
+  ) { }
 
   async createOrGetExpenseDocument(file: Express.Multer.File, options: any): Promise<ExpenseDocument> {
     const idempotencyKey = options.userId;
@@ -129,7 +129,10 @@ export class DocumentPersistenceService {
   async updateReceiptStatus(receiptId: string, status: ReceiptStatus, metadata?: any): Promise<void> {
     const updates: any = { status };
     if (metadata) {
-      updates.metadata = metadata;
+      // Merge with existing metadata to preserve receiptNumber, pageNumbers, etc.
+      const existingReceipt = await this.receiptRepository.findOne({ where: { id: receiptId } });
+      const existingMetadata = existingReceipt?.metadata || {};
+      updates.metadata = { ...existingMetadata, ...metadata };
     }
     await this.receiptRepository.update(receiptId, updates);
   }
