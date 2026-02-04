@@ -34,7 +34,7 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "security:audit": "npm audit",
-    "prepare": "if [ -d '.git' ]; then husky; fi"
+    "prepare": "node -e \"if (require('fs').existsSync('.git')) require('child_process').spawnSync('npx', ['husky'], { shell: true, stdio: 'inherit' })\""
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.857.0",

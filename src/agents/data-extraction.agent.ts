@@ -64,6 +64,7 @@ export class DataExtractionAgent extends BaseAgent {
 
       // Extract and parse response using BaseAgent utilities
       const rawContent = this.extractContentFromResponse(response);
+      this.logger.debug(`Raw LLM content: ${rawContent}`); // Log full raw content for debugging
       this.logger.debug(`Extracted content: ${rawContent.substring(0, 200)}...`);
 
       const parsedResult = this.parseJsonResponse(rawContent);

@@ -1,5 +1,5 @@
 // Auto-generated prompt index
-// Generated at: 2025-09-09T08:35:26.474Z
+// Generated at: 2025-09-09T08:35:26.474Z (Updated for visual preservation)
 
 import dataExtractionPrompt from './data-extraction-prompt.json';
 import fileClassificationPrompt from './file-classification-prompt.json';

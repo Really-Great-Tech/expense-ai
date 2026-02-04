@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AgentFactoryService } from './agent-factory.service';
 import { ProcessingMetricsService } from './processing-metrics.service';
 import { ProcessingStorageService } from './processing-storage.service';
@@ -58,6 +60,9 @@ export class ExpenseProcessingService {
         this.runFileClassification(markdownContent, country, expenseSchema, timing, agents.fileClassificationAgent),
         this.runDataExtraction(markdownContent, complianceData, timing, agents.dataExtractionAgent),
       ]);
+
+      // Save debug data locally after extraction (parallel group 1)
+      await this.saveDebugDataLocally(filename, markdownContent, extraction);
 
       const parallelGroup1End = Date.now();
       const parallelGroup1Duration = (parallelGroup1End - parallelGroup1Start) / 1000;
@@ -275,5 +280,36 @@ export class ExpenseProcessingService {
     }
 
     return validationResult;
+  }
+
+  /**
+   * Saves Textract markdown and Agent extraction JSON locally for debugging.
+   * Helps identify if rounding issues occur at the OCR level or the Agent level.
+   */
+  private async saveDebugDataLocally(filename: string, markdown: string, extraction: any) {
+    try {
+      const debugDir = path.join(process.cwd(), 'debug_outputs');
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true });
+      }
+
+      const baseName = path.parse(filename).name;
+      // Use a consistent timestamp for both files to keep them paired
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const prefix = `${baseName}_${timestamp}`;
+
+      // Save Textract Markdown
+      const markdownPath = path.join(debugDir, `${prefix}_textract.md`);
+      fs.writeFileSync(markdownPath, markdown, 'utf-8');
+
+      // Save Agent Extraction JSON
+      const extractionPath = path.join(debugDir, `${prefix}_agent_extraction.json`);
+      fs.writeFileSync(extractionPath, JSON.stringify(extraction, null, 2), 'utf-8');
+
+      this.logger.log(`Debug data saved locally: ${markdownPath} and ${extractionPath}`);
+    } catch (error) {
+      this.logger.error(`Failed to save debug data locally for ${filename}:`, error);
+      // Don't fail the main process if debug saving fails
+    }
   }
 }
