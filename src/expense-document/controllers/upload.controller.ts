@@ -16,6 +16,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestj
 import { DocumentSplitterService } from '../services/document-splitter.service';
 import { FileValidationService } from '../../utils/file-validation.service';
 import { SplitRequestDto } from '../dto/upload-request.dto';
+import { AVAILABLE_COUNTRIES, AVAILABLE_ICPS } from '../../utils/policy-data.utils';
 
 @ApiTags('Multi-Receipt Document Processing')
 @Controller('expenses/multi-receipt')
@@ -25,7 +26,7 @@ export class UploadController {
   constructor(
     private readonly documentSplitterService: DocumentSplitterService,
     private readonly fileValidationService: FileValidationService,
-  ) {}
+  ) { }
 
   @Post('upload')
   @UseInterceptors(
@@ -83,12 +84,14 @@ The documentReader parameter specifies the reader for downstream processing of s
         country: {
           type: 'string',
           description: '🌍 Country for compliance and policy validation (e.g., tax rules, receipt requirements)',
+          enum: AVAILABLE_COUNTRIES,
           example: 'Germany',
           default: 'Germany',
         },
         icp: {
           type: 'string',
           description: '📋 Internal Control Procedure / Policy context (e.g., department, cost center)',
+          enum: AVAILABLE_ICPS,
           default: 'Global People',
           example: 'Global People',
         },
