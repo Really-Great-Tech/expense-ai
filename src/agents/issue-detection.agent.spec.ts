@@ -154,7 +154,7 @@ describe('IssueDetectionAgent', () => {
 
       expect(result.validation_result.is_valid).toBe(false);
       expect(result.validation_result.issues_count).toBe(1);
-      expect(result.validation_result.issues[0].issue_type).toContain('Standards & Compliance');
+      expect(result.validation_result.issues[0].issue_type).toContain('Required Details Missing');
       expect(result.validation_result.issues[0].description).toContain('Connection timeout');
     });
 
@@ -255,7 +255,7 @@ describe('IssueDetectionAgent', () => {
               confidence_score: 0.98,
             },
             {
-              issue_type: 'Standards & Compliance | Fix Identified',
+              issue_type: 'Required Details Missing',
               field: 'receipt_number',
               description: 'Receipt number format invalid',
               recommendation: 'Receipt number should follow format: XXX-YYYY-NNNNN',

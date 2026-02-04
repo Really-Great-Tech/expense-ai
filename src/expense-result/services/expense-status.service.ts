@@ -525,7 +525,7 @@ export class ExpenseStatusService {
     // Check blur detection
     if (qualityAssessment.blur_detection?.detected) {
       issues.push({
-        issue_type: 'Image related | Blur Detection',
+        issue_type: 'Blurry or Incomplete',
         field: 'image_quality',
         description: qualityAssessment.blur_detection.description || 'Document shows blur affecting readability',
         recommendation: qualityAssessment.blur_detection.recommendation || 'Rescan document with better focus',

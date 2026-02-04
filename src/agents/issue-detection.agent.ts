@@ -112,7 +112,7 @@ export class IssueDetectionAgent extends BaseAgent {
           issues_count: 1,
           issues: [
             {
-              issue_type: 'Standards & Compliance | Fix Identified',
+              issue_type: 'Required Details Missing',
               field: 'system_error',
               description: `Compliance analysis failed: ${error.message}`,
               recommendation: 'Please retry the compliance analysis or contact support.',

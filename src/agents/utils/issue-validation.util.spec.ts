@@ -27,7 +27,7 @@ describe('Issue Validation Utility', () => {
     it('should validate issue with exact quote from compliance data', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'supplier_vat_number',
           description: 'VAT number is missing',
           recommendation: 'Contact supplier for VAT number',
@@ -46,7 +46,7 @@ describe('Issue Validation Utility', () => {
     it('should validate issue with partial quote from compliance data', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'line_items',
           description: 'Receipt not itemized',
           recommendation: 'Request itemized receipt',
@@ -64,7 +64,7 @@ describe('Issue Validation Utility', () => {
     it('should filter issue with made-up reference', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'employee_signature',
           description: 'Missing employee signature',
           recommendation: 'Get employee to sign',
@@ -84,7 +84,7 @@ describe('Issue Validation Utility', () => {
     it('should filter issue with generic reference', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'receipt_format',
           description: 'Receipt format incorrect',
           recommendation: 'Use standard format',
@@ -102,7 +102,7 @@ describe('Issue Validation Utility', () => {
     it('should filter issue with empty reference', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'some_field',
           description: 'Some issue',
           recommendation: 'Fix it',
@@ -130,7 +130,7 @@ describe('Issue Validation Utility', () => {
     it('should handle mix of valid and invalid issues', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'supplier_vat_number',
           description: 'VAT number missing',
           recommendation: 'Get VAT number',
@@ -138,7 +138,7 @@ describe('Issue Validation Utility', () => {
           confidence_score: 0.9,
         },
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'manager_approval',
           description: 'Missing manager approval',
           recommendation: 'Get approval',
@@ -146,7 +146,7 @@ describe('Issue Validation Utility', () => {
           confidence_score: 0.8,
         },
         {
-          issue_type: 'Standards & Compliance | Gross-up Identified',
+          issue_type: 'Potential Gross-Up',
           field: 'phone_expense',
           description: 'Phone expense exceeds limit',
           recommendation: 'Will be grossed up',
@@ -166,7 +166,7 @@ describe('Issue Validation Utility', () => {
     it('should handle paraphrased references with word overlap', () => {
       const issues = [
         {
-          issue_type: 'Standards & Compliance | Fix Identified',
+          issue_type: 'Required Details Missing',
           field: 'line_items',
           description: 'Not itemized',
           recommendation: 'Get itemized version',
