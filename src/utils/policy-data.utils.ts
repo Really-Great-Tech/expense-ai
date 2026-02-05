@@ -1,37 +1,14 @@
-import { COUNTRY_POLICY_SEEDS } from '../seeds/country-policies.seed';
-
 /**
- * Extracts unique ICP names from the country policy seed data.
- * Checks all relevant policy sections and handles comma-separated values.
+ * Policy data utilities - exports hardcoded country and ICP lists for dropdowns.
+ *
+ * These are manually maintained lists. When new countries or ICPs are added to the database,
+ * they should be added to the respective enum files:
+ * - src/common/constants/country.enum.ts
+ * - src/common/constants/icp.enum.ts
  */
-function getAvailableIcps(): string[] {
-    const icpSet = new Set<string>();
 
-    Object.values(COUNTRY_POLICY_SEEDS).forEach(dataset => {
-        // Check all sections where ICP names appear
-        const sections = [
-            dataset.receiptStandards,
-            dataset.compliancePoliciesGrossUpRelated,
-            dataset.compliancePoliciesAdditionalInfoRelated
-        ];
+import { COUNTRIES } from '../common/constants/country.enum';
+import { ICPS } from '../common/constants/icp.enum';
 
-        sections.forEach(section => {
-            if (Array.isArray(section)) {
-                section.forEach(item => {
-                    if (item.icp_name) {
-                        // Handle comma-separated values (e.g. "ICP A, ICP B")
-                        const names = item.icp_name.split(',').map(s => s.trim());
-                        names.forEach(name => {
-                            if (name) icpSet.add(name);
-                        });
-                    }
-                });
-            }
-        });
-    });
-
-    return Array.from(icpSet).sort();
-}
-
-export const AVAILABLE_COUNTRIES = Object.keys(COUNTRY_POLICY_SEEDS).sort();
-export const AVAILABLE_ICPS = getAvailableIcps();
+export const AVAILABLE_COUNTRIES = COUNTRIES;
+export const AVAILABLE_ICPS = ICPS;
