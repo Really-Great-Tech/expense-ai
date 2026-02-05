@@ -10,7 +10,7 @@ export const ReceiptStandardSchema = z.object({
     required_data: z.string().min(1, 'required_data cannot be empty'),
     travel_non_travel_both: z.enum(['Travel', 'Non-Travel', 'Both']),
     expense_type: z.string().min(1, 'expense_type cannot be empty'),
-    icp_name: z.string().min(1, 'icp_name cannot be empty'),
+    icp_id: z.string().min(1, 'icp_id cannot be empty'),
     mandatory_optional: z.enum(['Mandatory', 'Optional']),
     rule: z.string().min(1, 'rule cannot be empty'),
     citation: z.string().optional(),
@@ -26,7 +26,7 @@ export const ReceiptStandardWithValidationSchema = ReceiptStandardSchema.extend(
 export const CompliancePolicyGrossUpSchema = z.object({
     travel_non_travel_both: z.enum(['Travel', 'Non-Travel', 'Both']),
     expense_type: z.string().min(1, 'expense_type cannot be empty'),
-    icp_name: z.string().min(1, 'icp_name cannot be empty'),
+    icp_id: z.string().min(1, 'icp_id cannot be empty'),
     gross_up: z.boolean(),
     gross_up_rule: z.string().min(1, 'gross_up_rule cannot be empty'),
     citation: z.string().optional(),
@@ -42,7 +42,7 @@ export const CompliancePolicyGrossUpWithValidationSchema = CompliancePolicyGross
 export const CompliancePolicyAdditionalInfoSchema = z.object({
     travel_non_travel_both: z.enum(['Travel', 'Non-Travel', 'Both']),
     expense_type: z.string().min(1, 'expense_type cannot be empty'),
-    icp_name: z.string().min(1, 'icp_name cannot be empty'),
+    icp_id: z.string().min(1, 'icp_id cannot be empty'),
     additional_info_required: z.boolean(),
     additional_info_rule: z.string().min(1, 'additional_info_rule cannot be empty'),
     citation: z.string().optional(),

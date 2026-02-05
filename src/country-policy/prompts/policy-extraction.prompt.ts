@@ -269,7 +269,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
       "required_data": "string",
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string - comma-separated specific types",
-      "icp_name": "string - exact legal entity name(s)",
+      "icp_id": "string - exact legal entity name(s)",
       "mandatory_optional": "Mandatory" | "Optional",
       "rule": "string - comprehensive, clear explanation",
       "citation": "string - exact verbatim quote"
@@ -279,7 +279,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
     {
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string - comma-separated specific types",
-      "icp_name": "string - exact legal entity name(s)",
+      "icp_id": "string - exact legal entity name(s)",
       "gross_up": true | false,
       "gross_up_rule": "string - clear explanation with percentages, thresholds",
       "citation": "string - exact verbatim quote"
@@ -289,7 +289,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
     {
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string - comma-separated specific types",
-      "icp_name": "string - exact legal entity name(s)",
+      "icp_id": "string - exact legal entity name(s)",
       "additional_info_required": true | false,
       "additional_info_rule": "string - clear description of required documentation",
       "citation": "string - exact verbatim quote"

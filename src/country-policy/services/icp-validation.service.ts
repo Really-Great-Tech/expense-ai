@@ -8,7 +8,7 @@ export class IcpValidationService {
   // In-memory cache: country → Set of valid ICPs
   private icpCache = new Map<string, Set<string>>();
 
-  constructor(private readonly countryPolicyService: CountryPolicyService) {}
+  constructor(private readonly countryPolicyService: CountryPolicyService) { }
 
   /**
    * Check if an ICP is valid for a given country
@@ -86,12 +86,12 @@ export class IcpValidationService {
       const ruleList = rules[section];
       if (Array.isArray(ruleList)) {
         for (const rule of ruleList) {
-          const icpField = rule.icp_name || rule.icpName;
+          const icpField = rule.icp_id || rule.icpId;
           if (icpField) {
             const icpList = icpField.split(',').map((s: string) => s.trim().toLowerCase());
-            icpList.forEach((icpName: string) => {
-              if (icpName) {
-                icps.add(icpName);
+            icpList.forEach((icpId: string) => {
+              if (icpId) {
+                icps.add(icpId);
               }
             });
           }

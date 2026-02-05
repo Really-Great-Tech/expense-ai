@@ -3,8 +3,8 @@
  */
 
 interface ComplianceRule {
-  icp_name?: string;
-  icpName?: string;
+  icp_id?: string;
+  icpId?: string;
   [key: string]: any;
 }
 
@@ -17,7 +17,7 @@ interface ComplianceData {
 
 /**
  * Checks if a given ICP is included in a comma-separated list of ICP names
- * Handles both 'icp_name' and 'icpName' field variations
+ * Handles both 'icp_id' and 'icpId' field variations
  *
  * @param rule - The compliance rule object
  * @param targetIcp - The ICP to search for
@@ -25,9 +25,9 @@ interface ComplianceData {
  */
 function ruleMatchesIcp(rule: ComplianceRule, targetIcp: string): boolean {
   // Get the ICP name field (support both snake_case and camelCase)
-  const icpNameField = rule.icp_name || rule.icpName;
+  const icpIdField = rule.icp_id || rule.icpId;
 
-  if (!icpNameField) {
+  if (!icpIdField) {
     return false;
   }
 
@@ -40,7 +40,7 @@ function ruleMatchesIcp(rule: ComplianceRule, targetIcp: string): boolean {
   }
 
   // Split by comma and check if any ICP matches
-  const icpList = icpNameField.split(',').map((icp) => icp.trim().toLowerCase());
+  const icpList = icpIdField.split(',').map((icp) => icp.trim().toLowerCase());
 
   return icpList.includes(normalizedTargetIcp);
 }
@@ -54,7 +54,7 @@ function ruleMatchesIcp(rule: ComplianceRule, targetIcp: string): boolean {
  *
  * @example
  * const filtered = filterComplianceByIcp(complianceData, 'Atlas');
- * // Returns only rules where icp_name includes 'Atlas'
+ * // Returns only rules where icp_id includes 'Atlas'
  */
 export function filterComplianceByIcp(complianceData: ComplianceData, icp: string): ComplianceData {
   if (!complianceData) {

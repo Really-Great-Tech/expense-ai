@@ -8,7 +8,7 @@ describe('ComplianceFilterUtil', () => {
           required_data: 'Supplier business name',
           travel_non_travel_both: 'Both',
           expense_type: 'Hotel, Flight, Restaurant',
-          icp_name: 'Atlas, Global People, goGlobal, Parakar',
+          icp_id: 'Atlas, Global People, goGlobal, Parakar',
           mandatory_optional: 'Mandatory',
           rule: 'Clear and readable receipts must be submitted',
         },
@@ -16,7 +16,7 @@ describe('ComplianceFilterUtil', () => {
           required_data: 'Worker or company name',
           travel_non_travel_both: 'Both',
           expense_type: 'Hotel, Flight, Restaurant',
-          icp_name: 'Atlas',
+          icp_id: 'Atlas',
           mandatory_optional: 'Mandatory',
           rule: 'The worker or the company name can appear on the invoice',
         },
@@ -24,7 +24,7 @@ describe('ComplianceFilterUtil', () => {
           required_data: 'ICP company details',
           travel_non_travel_both: 'Non-Travel',
           expense_type: 'Office supplies',
-          icp_name: 'Global People',
+          icp_id: 'Global People',
           mandatory_optional: 'Mandatory',
           rule: 'Invoice must show Global People DE GmbH details',
         },
@@ -32,7 +32,7 @@ describe('ComplianceFilterUtil', () => {
           required_data: 'ICP company details',
           travel_non_travel_both: 'Non-Travel',
           expense_type: 'Office supplies',
-          icp_name: 'goGlobal',
+          icp_id: 'goGlobal',
           mandatory_optional: 'Mandatory',
           rule: 'Invoice must show GoGlobal Germany GmbH details',
         },
@@ -41,28 +41,28 @@ describe('ComplianceFilterUtil', () => {
         {
           travel_non_travel_both: 'Non-Travel',
           expense_type: 'Office supplies',
-          icp_name: 'Atlas',
+          icp_id: 'Atlas',
           gross_up: false,
           gross_up_rule: 'Office equipment is tax exempt',
         },
         {
           travel_non_travel_both: 'Non-Travel',
           expense_type: 'Telecommunications',
-          icp_name: 'Atlas',
+          icp_id: 'Atlas',
           gross_up: true,
           gross_up_rule: 'Phone/internet €20/month max tax-exempt',
         },
         {
           travel_non_travel_both: 'Non-Travel',
           expense_type: 'Office supplies',
-          icp_name: 'Global People',
+          icp_id: 'Global People',
           gross_up: false,
           gross_up_rule: 'IT equipment that is company property is tax exempt',
         },
         {
           travel_non_travel_both: 'Travel',
           expense_type: 'Mileage',
-          icp_name: 'Atlas, Global People',
+          icp_id: 'Atlas, Global People',
           gross_up: false,
           gross_up_rule: 'Reimbursement rate €0.30 per km',
         },
@@ -71,21 +71,21 @@ describe('ComplianceFilterUtil', () => {
         {
           travel_non_travel_both: 'Both',
           expense_type: 'Hotel, Flight, Restaurant',
-          icp_name: 'Atlas, Global People, goGlobal, Parakar',
+          icp_id: 'Atlas, Global People, goGlobal, Parakar',
           additional_info_required: true,
           additional_info_rule: 'Online copies are sufficient',
         },
         {
           travel_non_travel_both: 'Travel',
           expense_type: 'Mileage',
-          icp_name: 'Atlas',
+          icp_id: 'Atlas',
           additional_info_required: true,
           additional_info_rule: 'Mileage reimbursement requires providing a Fahrtenbuch',
         },
         {
           travel_non_travel_both: 'Travel',
           expense_type: 'Mileage',
-          icp_name: 'Global People',
+          icp_id: 'Global People',
           additional_info_required: true,
           additional_info_rule: 'Worker will need to share a map with the relevant route',
         },
@@ -96,8 +96,8 @@ describe('ComplianceFilterUtil', () => {
       const filtered = filterComplianceByIcp(mockComplianceData, 'Atlas');
 
       expect(filtered.receiptStandards).toHaveLength(2);
-      expect(filtered.receiptStandards[0].icp_name).toContain('Atlas');
-      expect(filtered.receiptStandards[1].icp_name).toBe('Atlas');
+      expect(filtered.receiptStandards[0].icp_id).toContain('Atlas');
+      expect(filtered.receiptStandards[1].icp_id).toBe('Atlas');
 
       expect(filtered.compliancePoliciesGrossUpRelated).toHaveLength(3);
       expect(filtered.compliancePoliciesAdditionalInfoRelated).toHaveLength(2);
@@ -107,8 +107,8 @@ describe('ComplianceFilterUtil', () => {
       const filtered = filterComplianceByIcp(mockComplianceData, 'Global People');
 
       expect(filtered.receiptStandards).toHaveLength(2);
-      expect(filtered.receiptStandards[0].icp_name).toContain('Global People');
-      expect(filtered.receiptStandards[1].icp_name).toBe('Global People');
+      expect(filtered.receiptStandards[0].icp_id).toContain('Global People');
+      expect(filtered.receiptStandards[1].icp_id).toBe('Global People');
 
       expect(filtered.compliancePoliciesGrossUpRelated).toHaveLength(2);
       expect(filtered.compliancePoliciesAdditionalInfoRelated).toHaveLength(2);
@@ -118,8 +118,8 @@ describe('ComplianceFilterUtil', () => {
       const filtered = filterComplianceByIcp(mockComplianceData, 'goGlobal');
 
       expect(filtered.receiptStandards).toHaveLength(2);
-      expect(filtered.receiptStandards[0].icp_name).toContain('goGlobal');
-      expect(filtered.receiptStandards[1].icp_name).toBe('goGlobal');
+      expect(filtered.receiptStandards[0].icp_id).toContain('goGlobal');
+      expect(filtered.receiptStandards[1].icp_id).toBe('goGlobal');
 
       // goGlobal appears in "goGlobal, Parakar" rules, so it should be included
       expect(filtered.compliancePoliciesGrossUpRelated).toHaveLength(0);
@@ -184,12 +184,12 @@ describe('ComplianceFilterUtil', () => {
         receiptStandards: [
           {
             required_data: 'Test',
-            icpName: 'Atlas',
+            icpId: 'Atlas',
             rule: 'Test rule',
           },
           {
             required_data: 'Test 2',
-            icpName: 'Global People',
+            icpId: 'Global People',
             rule: 'Test rule 2',
           },
         ],
@@ -198,7 +198,7 @@ describe('ComplianceFilterUtil', () => {
       const filtered = filterComplianceByIcp(camelCaseData, 'Atlas');
 
       expect(filtered.receiptStandards).toHaveLength(1);
-      expect(filtered.receiptStandards[0].icpName).toBe('Atlas');
+      expect(filtered.receiptStandards[0].icpId).toBe('Atlas');
     });
   });
 

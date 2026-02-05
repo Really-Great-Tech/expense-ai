@@ -6,7 +6,7 @@ interface ReceiptStandard {
   description: string;
   travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
   expenseType: string;
-  icpName: string;
+  icpId: string;
   mandatoryOptional: 'Mandatory' | 'Optional';
   rule: string;
   citation?: string;
@@ -15,7 +15,7 @@ interface ReceiptStandard {
 interface CompliancePolicyGrossUp {
   travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
   expenseType: string;
-  icpName: string;
+  icpId: string;
   grossUp: 'Yes' | 'No';
   grossUpRule: string;
   citation?: string;
@@ -24,7 +24,7 @@ interface CompliancePolicyGrossUp {
 interface CompliancePolicyAdditionalInfo {
   travelNonTravelBoth: 'Travel' | 'Non-Travel' | 'Both';
   expenseType: string;
-  icpName: string;
+  icpId: string;
   additionalInfoRequired: 'Yes' | 'No';
   additionalInfoRule: string;
   citation?: string;
