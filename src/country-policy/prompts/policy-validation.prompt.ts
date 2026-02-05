@@ -194,7 +194,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
       "required_data": "string - from original extraction",
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string",
-      "icp_id": "string",
+      "icp_name": "string",
       "mandatory_optional": "Mandatory" | "Optional",
       "rule": "string",
       "validation_status": “APPROVED” | “NEEDS REVISION”,
@@ -205,7 +205,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
     {
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string",
-      "icp_id": "string",
+      "icp_name": "string",
       "gross_up": true | false,
       "gross_up_rule": "string",
       "validation_status": “APPROVED” | “NEEDS REVISION”,
@@ -216,7 +216,7 @@ You MUST respond with ONLY valid JSON in this exact structure:
     {
       "travel_non_travel_both": "Travel" | "Non-Travel" | "Both",
       "expense_type": "string",
-      "icp_id": "string",
+      "icp_name": "string",
       "additional_info_required": true | false,
       "additional_info_rule": "string",
       "validation_status": “APPROVED” | “NEEDS REVISION”,

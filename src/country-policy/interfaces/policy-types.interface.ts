@@ -7,7 +7,7 @@ export interface ReceiptStandard {
   required_data: string;
   travel_non_travel_both: string;
   expense_type: string;
-  icp_id: string;
+  icp_name: string;
   mandatory_optional: string;
   rule: string;
   citation?: string;
@@ -16,7 +16,7 @@ export interface ReceiptStandard {
 export interface CompliancePolicyGrossUp {
   travel_non_travel_both: string;
   expense_type: string;
-  icp_id: string;
+  icp_name: string;
   gross_up: boolean;
   gross_up_rule: string;
   citation?: string;
@@ -25,7 +25,7 @@ export interface CompliancePolicyGrossUp {
 export interface CompliancePolicyAdditionalInfo {
   travel_non_travel_both: string;
   expense_type: string;
-  icp_id: string;
+  icp_name: string;
   additional_info_required: boolean;
   additional_info_rule: string;
   citation?: string;
