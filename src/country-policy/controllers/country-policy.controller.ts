@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException, Logger } from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException, Logger, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CountryPolicyService } from '../services/country-policy.service';
 
@@ -7,7 +7,7 @@ import { CountryPolicyService } from '../services/country-policy.service';
 export class CountryPolicyController {
   private readonly logger = new Logger(CountryPolicyController.name);
 
-  constructor(private readonly countryPolicyService: CountryPolicyService) {}
+  constructor(private readonly countryPolicyService: CountryPolicyService) { }
 
   @Get(':country')
   @ApiOperation({
@@ -56,5 +56,39 @@ export class CountryPolicyController {
     }
 
     return country;
+  }
+
+  @Delete(':country')
+  @ApiOperation({
+    summary: 'Delete Country Policy',
+    description: 'Permanently delete a country and all its associated policies, versions, and datasources.',
+  })
+  @ApiParam({
+    name: 'country',
+    description: 'Name of the country to delete (e.g., "Germany")',
+    example: 'Germany',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '✅ Country and associated data deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Country "Germany" and all associated data have been deleted.',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: '❌ Country not found',
+  })
+  async deleteCountry(@Param('country') countryName: string) {
+    this.logger.log(`Request to delete country: ${countryName}`);
+    await this.countryPolicyService.deleteCountry(countryName);
+
+    return {
+      success: true,
+      message: `Country "${countryName}" and all associated data have been deleted.`,
+    };
   }
 }
