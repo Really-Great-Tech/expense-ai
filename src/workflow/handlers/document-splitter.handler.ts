@@ -8,6 +8,8 @@ import { DocumentPersistenceService, ReceiptCreationData } from '@/expense-docum
 import { DocumentStatus } from '@/expense-document/entities/expense-document.entity';
 import { PageMarkdown, PageAnalysisResult, InvoiceGroup } from '@/expense-document/types/upload.types';
 import { SplitExpenseJobData, SplitResult } from '../interfaces/workflow-job-data.interface';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * DocumentSplitterHandler
@@ -80,7 +82,25 @@ export class DocumentSplitterHandler {
     // STEP E: LLM boundary detection (with vision when images available)
     await this.persistenceService.updateDocumentStatus(expenseDocument, DocumentStatus.BOUNDARY_DETECTION);
     await job.log('Running LLM boundary detection...');
-    const pageAnalysis = await this.documentSplitterAgent.analyzePages(pageMarkdowns);
+    const { result: pageAnalysis, processDetails } = await this.documentSplitterAgent.analyzePagesWithDetails(pageMarkdowns);
+
+    // Save document splitter results to disk
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // Save final result
+    const resultFilename = `document-splitter-result-${documentId}-${timestamp}.json`;
+    const resultFilepath = path.join(tempDir, resultFilename);
+    fs.writeFileSync(resultFilepath, JSON.stringify(pageAnalysis, null, 2));
+
+    // Save detailed process information
+    const processFilename = `document-splitter-process-${documentId}-${timestamp}.json`;
+    const processFilepath = path.join(tempDir, processFilename);
+    fs.writeFileSync(processFilepath, JSON.stringify(processDetails, null, 2));
+
     this.validatePageAnalysis(pageAnalysis, pageMarkdowns.length);
 
     // STEP F: Create invoice groups (filtering Expensify pages)

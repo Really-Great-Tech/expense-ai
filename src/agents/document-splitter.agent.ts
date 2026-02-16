@@ -7,6 +7,87 @@ import { ServiceUnavailableError } from '@/common/errors/service-errors';
 import pLimit from '@/tools/p-limit/limit';
 
 /**
+ * Detailed process information for document splitting
+ */
+export interface SplittingProcessDetails {
+  /** Input information */
+  input: {
+    totalPages: number;
+    hasImages: boolean;
+    analysisMethod: 'vision' | 'text-only';
+    timestamp: string;
+  };
+  /** Step 1: Page classifications */
+  pageClassifications: Array<{
+    pageNumber: number;
+    classification: string;
+    indicators: string[];
+  }>;
+  /** Step 2: Boundary comparisons */
+  boundaryComparisons: Array<{
+    pageA: number;
+    pageB: number;
+    sameDocument: boolean;
+    confidence: number;
+    reasoning: string;
+    isBoundary: boolean;
+  }>;
+  /** Step 3: Fallback boundary injection */
+  fallbackInjections: Array<{
+    boundaryIndex: number;
+    fromClassification: string;
+    toClassification: string;
+    indicators: string[];
+    reason: string;
+  }>;
+  /** Step 4: Initial boundaries detected */
+  initialBoundaries: number[];
+  /** Step 5: Final boundaries after fallback */
+  finalBoundaries: number[];
+  /** Step 6: Page groups formed */
+  pageGroupsFormation: Array<{
+    invoiceNumber: number;
+    pages: number[];
+    startIndex: number;
+    endIndex: number;
+    dominantClassification: string;
+  }>;
+  /** Step 7: Expensify detection per group */
+  expensifyDetection: Array<{
+    invoiceNumber: number;
+    isExpensifyExport: boolean;
+    confidence: number;
+    reason?: string;
+    indicators: string[];
+  }>;
+  /** Step 8: Blank/error page detection per group */
+  blankErrorDetection: Array<{
+    invoiceNumber: number;
+    isBlankOrError: boolean;
+    reason?: string;
+  }>;
+  /** Step 9: Metadata extraction per group */
+  metadataExtraction: Array<{
+    invoiceNumber: number;
+    metadata: DocumentMetadata;
+    extractionMethod: 'vision' | 'text-only';
+  }>;
+  /** Final result summary */
+  result: {
+    totalInvoices: number;
+    totalPageGroups: number;
+    processingCompleted: boolean;
+  };
+}
+
+/**
+ * Result with detailed process information
+ */
+export interface DetailedPageAnalysisResult extends PageAnalysisResult {
+  processDetails: SplittingProcessDetails;
+}
+
+/**
  * Configuration for parallel processing concurrency
  */
 interface ParallelConfig {
@@ -94,6 +175,81 @@ export class DocumentSplitterAgent extends BaseAgent {
     this.llm = new BedrockLlmService({ profile: AGENT_PROFILES.DOCUMENT_SPLITTER });
     // Claude Sonnet 4 for vision-based analysis
     this.visionLlm = new BedrockLlmService({ profile: AGENT_PROFILES.DOCUMENT_SPLITTER });
+  }
+
+  /**
+   * Analyze pages with full process details
+   * Returns both the result and detailed information about how the splitting was done
+   */
+  async analyzePagesWithDetails(
+    pageMarkdowns: PageMarkdown[],
+  ): Promise<{ result: PageAnalysisResult; processDetails: SplittingProcessDetails }> {
+    const processDetails: SplittingProcessDetails = {
+      input: {
+        totalPages: pageMarkdowns.length,
+        hasImages: pageMarkdowns.some((p) => p.imageBase64),
+        analysisMethod: pageMarkdowns.some((p) => p.imageBase64) ? 'vision' : 'text-only',
+        timestamp: new Date().toISOString(),
+      },
+      pageClassifications: [],
+      boundaryComparisons: [],
+      fallbackInjections: [],
+      initialBoundaries: [],
+      finalBoundaries: [],
+      pageGroupsFormation: [],
+      expensifyDetection: [],
+      blankErrorDetection: [],
+      metadataExtraction: [],
+      result: {
+        totalInvoices: 0,
+        totalPageGroups: 0,
+        processingCompleted: false,
+      },
+    };
+
+    try {
+      this.logger.log(`Starting invoice analysis with details for ${pageMarkdowns.length} pages`);
+
+      const hasImages = pageMarkdowns.some((p) => p.imageBase64);
+      let result: PageAnalysisResult;
+
+      if (hasImages) {
+        result = await this.analyzePagesWithVisionDetailed(pageMarkdowns, processDetails);
+      } else {
+        result = await this.analyzePagesTextOnlyDetailed(pageMarkdowns, processDetails);
+      }
+
+      processDetails.result = {
+        totalInvoices: result.totalInvoices,
+        totalPageGroups: result.pageGroups.length,
+        processingCompleted: true,
+      };
+
+      return { result, processDetails };
+    } catch (error: any) {
+      this.logger.error('Invoice analysis with details failed:', error);
+
+      // Return fallback with process details showing the failure
+      const fallbackResult: PageAnalysisResult = {
+        totalInvoices: 1,
+        pageGroups: [
+          {
+            invoiceNumber: 1,
+            pages: pageMarkdowns.map((p) => p.pageNumber),
+            confidence: 0.3,
+            reasoning: `Analysis failed (${error.message}), treating as single invoice`,
+          },
+        ],
+      };
+
+      processDetails.result = {
+        totalInvoices: 1,
+        totalPageGroups: 1,
+        processingCompleted: false,
+      };
+
+      return { result: fallbackResult, processDetails };
+    }
   }
 
   /**
@@ -330,6 +486,400 @@ export class DocumentSplitterAgent extends BaseAgent {
       totalInvoices: pageGroups.length,
       pageGroups,
     };
+  }
+
+  /**
+   * Vision-based analysis with detailed process tracking
+   */
+  private async analyzePagesWithVisionDetailed(
+    pageMarkdowns: PageMarkdown[],
+    processDetails: SplittingProcessDetails,
+  ): Promise<PageAnalysisResult> {
+    if (pageMarkdowns.length === 0) {
+      return { totalInvoices: 0, pageGroups: [] };
+    }
+
+    if (pageMarkdowns.length === 1) {
+      const expensify = this.detectExpensifyFromText(pageMarkdowns[0].content);
+      const blankCheck = this.isErrorOrBlankPage([pageMarkdowns[0].content]);
+      const classification = this.classifyPageType(pageMarkdowns[0].content, pageMarkdowns[0].content.length);
+      const metadata = await this.extractDocumentMetadata([pageMarkdowns[0]], 1);
+
+      // Record single page processing details
+      processDetails.pageClassifications.push({
+        pageNumber: pageMarkdowns[0].pageNumber,
+        classification: classification.classification,
+        indicators: classification.indicators,
+      });
+      processDetails.initialBoundaries = [0];
+      processDetails.finalBoundaries = [0];
+      processDetails.pageGroupsFormation.push({
+        invoiceNumber: 1,
+        pages: [pageMarkdowns[0].pageNumber],
+        startIndex: 0,
+        endIndex: 1,
+        dominantClassification: classification.classification,
+      });
+      processDetails.expensifyDetection.push({
+        invoiceNumber: 1,
+        isExpensifyExport: expensify.isExpensifyExport,
+        confidence: expensify.expensifyConfidence,
+        reason: expensify.expensifyReason,
+        indicators: expensify.expensifyIndicators,
+      });
+      processDetails.blankErrorDetection.push({
+        invoiceNumber: 1,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        reason: blankCheck.reason,
+      });
+      processDetails.metadataExtraction.push({
+        invoiceNumber: 1,
+        metadata,
+        extractionMethod: pageMarkdowns[0].imageBase64 ? 'vision' : 'text-only',
+      });
+
+      return {
+        totalInvoices: 1,
+        pageGroups: [
+          {
+            invoiceNumber: 1,
+            pages: [pageMarkdowns[0].pageNumber],
+            confidence: 1.0,
+            reasoning: 'Single page document',
+            ...expensify,
+            isBlankOrError: blankCheck.isErrorOrBlank || metadata.isBlankLlm,
+            blankErrorReason: blankCheck.reason,
+            pageClassification: classification.classification,
+            metadata,
+          },
+        ],
+      };
+    }
+
+    // Step 1: Pre-classify all pages
+    const pageClassifications = pageMarkdowns.map((p) => {
+      const classification = this.classifyPageType(p.content, p.content.length);
+      processDetails.pageClassifications.push({
+        pageNumber: p.pageNumber,
+        classification: classification.classification,
+        indicators: classification.indicators,
+      });
+      return {
+        pageNumber: p.pageNumber,
+        ...classification,
+      };
+    });
+
+    this.logger.log(`Page classifications: ${pageClassifications.map((c) => `P${c.pageNumber}:${c.classification}`).join(', ')}`);
+
+    // Step 2: PARALLEL boundary detection
+    this.logger.log(`Running ${pageMarkdowns.length - 1} boundary comparisons (concurrency: ${this.config.boundaryDetectionConcurrency})`);
+
+    interface BoundaryComparisonResult {
+      index: number;
+      pageANum: number;
+      pageBNum: number;
+      comparison: PageComparisonResult;
+    }
+
+    const comparisonTasks = pageMarkdowns.slice(0, -1).map((pageA, i) => {
+      const pageB = pageMarkdowns[i + 1];
+      const classA = pageClassifications[i].classification;
+      const classB = pageClassifications[i + 1].classification;
+
+      return this.boundaryLimiter(async (): Promise<BoundaryComparisonResult> => {
+        const comparison = await this.comparePagesWithVision(pageA, pageB, classA, classB);
+        return { index: i, pageANum: pageA.pageNumber, pageBNum: pageB.pageNumber, comparison };
+      }) as Promise<BoundaryComparisonResult>;
+    });
+
+    const comparisonResults = await Promise.all(comparisonTasks);
+
+    // Record boundary comparisons
+    for (const { pageANum, pageBNum, comparison } of comparisonResults) {
+      processDetails.boundaryComparisons.push({
+        pageA: pageANum,
+        pageB: pageBNum,
+        sameDocument: comparison.sameDocument,
+        confidence: comparison.confidence,
+        reasoning: comparison.reasoning,
+        isBoundary: !comparison.sameDocument && comparison.confidence >= 0.6,
+      });
+    }
+
+    // Step 3: Build initial boundaries
+    const boundaries: number[] = [0];
+    for (const { index, pageANum, pageBNum, comparison } of comparisonResults) {
+      if (!comparison.sameDocument && comparison.confidence >= 0.6) {
+        boundaries.push(index + 1);
+        this.logger.log(`Boundary detected between pages ${pageANum} and ${pageBNum}`);
+      }
+    }
+    processDetails.initialBoundaries = [...boundaries];
+
+    // Step 4: FALLBACK boundary injection
+    this.logger.log('Checking for fallback boundary injection...');
+    for (let i = 0; i < pageClassifications.length - 1; i++) {
+      const currentClass = pageClassifications[i].classification;
+      const nextClass = pageClassifications[i + 1].classification;
+      const currentIndicators = pageClassifications[i].indicators;
+
+      const hasStrongExpenseIndicator = currentIndicators.some(
+        (ind) =>
+          ind.includes('Expense Report') ||
+          ind.includes('Expense management system') ||
+          ind.includes('Approval status') ||
+          ind.includes('Receipt thumbnails'),
+      );
+
+      if (
+        (currentClass === 'EXPENSE_COVER' || currentClass === 'RECEIPT_THUMBNAIL') &&
+        (nextClass === 'ACTUAL_RECEIPT' || nextClass === 'UNKNOWN') &&
+        hasStrongExpenseIndicator
+      ) {
+        const boundaryIndex = i + 1;
+        if (!boundaries.includes(boundaryIndex)) {
+          this.logger.log(`Fallback: Injecting boundary at index ${boundaryIndex} (${currentClass} -> ${nextClass})`);
+          processDetails.fallbackInjections.push({
+            boundaryIndex,
+            fromClassification: currentClass,
+            toClassification: nextClass,
+            indicators: currentIndicators,
+            reason: `Fallback injection: ${currentClass} -> ${nextClass} with strong expense indicators`,
+          });
+          boundaries.push(boundaryIndex);
+        }
+      }
+    }
+
+    boundaries.sort((a, b) => a - b);
+    processDetails.finalBoundaries = [...boundaries];
+
+    // Step 5: Form page groups
+    const pageGroups: PageGroup[] = [];
+    for (let i = 0; i < boundaries.length; i++) {
+      const startIdx = boundaries[i];
+      const endIdx = boundaries[i + 1] ?? pageMarkdowns.length;
+      const groupPages = pageMarkdowns.slice(startIdx, endIdx);
+      const pages = groupPages.map((p) => p.pageNumber);
+      const groupContents = groupPages.map((p) => p.content);
+      const combinedText = groupContents.join('\n');
+      const expensify = this.detectExpensifyFromText(combinedText);
+      const blankCheck = this.isErrorOrBlankPage(groupContents);
+      const dominantClassification = pageClassifications.find((c) => c.pageNumber === groupPages[0].pageNumber)?.classification || 'UNKNOWN';
+
+      processDetails.pageGroupsFormation.push({
+        invoiceNumber: i + 1,
+        pages,
+        startIndex: startIdx,
+        endIndex: endIdx,
+        dominantClassification,
+      });
+
+      processDetails.expensifyDetection.push({
+        invoiceNumber: i + 1,
+        isExpensifyExport: expensify.isExpensifyExport,
+        confidence: expensify.expensifyConfidence,
+        reason: expensify.expensifyReason,
+        indicators: expensify.expensifyIndicators,
+      });
+
+      processDetails.blankErrorDetection.push({
+        invoiceNumber: i + 1,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        reason: blankCheck.reason,
+      });
+
+      pageGroups.push({
+        invoiceNumber: i + 1,
+        pages,
+        confidence: 0.8,
+        reasoning: i === 0 ? 'First document in PDF' : 'Boundary detected via vision analysis',
+        ...expensify,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        blankErrorReason: blankCheck.reason,
+        pageClassification: dominantClassification,
+      });
+    }
+
+    // Step 6: Metadata extraction
+    this.logger.log(`Extracting metadata for ${pageGroups.length} groups (concurrency: ${this.config.metadataExtractionConcurrency})`);
+
+    interface MetadataExtractionResult {
+      invoiceNumber: number;
+      metadata: DocumentMetadata;
+      extractionMethod: 'vision' | 'text-only';
+    }
+
+    const metadataTasks = pageGroups.map((group) => {
+      const groupPages = pageMarkdowns.filter((p) => group.pages.includes(p.pageNumber));
+      const hasVision = groupPages.some((p) => p.imageBase64);
+      return this.metadataLimiter(async (): Promise<MetadataExtractionResult> => {
+        const metadata = await this.extractDocumentMetadata(groupPages, group.invoiceNumber);
+        return { invoiceNumber: group.invoiceNumber, metadata, extractionMethod: hasVision ? 'vision' : 'text-only' };
+      }) as Promise<MetadataExtractionResult>;
+    });
+
+    const metadataResults = await Promise.all(metadataTasks);
+
+    for (const { invoiceNumber, metadata, extractionMethod } of metadataResults) {
+      const group = pageGroups.find((g) => g.invoiceNumber === invoiceNumber);
+      if (group) {
+        group.metadata = metadata;
+        processDetails.metadataExtraction.push({
+          invoiceNumber,
+          metadata,
+          extractionMethod,
+        });
+
+        if (metadata.isExpensifyPage) {
+          group.isExpensifyExport = true;
+          group.expensifyConfidence = Math.max(group.expensifyConfidence || 0, metadata.expensifyConfidenceLlm || 0);
+        }
+        if (metadata.isBlankLlm) {
+          group.isBlankOrError = true;
+          group.blankErrorReason = group.blankErrorReason || 'LLM detected blank page';
+        }
+      }
+    }
+
+    return {
+      totalInvoices: pageGroups.length,
+      pageGroups,
+    };
+  }
+
+  /**
+   * Text-only analysis with detailed process tracking
+   */
+  private async analyzePagesTextOnlyDetailed(
+    pageMarkdowns: PageMarkdown[],
+    processDetails: SplittingProcessDetails,
+  ): Promise<PageAnalysisResult> {
+    const systemPrompt = this.getSystemPrompt();
+    const pagesContent = this.buildPagesContent(pageMarkdowns);
+
+    const userContent = await this.getPromptTemplate('document-splitter-user-prompt', {
+      pagesContent,
+    });
+
+    const response = await this.llm.chat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+    });
+
+    const rawContent = this.extractContentFromResponse(response);
+    const parsedResult = this.parseJsonResponse(rawContent);
+
+    if (!parsedResult.totalInvoices || !Array.isArray(parsedResult.pageGroups)) {
+      throw new Error('Invalid response structure from LLM');
+    }
+
+    // Record that we used text-only analysis
+    processDetails.input.analysisMethod = 'text-only';
+
+    // Process each group
+    for (const group of parsedResult.pageGroups) {
+      const groupPages = pageMarkdowns.filter((p) => group.pages.includes(p.pageNumber));
+      const groupContents = groupPages.map((p) => p.content);
+      const combinedText = groupContents.join('\n');
+
+      const expensify = this.detectExpensifyFromText(combinedText);
+      const blankCheck = this.isErrorOrBlankPage(groupContents);
+
+      const firstPageContent = groupPages[0]?.content || '';
+      const classification = this.classifyPageType(firstPageContent, firstPageContent.length);
+
+      // Record page classifications for pages in this group
+      for (const page of groupPages) {
+        const pageClass = this.classifyPageType(page.content, page.content.length);
+        const existingIndex = processDetails.pageClassifications.findIndex((pc) => pc.pageNumber === page.pageNumber);
+        if (existingIndex === -1) {
+          processDetails.pageClassifications.push({
+            pageNumber: page.pageNumber,
+            classification: pageClass.classification,
+            indicators: pageClass.indicators,
+          });
+        }
+      }
+
+      processDetails.expensifyDetection.push({
+        invoiceNumber: group.invoiceNumber,
+        isExpensifyExport: expensify.isExpensifyExport,
+        confidence: expensify.expensifyConfidence,
+        reason: expensify.expensifyReason,
+        indicators: expensify.expensifyIndicators,
+      });
+
+      processDetails.blankErrorDetection.push({
+        invoiceNumber: group.invoiceNumber,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        reason: blankCheck.reason,
+      });
+
+      Object.assign(group, {
+        ...expensify,
+        isBlankOrError: blankCheck.isErrorOrBlank,
+        blankErrorReason: blankCheck.reason,
+        pageClassification: classification.classification,
+      });
+    }
+
+    // Record boundaries from parsed result
+    const boundaries: number[] = [0];
+    for (let i = 1; i < parsedResult.pageGroups.length; i++) {
+      const firstPageOfGroup = parsedResult.pageGroups[i].pages[0];
+      const pageIndex = pageMarkdowns.findIndex((p) => p.pageNumber === firstPageOfGroup);
+      if (pageIndex !== -1) {
+        boundaries.push(pageIndex);
+      }
+    }
+    processDetails.initialBoundaries = [...boundaries];
+    processDetails.finalBoundaries = [...boundaries];
+
+    // Metadata extraction
+    this.logger.log(`Extracting metadata for ${parsedResult.pageGroups.length} groups`);
+
+    interface MetadataExtractionResult {
+      invoiceNumber: number;
+      metadata: DocumentMetadata;
+      extractionMethod: 'vision' | 'text-only';
+    }
+
+    const metadataTasks = parsedResult.pageGroups.map((group: PageGroup) => {
+      const groupPages = pageMarkdowns.filter((p) => group.pages.includes(p.pageNumber));
+      return this.metadataLimiter(async (): Promise<MetadataExtractionResult> => {
+        const metadata = await this.extractDocumentMetadata(groupPages, group.invoiceNumber);
+        return { invoiceNumber: group.invoiceNumber, metadata, extractionMethod: 'text-only' };
+      }) as Promise<MetadataExtractionResult>;
+    });
+
+    const metadataResults = await Promise.all(metadataTasks);
+
+    for (const { invoiceNumber, metadata, extractionMethod } of metadataResults) {
+      const group = parsedResult.pageGroups.find((g: PageGroup) => g.invoiceNumber === invoiceNumber);
+      if (group) {
+        group.metadata = metadata;
+        processDetails.metadataExtraction.push({
+          invoiceNumber,
+          metadata,
+          extractionMethod,
+        });
+
+        if (metadata.isExpensifyPage) {
+          group.isExpensifyExport = true;
+          group.expensifyConfidence = Math.max(group.expensifyConfidence || 0, metadata.expensifyConfidenceLlm || 0);
+        }
+        if (metadata.isBlankLlm) {
+          group.isBlankOrError = true;
+          group.blankErrorReason = group.blankErrorReason || 'LLM detected blank page';
+        }
+      }
+    }
+
+    return parsedResult as PageAnalysisResult;
   }
 
   /**
