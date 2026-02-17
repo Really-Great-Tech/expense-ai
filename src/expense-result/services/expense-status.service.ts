@@ -620,14 +620,18 @@ export class ExpenseStatusService {
    * Merge compliance issues with image quality issues
    * Adds index numbers to all issues for consistent display
    * Removes confidence_score from compliance issues as per requirement
+   * Filters out "Supporting Docs Required" issues (additional info category)
    */
   private mergeComplianceIssues(complianceIssues: Array<any>, imageQualityIssues: Array<any>): Array<any> {
     // Remove confidence_score from compliance issues (but keep llm_validation)
-    const processedComplianceIssues = complianceIssues.map((issue) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { confidence_score, ...rest } = issue;
-      return rest;
-    });
+    // Filter out "Supporting Docs Required" issues (additional info category)
+    const processedComplianceIssues = complianceIssues
+      .filter((issue) => issue.issue_type !== 'Supporting Docs Required')
+      .map((issue) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { confidence_score, ...rest } = issue;
+        return rest;
+      });
 
     const allIssues = [...processedComplianceIssues, ...imageQualityIssues];
 
